@@ -1,0 +1,256 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Academia {
+  id_academia    Int                @id @default(autoincrement())
+  nome           String             @db.VarChar(255)
+  nome_fantasia  String?            @db.VarChar(255)
+  cnpj           String             @unique @db.VarChar(20)
+  inscr_est      String?            @db.VarChar(50)
+  telefone       String?            @db.VarChar(20)
+  
+  endereco       Endereco_Academia?
+  usuarios       Usuario_Academia[]
+  turmas         Treino_Turma[]
+  eventos        Evento[]
+}
+
+model Usuario {
+  id_usuario   Int                @id @default(autoincrement())
+  nome         String             @db.VarChar(255)
+  cpf          String             @unique @db.VarChar(14)
+  email        String             @unique @db.VarChar(255)
+  senha_hash   String             @db.VarChar(255)
+  telefone     String?            @db.VarChar(20)
+  
+  endereco     Endereco_Usuario?
+  academias    Usuario_Academia[]
+  perfis       Usuario_Perfil[]
+  responsavel  Responsavel?
+  professor    Professor?
+  aluno        Aluno?
+}
+
+model Perfil {
+  id_perfil Int              @id @default(autoincrement())
+  role      String           @db.VarChar(50) // Admin, Recepção, Professor, Aluno, Responsável
+  usuarios  Usuario_Perfil[]
+}
+
+model Endereco_Academia {
+  id_academia Int      @id
+  logradouro  String   @db.VarChar(255)
+  numero      String?  @db.VarChar(20)
+  complemento String?  @db.VarChar(100)
+  bairro      String?  @db.VarChar(100)
+  cidade      String   @db.VarChar(100)
+  uf          String   @db.Char(2)
+  cep         String   @db.VarChar(20)
+  
+  academia    Academia @relation(fields: [id_academia], references: [id_academia], onDelete: Cascade)
+}
+
+model Endereco_Usuario {
+  id_usuario  Int     @id
+  logradouro  String  @db.VarChar(255)
+  numero      String? @db.VarChar(20)
+  complemento String? @db.VarChar(100)
+  bairro      String? @db.VarChar(100)
+  cidade      String  @db.VarChar(100)
+  uf          String  @db.Char(2)
+  cep         String  @db.VarChar(20)
+  
+  usuario     Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+}
+
+model Usuario_Academia {
+  id_usuario  Int
+  id_academia Int
+  usuario     Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  academia    Academia @relation(fields: [id_academia], references: [id_academia], onDelete: Cascade)
+
+  @@id([id_usuario, id_academia])
+}
+
+model Usuario_Perfil {
+  id_usuario Int
+  id_perfil  Int
+  usuario    Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  perfil     Perfil  @relation(fields: [id_perfil], references: [id_perfil], onDelete: Cascade)
+
+  @@id([id_usuario, id_perfil])
+}
+
+// --- HERANÇA DE USUÁRIO ---
+
+model Responsavel {
+  id_usuario       Int                 @id
+  grau_parentesco  String?             @db.VarChar(50)
+  financeiro       Boolean?
+  usuario          Usuario             @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  alunos           Responsavel_Aluno[]
+}
+
+model Professor {
+  id_usuario   Int                @id
+  n_federacao  String?            @db.VarChar(50)
+  grau_faixa   String?            @db.VarChar(50)
+  usuario      Usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  treinos      Professor_Treino[]
+  inscricoes   Inscricao_Evento[]
+}
+
+model Aluno {
+  id_usuario                Int                 @id
+  peso                      Decimal?            @db.Decimal(5, 2)
+  categoria                 String?             @db.VarChar(50)
+  n_federacao               String?             @db.VarChar(50)
+  status_federacao          String?             @db.VarChar(50)
+  data_primeira_graduacao   DateTime?           @db.Date
+  data_inicio               DateTime?           @db.Date
+  graduacao_atual           String?             @db.VarChar(50)
+  grupo_especial_aspirante  String?             @db.VarChar(50)
+  
+  usuario                   Usuario             @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  responsveis               Responsavel_Aluno[]
+  treinos                   Aluno_Treino[]
+  inscricoes                Inscricao_Evento[]
+  classificacoes            Classificacao[]
+  historicos                Historico_Graduacao[]
+}
+
+model Responsavel_Aluno {
+  id_responsavel Int
+  id_aluno       Int
+  responsavel    Responsavel @relation(fields: [id_responsavel], references: [id_usuario], onDelete: Cascade)
+  aluno          Aluno       @relation(fields: [id_aluno], references: [id_usuario], onDelete: Cascade)
+
+  @@id([id_responsavel, id_aluno])
+}
+
+// --- TURMAS E OPERAÇÃO ---
+
+model Treino_Turma {
+  id_treino      Int                @id @default(autoincrement())
+  id_academia    Int
+  descricao      String?            @db.VarChar(255)
+  horario_inicio DateTime?          @db.Time
+  horario_fim    DateTime?          @db.Time
+  dia_semana     String?            @db.VarChar(50)
+  
+  academia       Academia           @relation(fields: [id_academia], references: [id_academia], onDelete: Cascade)
+  professores    Professor_Treino[]
+  alunos         Aluno_Treino[]
+}
+
+model Professor_Treino {
+  id_professor Int
+  id_treino    Int
+  professor    Professor    @relation(fields: [id_professor], references: [id_usuario], onDelete: Cascade)
+  treino       Treino_Turma @relation(fields: [id_treino], references: [id_treino], onDelete: Cascade)
+
+  @@id([id_professor, id_treino])
+}
+
+model Aluno_Treino {
+  id_aluno   Int
+  id_treino  Int
+  aluno      Aluno        @relation(fields: [id_aluno], references: [id_usuario], onDelete: Cascade)
+  treino     Treino_Turma @relation(fields: [id_treino], references: [id_treino], Cascade)
+
+  @@id([id_aluno, id_treino])
+}
+
+// --- EVENTOS E CAMPEONATOS ---
+
+model Evento {
+  id_evento     Int                @id @default(autoincrement())
+  id_academia   Int
+  nome          String             @db.VarChar(255)
+  edicao        String?            @db.VarChar(50)
+  data_inicio   DateTime?          @db.Date
+  
+  academia      Academia           @relation(fields: [id_academia], references: [id_academia], onDelete: Cascade)
+  endereco      Endereco_Evento?
+  inscricoes    Inscricao_Evento[]
+  campeonato    Campeonato?
+  graduacao     Graduacao_Evento?
+}
+
+model Endereco_Evento {
+  id_evento   Int    @id
+  logradouro  String @db.VarChar(255)
+  numero      String? @db.VarChar(20)
+  complemento String? @db.VarChar(100)
+  cidade      String @db.VarChar(100)
+  uf          String @db.Char(2)
+  cep         String @db.VarChar(20)
+  
+  evento      Evento @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+}
+
+model Inscricao_Evento {
+  id_inscricao          Int        @id @default(autoincrement())
+  id_aluno              Int?
+  id_professor          Int?
+  id_evento             Int
+  data_inicio_inscricao DateTime?  @db.Date
+  data_fim_inscricao    DateTime?  @db.Date
+  status_inscricao      String?    @db.VarChar(50)
+  valor                 Decimal?   @db.Decimal(10, 2)
+  
+  aluno                 Aluno?     @relation(fields: [id_aluno], references: [id_usuario], onDelete: Cascade)
+  professor             Professor? @relation(fields: [id_professor], references: [id_usuario], onDelete: Cascade)
+  evento                Evento     @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+}
+
+model Campeonato {
+  id_evento              Int             @id
+  tipo_campeonato        String?         @db.VarChar(100)
+  classificacao_academia String?         @db.VarChar(100)
+  limite_graduacao       String?         @db.VarChar(100)
+  limite_grupo           String?         @db.VarChar(100)
+  
+  evento                 Evento          @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+  classificacoes         Classificacao[]
+}
+
+model Classificacao {
+  id_classificacao    Int        @id @default(autoincrement())
+  id_campeonato       Int
+  id_aluno            Int
+  classificacao_aluno String?    @db.VarChar(50)
+  qtd_lutas           Int?       @default(0)
+  qtd_vitorias        Int?       @default(0)
+  
+  campeonato          Campeonato @relation(fields: [id_campeonato], references: [id_evento], onDelete: Cascade)
+  aluno               Aluno      @relation(fields: [id_aluno], references: [id_usuario], onDelete: Cascade)
+}
+
+model Graduacao_Evento {
+  id_evento      Int                   @id
+  tipo_graduacao String?               @db.VarChar(100)
+  status         String?               @db.VarChar(50)
+  requisitos     String?               @db.Text
+  
+  evento         Evento                @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+  historicos     Historico_Graduacao[]
+}
+
+model Historico_Graduacao {
+  id_historico        Int              @id @default(autoincrement())
+  id_evento_graduacao Int
+  id_aluno            Int
+  data_graduacao      DateTime?        @db.Date
+  associacao          String?          @db.VarChar(100)
+  faixa               String?          @db.VarChar(50)
+  
+  evento_graduacao    Graduacao_Evento @relation(fields: [id_evento_graduacao], references: [id_evento], onDelete: Cascade)
+  aluno               Aluno            @relation(fields: [id_aluno], references: [id_usuario], onDelete: Cascade)
+}

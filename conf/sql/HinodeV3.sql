@@ -20,6 +20,7 @@ CREATE TABLE Usuario (
     nome VARCHAR(255) NOT NULL,
     cpf VARCHAR(14) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
+    senha_hash VARCHAR(255) NOT NULL,
     telefone VARCHAR(20)
 );
 
@@ -124,10 +125,12 @@ CREATE TABLE Responsavel_Aluno (
 
 CREATE TABLE Treino_Turma (
     id_treino INT AUTO_INCREMENT PRIMARY KEY,
+    id_academia INT NOT NULL,
     descricao VARCHAR(255),
     horario_inicio TIME,
     horario_fim TIME,
-    dia_semana VARCHAR(50)
+    dia_semana VARCHAR(50),
+    FOREIGN KEY (id_academia) REFERENCES Academia(id_academia) ON DELETE CASCADE
 );
 
 -- M:N - Professor treina Turma
@@ -154,9 +157,11 @@ CREATE TABLE Aluno_Treino (
 
 CREATE TABLE Evento (
     id_evento INT AUTO_INCREMENT PRIMARY KEY,
+    id_academia INT NOT NULL,
     nome VARCHAR(255) NOT NULL,
     edicao VARCHAR(50),
-    data_inicio DATE
+    data_inicio DATE,
+    FOREIGN KEY (id_academia) REFERENCES Academia(id_academia) ON DELETE CASCADE
 );
 
 CREATE TABLE Endereco_Evento (
@@ -182,7 +187,8 @@ CREATE TABLE Inscricao_Evento (
     valor DECIMAL(10,2),
     FOREIGN KEY (id_aluno) REFERENCES Aluno(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_professor) REFERENCES Professor(id_usuario) ON DELETE CASCADE,
-    FOREIGN KEY (id_evento) REFERENCES Evento(id_evento) ON DELETE CASCADE
+    FOREIGN KEY (id_evento) REFERENCES Evento(id_evento) ON DELETE CASCADE,
+    CHECK (id_aluno IS NOT NULL OR id_professor IS NOT NULL)
 );
 
 -- Subtipo de Evento
