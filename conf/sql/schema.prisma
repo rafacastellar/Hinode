@@ -108,6 +108,7 @@ model Professor {
 
 model Aluno {
   id_usuario                Int                 @id
+  matricula                 String?             @db.VarChar(50)
   peso                      Decimal?            @db.Decimal(5, 2)
   categoria                 String?             @db.VarChar(50)
   n_federacao               String?             @db.VarChar(50)

@@ -1,0 +1,6 @@
+Copyright (c) 2026 Rafael César Gonçalves e Rafael Marques Castellar. Todos os direitos reservados.
+
+Este software e seus arquivos associados são propriedade exclusiva do autor.
+Nenhuma permissão é concedida para copiar, modificar, distribuir, sublicenciar,
+hospedar como serviço ou utilizar comercialmente este código sem autorização
+prévia e por escrito do autor.

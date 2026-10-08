@@ -99,6 +99,7 @@ CREATE TABLE Professor (
 
 CREATE TABLE Aluno (
     id_usuario INT PRIMARY KEY,
+    matricula VARCHAR(50),
     peso DECIMAL(5,2),
     categoria VARCHAR(50),
     n_federacao VARCHAR(50),
