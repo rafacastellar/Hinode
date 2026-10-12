@@ -1,0 +1,10 @@
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async ({ locals }) => {
+	return {
+		usuario: locals.usuario,
+		idAcademia: locals.idAcademia,
+		nomeAcademia: locals.nomeAcademia,
+		perfis: locals.perfis
+	};
+};
