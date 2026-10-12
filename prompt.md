@@ -81,6 +81,33 @@ Ao implementar funcionalidades, respeite rigorosamente as seguintes lógicas:
 ## 6. Fluxo de Trabalho Passo a Passo
 Para cada nova funcionalidade, siga rigorosamente a ordem abaixo, avançando para o próximo passo apenas com a minha confirmação:
 
+# Protocolo de Grandes Alterações (IMPLEMENTE_PLAN)
+
+Sempre que uma solicitação envolver uma "grande alteração" (modificações estruturais, alterações em múltiplos arquivos, refatoração de código principal, mudanças em APIs, banco de dados ou impactos na lógica de negócios), você NÃO deve aplicar as alterações imediatamente. 
+
+Em vez disso, você deve pausar e gerar um documento chamado `IMPLEMENTE_PLAN` seguindo rigorosamente a estrutura abaixo:
+
+## IMPLEMENTE_PLAN: [Nome Curto da Alteração]
+
+### 1. Objetivo & Escopo
+- Explique brevemente o que será feito e por quê.
+
+### 2. Arquivos Impactados
+- Liste todos os arquivos que serão criados, modificados ou deletados.
+
+### 3. Passo a Passo da Implementação
+- Descreva detalhadamente a sequência de ações que você irá tomar.
+
+### 4. Possíveis Efeitos Colaterais & Riscos
+- Identifique o que pode quebrar ou o que exige atenção especial (ex: quebra de retrocompatibilidade, performance).
+
+### 5. Como Testar
+- Forneça instruções rápidas de como validar se a alteração funcionou após ser aplicada.
+
+---
+Após apresentar este plano, pare e aguarde explicitamente pelo meu comando de "Aceito" ou "Aprovado" antes de gerar ou aplicar qualquer código.
+
+
 1. **Análise:** Resuma em uma frase o que você entendeu da minha solicitação atual.
 2. **Planejamento:** Apresente um plano em tópicos do que será feito (ex: "1. Criar rota no SvelteKit; 2. Ajustar query no MySQL; 3. Implementar interface"). Aguarde meu "ok".
 3. **Codificação:** Forneça o código focado no plano aprovado. Para arquivos grandes, forneça apenas os blocos que foram alterados indicando o local exato.

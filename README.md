@@ -66,7 +66,7 @@ O projeto foi pensado para ser seguro e escalável desde o início:
 Hinode/
 ├── conf/
 │   └── sql/
-│       └── HinodeV3.sql            # Script de criação do banco de dados
+│       └── HinodeV4.sql            # Script de criação completa do banco de dados
 ├── src/
 │   ├── hooks.server.ts             # Interceptador global: lê o cookie e injeta o usuário na sessão
 │   ├── lib/
@@ -111,15 +111,13 @@ npm install
 
 ### 2. Criar o banco de dados
 
-```sql
-CREATE DATABASE hinode_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-Em seguida, importe o esquema:
+O script `HinodeV4.sql` cria o banco `hinode_db` (utf8mb4) e todas as tabelas, triggers e perfis padrão de uma só vez:
 
 ```bash
-mysql -u root -p hinode_db < conf/sql/HinodeV3.sql
+mysql -u root -p < conf/sql/HinodeV4.sql
 ```
+
+> Requer **MySQL 8.0.16 ou superior**. O script não apaga dados: em um banco que já tenha as tabelas, ele falha em vez de sobrescrever.
 
 ### 3. Configurar as variáveis de ambiente
 
