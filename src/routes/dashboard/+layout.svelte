@@ -8,6 +8,7 @@
 		Award,
 		Trophy,
 		Settings,
+		UserCog,
 		LogOut,
 		Menu,
 		X,
@@ -27,7 +28,8 @@
 		calendar: Calendar,
 		award: Award,
 		trophy: Trophy,
-		settings: Settings
+		settings: Settings,
+		'users-cog': UserCog
 	};
 
 	function rotaAtiva(href: string): boolean {

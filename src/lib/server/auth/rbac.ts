@@ -16,7 +16,9 @@ export type Permissao =
 	| 'CAMPEONATOS_INSCREVER'
 	| 'CAMPEONATOS_RESULTADOS'
 	| 'ACADEMIA_CONFIGURAR'
-	| 'AUDITORIA_VER';
+	| 'AUDITORIA_VER'
+	| 'USUARIOS_VER'
+	| 'USUARIOS_GERENCIAR';
 
 /**
  * Matriz base de permissões associadas a cada papel (Role) do dojo.
@@ -36,7 +38,9 @@ const PERMISSOES_POR_PAPEL: Record<string, readonly Permissao[]> = {
 		'CAMPEONATOS_INSCREVER',
 		'CAMPEONATOS_RESULTADOS',
 		'ACADEMIA_CONFIGURAR',
-		'AUDITORIA_VER'
+		'AUDITORIA_VER',
+		'USUARIOS_VER',
+		'USUARIOS_GERENCIAR'
 	],
 	professor: [
 		'DASHBOARD_VER',
@@ -130,7 +134,8 @@ export type IconeMenu =
 	| 'calendar'
 	| 'award'
 	| 'trophy'
-	| 'settings';
+	| 'settings'
+	| 'users-cog';
 
 export interface ItemMenu {
 	titulo: string;
@@ -189,6 +194,15 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
 		permissao: 'CAMPEONATOS_VER',
 		fase: 7,
 		badge: 'Fase 7'
+	},
+	{
+		titulo: 'Equipe & Usuários',
+		href: '/dashboard/usuarios',
+		icone: 'users-cog',
+		descricao: 'Gestão de operadores e perfis acumulativos',
+		permissao: 'USUARIOS_VER',
+		fase: 9,
+		badge: 'Fase 9'
 	},
 	{
 		titulo: 'Configurações do Dojo',
