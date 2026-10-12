@@ -48,3 +48,13 @@ export async function executarTransacao<T>(
 		conn.release();
 	}
 }
+
+/**
+ * Encerra todas as conexões do pool para desligamento gracioso em scripts CLI e jobs.
+ */
+export async function fecharPool(): Promise<void> {
+	if (poolInstance) {
+		await poolInstance.end();
+		poolInstance = null;
+	}
+}
