@@ -13,8 +13,13 @@ import {
 	contarAdminsAtivosNoDojo,
 	buscarUsuarioDetalhadoNoDojo,
 	listarPerfisDoSistema,
-	mascararCpf
+	mascararCpf,
+	salvarEnderecoUsuarioTx,
+	vincularResponsavelAoUsuarioTx,
+	sincronizarResponsaveisDoUsuarioTx,
+	desvincularResponsavelDoUsuarioTx
 } from '../repositorios/usuario.repo';
+import { calcularIdadeServidor } from '../repositorios/aluno.repo';
 import {
 	criarUsuarioSchema,
 	editarUsuarioSchema,
@@ -100,14 +105,66 @@ export async function cadastrarUsuarioNoDojo(
 			);
 		}
 
-		// 5. Trilha de Auditoria LGPD (sem senhas nem CPF completo)
+		// 4.1. Se perfil de Responsável atribuído, garante registro na tabela Responsavel
+		const perfilResponsavel = todosPerfis.find((p) => p.role.toLowerCase() === 'responsável');
+		const ehResponsavel =
+			perfilResponsavel && dados.idsPerfis.includes(perfilResponsavel.id_perfil);
+		if (ehResponsavel) {
+			await conn.execute(
+				`INSERT INTO Responsavel (id_usuario, grau_parentesco, financeiro)
+				 VALUES (?, 'Responsável Legal', 0)
+				 ON DUPLICATE KEY UPDATE grau_parentesco = VALUES(grau_parentesco)`,
+				[idUsuarioFinal]
+			);
+		}
+
+		// 5. Se endereço informado, salva na tabela Endereco_Usuario
+		if (dados.logradouro && dados.cidade && dados.uf && dados.cep) {
+			await salvarEnderecoUsuarioTx(conn, idUsuarioFinal, {
+				logradouro: dados.logradouro,
+				numero: dados.numero,
+				complemento: dados.complemento,
+				bairro: dados.bairro,
+				cidade: dados.cidade,
+				uf: dados.uf,
+				cep: dados.cep
+			});
+		}
+
+		// 6. Se menor de idade, vincula responsáveis legais em Responsavel_Aluno
+		const idade = calcularIdadeServidor(dados.dataNascimento);
+		const ehMenor = idade < 18;
+		const responsaveisParaVincular =
+			dados.responsaveisJson && dados.responsaveisJson.length > 0
+				? dados.responsaveisJson
+				: dados.idResponsavel
+				  ? [
+							{
+								idResponsavel: dados.idResponsavel,
+								grauParentesco: dados.responsavelParentesco || 'Responsável Legal',
+								financeiro: dados.responsavelFinanceiro || false
+							}
+				    ]
+				  : [];
+
+		if (ehMenor && responsaveisParaVincular.length > 0) {
+			await sincronizarResponsaveisDoUsuarioTx(
+				conn,
+				idUsuarioFinal,
+				responsaveisParaVincular
+			);
+		}
+
+		// 7. Trilha de Auditoria LGPD (sem senhas nem CPF completo)
 		const logPayload = {
 			nome: dados.nome,
 			email: dados.email,
 			genero: dados.genero,
 			cpf_mascarado: mascararCpf(dados.cpf),
 			perfis_ids: dados.idsPerfis,
-			eh_professor: !!ehProfessor
+			eh_professor: !!ehProfessor,
+			possui_endereco: !!(dados.logradouro && dados.cep),
+			possui_responsavel: !!dados.idResponsavel
 		};
 
 		await conn.query(
@@ -196,13 +253,65 @@ export async function atualizarUsuarioNoDojo(
 			);
 		}
 
-		// 6. Registro de Auditoria LGPD
+		// 5.1. Se perfil Responsável selecionado, garante registro na tabela Responsavel
+		const perfilResponsavel = todosPerfis.find((p) => p.role.toLowerCase() === 'responsável');
+		const ehResponsavel =
+			perfilResponsavel && dados.idsPerfis.includes(perfilResponsavel.id_perfil);
+		if (ehResponsavel) {
+			await conn.execute(
+				`INSERT INTO Responsavel (id_usuario, grau_parentesco, financeiro)
+				 VALUES (?, 'Responsável Legal', 0)
+				 ON DUPLICATE KEY UPDATE grau_parentesco = VALUES(grau_parentesco)`,
+				[idUsuario]
+			);
+		}
+
+		// 6. Atualiza Endereço Completo se informado
+		if (dados.logradouro && dados.cidade && dados.uf && dados.cep) {
+			await salvarEnderecoUsuarioTx(conn, idUsuario, {
+				logradouro: dados.logradouro,
+				numero: dados.numero,
+				complemento: dados.complemento,
+				bairro: dados.bairro,
+				cidade: dados.cidade,
+				uf: dados.uf,
+				cep: dados.cep
+			});
+		}
+
+		// 7. Atualiza Vínculos de Responsáveis Legais (Apenas se menor de idade)
+		const idade = calcularIdadeServidor(dados.dataNascimento);
+		const ehMenor = idade < 18;
+
+		if (ehMenor) {
+			const responsaveisParaVincular =
+				dados.responsaveisJson && dados.responsaveisJson.length > 0
+					? dados.responsaveisJson
+					: dados.idResponsavel
+					  ? [
+								{
+									idResponsavel: dados.idResponsavel,
+									grauParentesco: dados.responsavelParentesco || 'Responsável Legal',
+									financeiro: dados.responsavelFinanceiro || false
+								}
+					    ]
+					  : [];
+
+			await sincronizarResponsaveisDoUsuarioTx(conn, idUsuario, responsaveisParaVincular);
+		} else {
+			// Se o usuário for maior de idade (18+ anos), desvincula qualquer responsável legal
+			await desvincularResponsavelDoUsuarioTx(conn, idUsuario);
+		}
+
+		// 8. Registro de Auditoria LGPD
 		const logPayload = {
 			nome: dados.nome,
 			email: dados.email,
 			genero: dados.genero,
 			perfis_ids: dados.idsPerfis,
-			eh_professor: !!ehProfessor
+			eh_professor: !!ehProfessor,
+			possui_endereco: !!(dados.logradouro && dados.cep),
+			possui_responsavel: !!dados.idResponsavel
 		};
 
 		await conn.query(

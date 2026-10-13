@@ -5,6 +5,7 @@ import {
 	buscarUsuarioDetalhadoNoDojo,
 	listarPerfisDoSistema
 } from '#lib/server/repositorios/usuario.repo';
+import { listarResponsaveisDoDojo } from '#lib/server/repositorios/responsavel.repo';
 import { atualizarUsuarioNoDojo } from '#lib/server/servicos/usuario.service';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -20,9 +21,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		throw error(404, 'Identificador de usuário inválido.');
 	}
 
-	const [usuario, perfis] = await Promise.all([
+	const [usuario, perfis, responsaveis] = await Promise.all([
 		buscarUsuarioDetalhadoNoDojo(idAcademia, idUsuario),
-		listarPerfisDoSistema()
+		listarPerfisDoSistema(),
+		listarResponsaveisDoDojo(idAcademia)
 	]);
 
 	if (!usuario) {
@@ -31,7 +33,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	return {
 		usuario,
-		perfis
+		perfis,
+		responsaveis
 	};
 };
 
@@ -60,7 +63,24 @@ export const actions: Actions = {
 			telefone: formData.get('telefone') ? String(formData.get('telefone')) : null,
 			idsPerfis: idsPerfisRaw.map((id) => Number(id)),
 			nFederacao: formData.get('nFederacao') ? String(formData.get('nFederacao')) : null,
-			grauFaixa: formData.get('grauFaixa') ? String(formData.get('grauFaixa')) : null
+			grauFaixa: formData.get('grauFaixa') ? String(formData.get('grauFaixa')) : null,
+			// Endereço Completo
+			cep: formData.get('cep') ? String(formData.get('cep')) : null,
+			logradouro: formData.get('logradouro') ? String(formData.get('logradouro')) : null,
+			numero: formData.get('numero') ? String(formData.get('numero')) : null,
+			complemento: formData.get('complemento') ? String(formData.get('complemento')) : null,
+			bairro: formData.get('bairro') ? String(formData.get('bairro')) : null,
+			cidade: formData.get('cidade') ? String(formData.get('cidade')) : null,
+			uf: formData.get('uf') ? String(formData.get('uf')) : null,
+			// Responsável Legal
+			idResponsavel: formData.get('idResponsavel') ? Number(formData.get('idResponsavel')) : null,
+			responsavelParentesco: formData.get('responsavelParentesco')
+				? String(formData.get('responsavelParentesco'))
+				: 'Responsável Legal',
+			responsavelFinanceiro: formData.get('responsavelFinanceiro') === 'on',
+			responsaveisJson: formData.get('responsaveisJson')
+				? String(formData.get('responsaveisJson'))
+				: null
 		};
 
 		try {

@@ -172,9 +172,11 @@ CREATE TABLE Aluno (
 CREATE TABLE Responsavel_Aluno (
     id_responsavel INT,
     id_aluno INT,
+    grau_parentesco VARCHAR(50) DEFAULT 'Responsável Legal',
+    financeiro BOOLEAN DEFAULT 0,
     PRIMARY KEY (id_responsavel, id_aluno),
     FOREIGN KEY (id_responsavel) REFERENCES Responsavel(id_usuario) ON DELETE CASCADE,
-    FOREIGN KEY (id_aluno) REFERENCES Aluno(id_usuario) ON DELETE CASCADE
+    FOREIGN KEY (id_aluno) REFERENCES Usuario(id_usuario) ON DELETE CASCADE
 );
 
 -- =======================================================

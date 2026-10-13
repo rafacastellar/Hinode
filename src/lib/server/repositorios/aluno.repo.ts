@@ -13,6 +13,8 @@ export interface AlunoListaItem {
 	graduacao_atual: string;
 	peso: number | null;
 	categoria: string | null;
+	status_federacao?: string | null;
+	grupo_especial_aspirante?: string | null;
 	id_professor_responsavel: number;
 	nome_professor_responsavel: string;
 	nome_responsavel: string | null;
@@ -41,7 +43,9 @@ export interface InserirAlunoDados {
 	nFederacao: string | null;
 	statusFederacao: string | null;
 	dataInicio: string | null;
+	dataPrimeiraGraduacao: string | null;
 	graduacaoAtual: string;
+	grupoEspecialAspirante: string | null;
 	idProfessorResponsavel: number;
 }
 
@@ -81,6 +85,8 @@ export async function listarAlunos(
 			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
 			a.peso,
 			a.categoria,
+			a.status_federacao,
+			a.grupo_especial_aspirante,
 			a.id_professor_responsavel,
 			prof_u.nome AS nome_professor_responsavel,
 			resp_u.nome AS nome_responsavel,
@@ -123,6 +129,10 @@ export async function listarAlunos(
 			graduacao_atual: String(linha.graduacao_atual),
 			peso: linha.peso !== null ? Number(linha.peso) : null,
 			categoria: linha.categoria ? String(linha.categoria) : null,
+			status_federacao: linha.status_federacao ? String(linha.status_federacao) : null,
+			grupo_especial_aspirante: linha.grupo_especial_aspirante
+				? String(linha.grupo_especial_aspirante)
+				: null,
 			id_professor_responsavel: Number(linha.id_professor_responsavel),
 			nome_professor_responsavel: String(linha.nome_professor_responsavel),
 			nome_responsavel: linha.nome_responsavel ? String(linha.nome_responsavel) : null,
@@ -264,9 +274,11 @@ export async function inserirAlunoEmTransacao(
 			n_federacao,
 			status_federacao,
 			data_inicio,
+			data_primeira_graduacao,
 			graduacao_atual,
+			grupo_especial_aspirante,
 			id_professor_responsavel
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			idUsuario,
 			dados.matricula,
@@ -275,10 +287,76 @@ export async function inserirAlunoEmTransacao(
 			dados.nFederacao,
 			dados.statusFederacao,
 			dados.dataInicio || null,
+			dados.dataPrimeiraGraduacao || null,
 			dados.graduacaoAtual,
+			dados.grupoEspecialAspirante || null,
 			dados.idProfessorResponsavel
 		]
 	);
 
 	return idUsuario;
 }
+
+/**
+ * Atualiza os dados esportivos e técnicos de um Aluno dentro de uma transação.
+ * Garante isolamento multi-tenant validando que o aluno pertence ao dojo.
+ */
+export async function atualizarAlunoEmTransacao(
+	conn: PoolConnection,
+	idAcademia: number,
+	idAluno: number,
+	dados: {
+		matricula: string | null;
+		peso: number | null;
+		categoria: string | null;
+		nFederacao: string | null;
+		statusFederacao: string | null;
+		dataInicio: string | null;
+		dataPrimeiraGraduacao: string | null;
+		graduacaoAtual: string;
+		grupoEspecialAspirante: string | null;
+		idProfessorResponsavel: number;
+	}
+): Promise<void> {
+	// Garante que o aluno pertence ao dojo (tenant)
+	const [alunoTenant] = await conn.execute<RowDataPacket[]>(
+		`SELECT a.id_usuario 
+		 FROM Aluno a 
+		 INNER JOIN Usuario_Academia ua ON a.id_usuario = ua.id_usuario 
+		 WHERE a.id_usuario = ? AND ua.id_academia = ? LIMIT 1`,
+		[idAluno, idAcademia]
+	);
+	if (alunoTenant.length === 0) {
+		throw new Error('Judoca não encontrado ou não pertence a esta academia.');
+	}
+
+	await conn.execute(
+		`UPDATE Aluno
+		 SET 
+		 	matricula = ?,
+		 	peso = ?,
+		 	categoria = ?,
+		 	n_federacao = ?,
+		 	status_federacao = ?,
+		 	data_inicio = ?,
+		 	data_primeira_graduacao = ?,
+		 	graduacao_atual = ?,
+		 	grupo_especial_aspirante = ?,
+		 	id_professor_responsavel = ?
+		 WHERE id_usuario = ?`,
+		[
+			dados.matricula,
+			dados.peso,
+			dados.categoria,
+			dados.nFederacao,
+			dados.statusFederacao,
+			dados.dataInicio || null,
+			dados.dataPrimeiraGraduacao || null,
+			dados.graduacaoAtual,
+			dados.grupoEspecialAspirante || null,
+			dados.idProfessorResponsavel,
+			idAluno
+		]
+	);
+}
+

@@ -12,6 +12,18 @@ export function apenasDigitos(valor: string | null | undefined): string {
  * Trata campos opcionais, nullish, formatos vazios e conversões de FormData.
  */
 export const alunoSchema = z.object({
+	// Vínculos com cadastros existentes (Opcionais)
+	idUsuarioExistente: z.any().transform((val) => {
+		if (val === undefined || val === null || val === '') return null;
+		const num = Number(val);
+		return isNaN(num) || num <= 0 ? null : num;
+	}),
+	idResponsavelExistente: z.any().transform((val) => {
+		if (val === undefined || val === null || val === '') return null;
+		const num = Number(val);
+		return isNaN(num) || num <= 0 ? null : num;
+	}),
+
 	// Dados Pessoais do Judoca
 	nome: z
 		.string()
@@ -63,17 +75,28 @@ export const alunoSchema = z.object({
 		.string()
 		.trim()
 		.nullish()
-		.transform((val) => val || null),
+		.transform((val) => val || 'Ativo'),
 	dataInicio: z
 		.string()
 		.trim()
 		.nullish()
 		.refine((val) => !val || regexData.test(val), { message: 'Data de início inválida' })
 		.transform((val) => val || null),
+	dataPrimeiraGraduacao: z
+		.string()
+		.trim()
+		.nullish()
+		.refine((val) => !val || regexData.test(val), { message: 'Data da 1ª graduação inválida' })
+		.transform((val) => val || null),
 	graduacaoAtual: z
 		.string()
 		.trim()
 		.min(1, { message: 'Selecione a faixa atual do judoca' }),
+	grupoEspecialAspirante: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || null),
 	idProfessorResponsavel: z.coerce
 		.number()
 		.int()
@@ -109,3 +132,74 @@ export const alunoSchema = z.object({
 });
 
 export type AlunoInput = z.infer<typeof alunoSchema>;
+
+/**
+ * Schema Zod para atualização/edição de dados esportivos e técnicos do judoca.
+ */
+export const editarAlunoSchema = z.object({
+	matricula: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || null),
+	peso: z.any().transform((val) => {
+		if (val === undefined || val === null || val === '') return null;
+		const num = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val);
+		return isNaN(num) ? null : num;
+	}),
+	categoria: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || null),
+	nFederacao: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || null),
+	statusFederacao: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || 'Ativo'),
+	dataInicio: z
+		.string()
+		.trim()
+		.nullish()
+		.refine((val) => !val || regexData.test(val), { message: 'Data de início inválida' })
+		.transform((val) => val || null),
+	dataPrimeiraGraduacao: z
+		.string()
+		.trim()
+		.nullish()
+		.refine((val) => !val || regexData.test(val), { message: 'Data da 1ª graduação inválida' })
+		.transform((val) => val || null),
+	graduacaoAtual: z
+		.string()
+		.trim()
+		.min(1, { message: 'Selecione a faixa atual do judoca' }),
+	grupoEspecialAspirante: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || null),
+	idProfessorResponsavel: z.coerce
+		.number()
+		.int()
+		.positive({ message: 'Selecione o professor responsável' })
+});
+
+export type EditarAlunoInput = z.infer<typeof editarAlunoSchema>;
+
+/**
+ * Schema Zod para matrícula de judoca a partir de um usuário já cadastrado
+ * (perfil 'Aluno'). Dados pessoais e responsáveis são geridos no módulo de usuários.
+ */
+export const matricularAlunoSchema = editarAlunoSchema.extend({
+	idUsuario: z.coerce
+		.number()
+		.int()
+		.positive({ message: 'Selecione um usuário com perfil Aluno para matricular' })
+});
+
+export type MatricularAlunoInput = z.infer<typeof matricularAlunoSchema>;

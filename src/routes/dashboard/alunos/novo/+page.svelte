@@ -3,33 +3,92 @@
 	import { enhance } from '$app/forms';
 	import {
 		User,
-		Calendar,
-		ShieldAlert,
 		HeartHandshake,
 		ArrowLeft,
 		AlertCircle,
 		Award,
-		Scale,
-		Hash,
+		CheckCircle2,
+		Search,
+		List,
+		X,
+		Check,
+		Info,
+		Pencil,
+		ShieldAlert,
+		UserPlus,
 		Phone,
 		Mail,
-		CheckCircle2
+		Calendar
 	} from '@lucide/svelte';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	let carregando = $state(false);
-	let dataNascimento = $state('');
-	let graduacaoSelecionada = $state('Branca');
+	type Candidato = PageData['candidatos'][number];
 
+	let carregando = $state(false);
+
+	// =========================================================================
+	// ESTADO: LOCALIZAÇÃO DO USUÁRIO (PERFIL ALUNO)
+	// =========================================================================
+	let termoBusca = $state('');
+	let listarTodos = $state(false);
+	let idSelecionado = $state<number | null>(null);
+
+	const selecionado = $derived<Candidato | null>(
+		idSelecionado ? (data.candidatos.find((c) => c.id_usuario === idSelecionado) ?? null) : null
+	);
+
+	const totalDisponiveis = $derived(data.candidatos.filter((c) => !c.ja_matriculado).length);
+
+	// Filtro local por nome, CPF (dígitos), e-mail ou telefone
+	const resultados = $derived.by<Candidato[]>(() => {
+		const q = termoBusca.trim().toLowerCase();
+		if (q.length < 2) return listarTodos ? data.candidatos : [];
+		const digitos = q.replace(/\D/g, '');
+		return data.candidatos.filter(
+			(c) =>
+				c.nome.toLowerCase().includes(q) ||
+				c.email.toLowerCase().includes(q) ||
+				(digitos.length >= 3 &&
+					(c.cpf.includes(digitos) || (c.telefone ?? '').replace(/\D/g, '').includes(digitos)))
+		);
+	});
+
+	const exibindoResultados = $derived(termoBusca.trim().length >= 2 || listarTodos);
+
+	const ehMenor = $derived(selecionado ? selecionado.idade < 18 : false);
+	const menorSemResponsavel = $derived(
+		!!selecionado && ehMenor && selecionado.responsaveis.length === 0
+	);
+
+	// Campos técnicos do Judoca
+	let matricula = $state('');
+	let peso = $state('');
+	let categoria = $state('');
+	let nFederacao = $state('');
+	let statusFederacao = $state('Ativo');
+	let dataInicio = $state('');
+	let dataPrimeiraGraduacao = $state('');
+	let graduacaoSelecionada = $state('Branca');
+	let grupoEspecialAspirante = $state('');
+	let idProfessorResponsavel = $state<number | ''>('');
+
+	// Restaura valores se o formulário retornar com erro
 	$effect(() => {
-		if (form?.valores?.dataNascimento) {
-			dataNascimento = form.valores.dataNascimento as string;
-		}
-		if (form?.valores?.graduacaoAtual) {
-			graduacaoSelecionada = form.valores.graduacaoAtual as string;
-		}
+		const v = form?.valores;
+		if (!v) return;
+		if (v.idUsuario) idSelecionado = Number(v.idUsuario);
+		if (v.matricula) matricula = String(v.matricula);
+		if (v.peso) peso = String(v.peso);
+		if (v.categoria) categoria = String(v.categoria);
+		if (v.nFederacao) nFederacao = String(v.nFederacao);
+		if (v.statusFederacao) statusFederacao = String(v.statusFederacao);
+		if (v.dataInicio) dataInicio = String(v.dataInicio);
+		if (v.dataPrimeiraGraduacao) dataPrimeiraGraduacao = String(v.dataPrimeiraGraduacao);
+		if (v.graduacaoAtual) graduacaoSelecionada = String(v.graduacaoAtual);
+		if (v.grupoEspecialAspirante) grupoEspecialAspirante = String(v.grupoEspecialAspirante);
+		if (v.idProfessorResponsavel) idProfessorResponsavel = Number(v.idProfessorResponsavel);
 	});
 
 	const faixasDisponiveis = [
@@ -44,26 +103,27 @@
 		'Preta'
 	];
 
-	// Cálculo reativo de idade na interface para guiar o preenchimento
-	const idadeCalculada = $derived.by(() => {
-		if (!dataNascimento || dataNascimento.length < 10) return null;
-		const hoje = new Date();
-		const nasc = new Date(dataNascimento);
-		if (isNaN(nasc.getTime())) return null;
+	function selecionar(c: Candidato) {
+		if (c.ja_matriculado) return;
+		idSelecionado = c.id_usuario;
+	}
 
-		let anos = hoje.getFullYear() - nasc.getFullYear();
-		const mes = hoje.getMonth() - nasc.getMonth();
-		if (mes < 0 || (mes === 0 && hoje.getDate() < nasc.getDate())) {
-			anos--;
-		}
-		return anos >= 0 ? anos : null;
-	});
+	function trocarUsuario() {
+		idSelecionado = null;
+	}
 
-	const ehMenor = $derived(idadeCalculada !== null && idadeCalculada < 18);
+	function formatarData(iso: string) {
+		const [a, m, d] = iso.split('-');
+		return a && m && d ? `${d}/${m}/${a}` : iso;
+	}
 </script>
 
 <svelte:head>
 	<title>Matricular Judoca - Judô Hinodê</title>
+	<meta
+		name="description"
+		content="Matricule como judoca um usuário já cadastrado no dojo com o perfil Aluno."
+	/>
 </svelte:head>
 
 <div class="max-w-4xl mx-auto space-y-8">
@@ -83,15 +143,14 @@
 			<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 				Formulário de Matrícula
 			</span>
-			<span class="text-xs text-zinc-600">•</span>
-			<span class="text-xs text-zinc-400 font-mono">Fase 4</span>
 		</div>
 		<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 			Novo Judoca
 		</h1>
 		<p class="text-xs sm:text-sm text-zinc-400 mt-1">
-			Preencha os dados do atleta. Para menores de 18 anos, os dados do responsável legal serão
-			exigidos obrigatoriamente.
+			Selecione um usuário já cadastrado com o perfil <strong class="text-zinc-200">Aluno</strong> e
+			informe os dados técnicos. Dados pessoais e responsáveis legais são gerenciados no cadastro de
+			usuários.
 		</p>
 	</div>
 
@@ -108,9 +167,6 @@
 		</div>
 	{/if}
 
-	<!-- ========================================================================= -->
-	<!-- FORMULÁRIO PRINCIPAL -->
-	<!-- ========================================================================= -->
 	<form
 		method="POST"
 		use:enhance={() => {
@@ -122,375 +178,510 @@
 		}}
 		class="space-y-8"
 	>
-		<!-- 1. DADOS PESSOAIS DO ATLETA -->
-		<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
+		{#if selecionado}
+			<input type="hidden" name="idUsuario" value={selecionado.id_usuario} />
+		{/if}
+
+		<!-- ===================================================================== -->
+		<!-- 1. LOCALIZAR USUÁRIO COM PERFIL ALUNO -->
+		<!-- ===================================================================== -->
+		<section class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
 			<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
 				<div
-					class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300"
+					class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
 				>
 					<User class="w-4 h-4 text-red-500" />
 				</div>
-				<div>
-					<h2 class="text-sm font-bold text-white font-display">Identificação do Judoca</h2>
-					<p class="text-[11px] text-zinc-500">Dados civis e de contato do atleta</p>
+				<div class="flex-1">
+					<h2 class="text-sm font-bold text-white font-display">1. Identificação do Judoca</h2>
+					<p class="text-[11px] text-zinc-500">
+						{totalDisponiveis} usuário(s) com perfil Aluno aguardando matrícula
+					</p>
 				</div>
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="sm:col-span-2">
-					<label for="nome" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Nome Completo *
-					</label>
-					<input
-						type="text"
-						id="nome"
-						name="nome"
-						required
-						value={(form?.valores?.nome as string) || ''}
-						placeholder="Ex: Pedro Henrique da Silva"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label for="cpf" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						CPF (somente números) *
-					</label>
-					<input
-						type="text"
-						id="cpf"
-						name="cpf"
-						required
-						maxlength="14"
-						value={(form?.valores?.cpf as string) || ''}
-						placeholder="000.000.000-00"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label for="dataNascimento" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Data de Nascimento *
-					</label>
-					<input
-						type="date"
-						id="dataNascimento"
-						name="dataNascimento"
-						required
-						bind:value={dataNascimento}
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-					{#if idadeCalculada !== null}
-						<div class="mt-2 text-xs flex items-center gap-2">
-							<span class="text-zinc-400 font-mono">Idade calculada:</span>
-							<strong class="text-white font-mono">{idadeCalculada} anos</strong>
-							{#if ehMenor}
-								<span
-									class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-950/60 border border-amber-800/80 text-amber-300"
+			{#if selecionado}
+				<!-- CARD DO USUÁRIO SELECIONADO (SOMENTE LEITURA) -->
+				<div
+					class="p-5 rounded-xl bg-emerald-950/20 border border-emerald-800/70 space-y-4"
+				>
+					<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+						<div class="flex items-start gap-3">
+							<div
+								class="w-10 h-10 rounded-xl bg-emerald-900/50 border border-emerald-700/60 flex items-center justify-center shrink-0"
+							>
+								<CheckCircle2 class="w-5 h-5 text-emerald-400" />
+							</div>
+							<div>
+								<div class="flex items-center gap-2 flex-wrap">
+									<span class="font-bold text-white text-base">{selecionado.nome}</span>
+									{#if ehMenor}
+										<span
+											class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-amber-950/70 border border-amber-700 text-amber-300"
+										>
+											Menor • {selecionado.idade} anos
+										</span>
+									{:else}
+										<span
+											class="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-zinc-900 border border-zinc-800 text-zinc-400"
+										>
+											{selecionado.idade} anos
+										</span>
+									{/if}
+								</div>
+								<div
+									class="text-[11px] text-zinc-400 font-mono mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1"
 								>
-									Menor de Idade (Responsável Obrigatório)
-								</span>
-							{:else}
-								<span
-									class="px-2 py-0.5 rounded text-[10px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800"
-								>
-									Maior de Idade
-								</span>
-							{/if}
+									<span>CPF: {selecionado.cpf_mascarado}</span>
+									<span class="flex items-center gap-1">
+										<Calendar class="w-3 h-3" />
+										{formatarData(selecionado.data_nascimento)}
+									</span>
+									<span class="flex items-center gap-1">
+										<Mail class="w-3 h-3" />
+										{selecionado.email}
+									</span>
+									{#if selecionado.telefone}
+										<span class="flex items-center gap-1">
+											<Phone class="w-3 h-3" />
+											{selecionado.telefone}
+										</span>
+									{/if}
+								</div>
+							</div>
 						</div>
+
+						<div class="flex items-center gap-2 self-end sm:self-auto">
+							<a
+								href="/dashboard/usuarios/{selecionado.id_usuario}"
+								class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors"
+							>
+								<Pencil class="w-3.5 h-3.5" />
+								<span>Editar cadastro</span>
+							</a>
+							<button
+								type="button"
+								id="btn-trocar-usuario"
+								onclick={trocarUsuario}
+								class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors"
+							>
+								<X class="w-3.5 h-3.5" />
+								<span>Trocar</span>
+							</button>
+						</div>
+					</div>
+				</div>
+			{:else}
+				<!-- BUSCA / LISTAGEM -->
+				<div class="space-y-4">
+					<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+						<div class="relative flex-1">
+							<Search class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+							<input
+								type="search"
+								id="busca-aluno"
+								bind:value={termoBusca}
+								onkeydown={(e) => e.key === 'Enter' && e.preventDefault()}
+								placeholder="Buscar por nome, CPF, e-mail ou telefone..."
+								autocomplete="off"
+								class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+							/>
+						</div>
+						<button
+							type="button"
+							id="btn-listar-todos"
+							onclick={() => (listarTodos = !listarTodos)}
+							class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium flex items-center justify-center gap-2 transition-colors border {listarTodos
+								? 'bg-red-600 border-red-600 text-white hover:bg-red-700'
+								: 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700'}"
+						>
+							<List class="w-4 h-4" />
+							<span>{listarTodos ? 'Ocultar lista' : `Listar todos (${data.candidatos.length})`}</span>
+						</button>
+					</div>
+
+					{#if exibindoResultados}
+						{#if resultados.length === 0}
+							<div
+								class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-zinc-400 flex items-start gap-2.5"
+							>
+								<Info class="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+								<div>
+									<p>Nenhum usuário com perfil Aluno encontrado.</p>
+									<a
+										href="/dashboard/usuarios/novo"
+										class="inline-flex items-center gap-1 mt-1.5 text-red-400 hover:text-red-300 font-medium"
+									>
+										<UserPlus class="w-3.5 h-3.5" />
+										Cadastrar usuário com perfil Aluno
+									</a>
+								</div>
+							</div>
+						{:else}
+							<div
+								class="divide-y divide-zinc-800/80 rounded-xl border border-zinc-800 overflow-hidden bg-zinc-900/40 max-h-96 overflow-y-auto"
+							>
+								{#each resultados as c (c.id_usuario)}
+									<div
+										class="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors {c.ja_matriculado
+											? 'opacity-50'
+											: 'hover:bg-zinc-800/40'}"
+									>
+										<div class="min-w-0 flex-1 space-y-1">
+											<div class="flex items-center gap-2 flex-wrap">
+												<strong class="text-white text-xs sm:text-sm truncate">{c.nome}</strong>
+												{#if c.idade < 18}
+													<span
+														class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-950/60 border border-amber-800/70 text-amber-300"
+													>
+														Menor
+													</span>
+												{/if}
+												{#if c.ja_matriculado}
+													<span
+														class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-zinc-400"
+													>
+														Já matriculado
+													</span>
+												{/if}
+											</div>
+											<div
+												class="text-[11px] text-zinc-400 font-mono flex flex-wrap gap-x-3 gap-y-0.5"
+											>
+												<span>CPF: {c.cpf_mascarado}</span>
+												<span>{c.idade} anos</span>
+												<span>{c.email}</span>
+											</div>
+											{#if c.responsaveis.length > 0}
+												<div class="flex items-center gap-1.5 flex-wrap text-[10px]">
+													<HeartHandshake class="w-3 h-3 text-amber-400" />
+													{#each c.responsaveis as r (r.id_responsavel)}
+														<span
+															class="px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-zinc-300"
+														>
+															{r.nome} ({r.grau_parentesco})
+														</span>
+													{/each}
+												</div>
+											{:else if c.idade < 18}
+												<div class="flex items-center gap-1 text-[10px] text-red-400">
+													<ShieldAlert class="w-3 h-3" />
+													Sem responsável vinculado
+												</div>
+											{/if}
+										</div>
+
+										{#if !c.ja_matriculado}
+											<button
+												type="button"
+												onclick={() => selecionar(c)}
+												class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm self-end sm:self-auto"
+											>
+												<Check class="w-3.5 h-3.5" />
+												<span>Selecionar</span>
+											</button>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{:else}
+						<p class="text-[11px] text-zinc-500">
+							Digite ao menos 2 caracteres para buscar ou clique em <strong>Listar todos</strong>.
+						</p>
 					{/if}
 				</div>
+			{/if}
+		</section>
 
-				<div>
-					<label for="email" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						E-mail de Acesso *
-					</label>
-					<input
-						type="email"
-						id="email"
-						name="email"
-						required
-						value={(form?.valores?.email as string) || ''}
-						placeholder="atleta@exemplo.com"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label for="telefone" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Telefone / WhatsApp
-					</label>
-					<input
-						type="text"
-						id="telefone"
-						name="telefone"
-						value={(form?.valores?.telefone as string) || ''}
-						placeholder="(11) 99999-9999"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-			</div>
-		</div>
-
-		<!-- 2. DADOS TÉCNICOS DE JUDÔ & TATAME -->
-		<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
-			<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
-				<div
-					class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300"
+		{#if selecionado}
+			<!-- ===================================================================== -->
+			<!-- 2. RESPONSÁVEIS LEGAIS VINCULADOS (SOMENTE LEITURA) -->
+			<!-- ===================================================================== -->
+			{#if !ehMenor && selecionado.responsaveis.length === 0}
+				<section
+					class="p-5 rounded-2xl bg-zinc-950/60 border border-zinc-900 flex items-center gap-3 opacity-80"
 				>
-					<Award class="w-4 h-4 text-red-500" />
-				</div>
-				<div>
-					<h2 class="text-sm font-bold text-white font-display">Dados Técnicos do Judô</h2>
-					<p class="text-[11px] text-zinc-500">Graduação, professor responsável e categoria</p>
-				</div>
-			</div>
-
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div>
-					<label for="graduacaoAtual" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Graduação Atual (Faixa) *
-					</label>
-					<div class="flex items-center gap-3">
-						<select
-							id="graduacaoAtual"
-							name="graduacaoAtual"
-							bind:value={graduacaoSelecionada}
-							required
-							class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-						>
-							{#each faixasDisponiveis as faixa}
-								<option value={faixa}>{faixa}</option>
-							{/each}
-						</select>
-						<BadgeFaixa faixa={graduacaoSelecionada} size="md" />
-					</div>
-				</div>
-
-				<div>
-					<label
-						for="idProfessorResponsavel"
-						class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
-					>
-						Professor Técnico Responsável *
-					</label>
-					<select
-						id="idProfessorResponsavel"
-						name="idProfessorResponsavel"
-						required
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					>
-						<option value="">Selecione o Sensei...</option>
-						{#each data.professores as prof}
-							<option
-								value={prof.id_usuario}
-								selected={Number(form?.valores?.idProfessorResponsavel) === prof.id_usuario}
-							>
-								{prof.nome} ({prof.grau_faixa || 'Sensei'})
-							</option>
-						{/each}
-					</select>
-					<span class="text-[10px] text-zinc-500 mt-1 block">
-						Cada judoca responde a apenas 1 professor responsável no dojo.
-					</span>
-				</div>
-
-				<div>
-					<label for="matricula" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Matrícula no Dojo
-					</label>
-					<input
-						type="text"
-						id="matricula"
-						name="matricula"
-						value={(form?.valores?.matricula as string) || ''}
-						placeholder="Ex: HIN-2026-0042"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label for="peso" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Peso Atual (kg)
-					</label>
-					<input
-						type="number"
-						step="0.1"
-						id="peso"
-						name="peso"
-						value={(form?.valores?.peso as string) || ''}
-						placeholder="Ex: 73.5"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label for="categoria" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Categoria de Peso / Idade
-					</label>
-					<input
-						type="text"
-						id="categoria"
-						name="categoria"
-						value={(form?.valores?.categoria as string) || ''}
-						placeholder="Ex: Meio-Médio (-81kg) / Sub-21"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label for="nFederacao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Nº de Registro Federativo (FPJ/CBJ)
-					</label>
-					<input
-						type="text"
-						id="nFederacao"
-						name="nFederacao"
-						value={(form?.valores?.nFederacao as string) || ''}
-						placeholder="Ex: FPJ-94821"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-			</div>
-		</div>
-
-		<!-- 3. DADOS DO RESPONSÁVEL LEGAL (DINÂMICO & OBRIGATÓRIO PARA MENORES) -->
-		<div
-			class="p-6 sm:p-8 rounded-2xl transition-all duration-300 {ehMenor
-				? 'bg-zinc-950 border-2 border-amber-800/80 shadow-[0_0_25px_rgba(217,119,6,0.1)]'
-				: 'bg-zinc-950 border border-zinc-900'}"
-		>
-			<div class="flex items-center justify-between pb-4 border-b border-zinc-900 mb-6">
-				<div class="flex items-center gap-3">
 					<div
-						class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300"
+						class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
 					>
-						<HeartHandshake class="w-4 h-4 {ehMenor ? 'text-amber-400' : 'text-zinc-400'}" />
+						<HeartHandshake class="w-4 h-4 text-zinc-500" />
 					</div>
 					<div>
-						<h2 class="text-sm font-bold text-white font-display">
-							Responsável Legal {ehMenor ? '(Obrigatório)' : '(Opcional)'}
-						</h2>
-						<p class="text-[11px] text-zinc-500">
-							{#if ehMenor}
-								Atleta menor de 18 anos exige representação civil auditada pela LGPD.
-							{:else}
-								Vínculo opcional para atletas maiores de idade.
-							{/if}
+						<h2 class="text-sm font-bold text-zinc-300 font-display">2. Responsáveis Legais</h2>
+						<p class="text-xs text-zinc-500 mt-0.5">
+							Judoca maior de idade — responsável legal não se aplica.
 						</p>
+					</div>
+				</section>
+			{:else}
+				<section
+					class="p-6 sm:p-8 rounded-2xl space-y-5 {menorSemResponsavel
+						? 'bg-red-950/10 border-2 border-red-800/70'
+						: 'bg-amber-950/10 border-2 border-amber-800/60 shadow-[0_0_25px_rgba(217,119,6,0.08)]'}"
+				>
+					<div
+						class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-900/30"
+					>
+						<div class="flex items-center gap-3">
+							<div
+								class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
+							>
+								<HeartHandshake class="w-4 h-4 text-amber-400" />
+							</div>
+							<div>
+								<h2 class="text-sm font-bold text-amber-300 font-display">
+									2. Responsáveis Legais Vinculados ({selecionado.responsaveis.length})
+								</h2>
+								<p class="text-[11px] text-zinc-500">
+									Gerenciados no cadastro do usuário
+								</p>
+							</div>
+						</div>
+						<a
+							href="/dashboard/usuarios/{selecionado.id_usuario}"
+							class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors w-fit"
+						>
+							<Pencil class="w-3.5 h-3.5" />
+							<span>Gerenciar responsáveis</span>
+						</a>
+					</div>
+
+					{#if menorSemResponsavel}
+						<div
+							class="p-4 rounded-xl bg-red-950/40 border border-red-800/70 text-red-200 text-xs flex items-start gap-2.5"
+						>
+							<ShieldAlert class="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+							<p>
+								<strong>{selecionado.nome}</strong> é menor de idade e não possui responsável legal
+								vinculado. Vincule ao menos um responsável no cadastro do usuário para liberar a matrícula.
+							</p>
+						</div>
+					{:else}
+						<div class="grid grid-cols-1 gap-2">
+							{#each selecionado.responsaveis as r (r.id_responsavel)}
+								<div
+									class="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center gap-3"
+								>
+									<div
+										class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0"
+									>
+										<HeartHandshake class="w-4 h-4 text-amber-400" />
+									</div>
+									<div class="min-w-0 flex-1">
+										<div class="flex items-center gap-2 flex-wrap">
+											<span class="text-xs font-bold text-white">{r.nome}</span>
+											<span class="text-[10px] font-mono text-zinc-500">CPF: {r.cpf_mascarado}</span>
+											<span
+												class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-zinc-300"
+											>
+												{r.grau_parentesco}
+											</span>
+											{#if r.financeiro}
+												<span
+													class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/60 border border-emerald-800 text-emerald-400"
+												>
+													Financeiro
+												</span>
+											{/if}
+										</div>
+										<div
+											class="text-[11px] text-zinc-400 font-mono mt-0.5 flex flex-wrap gap-x-3"
+										>
+											{#if r.telefone}<span>Tel: {r.telefone}</span>{/if}
+											{#if r.email}<span>{r.email}</span>{/if}
+										</div>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</section>
+			{/if}
+
+			<!-- ===================================================================== -->
+			<!-- 3. DADOS TÉCNICOS DE JUDÔ & TATAME -->
+			<!-- ===================================================================== -->
+			<section class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
+				<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
+					<div
+						class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
+					>
+						<Award class="w-4 h-4 text-red-500" />
+					</div>
+					<div>
+						<h2 class="text-sm font-bold text-white font-display">3. Dados Técnicos do Judô</h2>
+						<p class="text-[11px] text-zinc-500">Graduação, professor responsável e categoria</p>
 					</div>
 				</div>
 
-				{#if ehMenor}
-					<span
-						class="px-2.5 py-1 rounded-md text-[10px] font-mono uppercase font-bold bg-amber-950/60 border border-amber-700/80 text-amber-300"
-					>
-						Exigência Legal
-					</span>
-				{/if}
-			</div>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div>
+						<label for="graduacaoAtual" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Graduação Atual (Faixa) *
+						</label>
+						<div class="flex items-center gap-3">
+							<select
+								id="graduacaoAtual"
+								name="graduacaoAtual"
+								bind:value={graduacaoSelecionada}
+								required
+								class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+							>
+								{#each faixasDisponiveis as faixa}
+									<option value={faixa}>{faixa}</option>
+								{/each}
+							</select>
+							<BadgeFaixa faixa={graduacaoSelecionada} size="md" />
+						</div>
+					</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="sm:col-span-2">
-					<label for="responsavelNome" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Nome Completo do Responsável {ehMenor ? '*' : ''}
-					</label>
-					<input
-						type="text"
-						id="responsavelNome"
-						name="responsavelNome"
-						required={ehMenor}
-						value={(form?.valores?.responsavelNome as string) || ''}
-						placeholder="Ex: Maria das Dores da Silva"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
+					<div>
+						<label
+							for="idProfessorResponsavel"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
+							Professor Técnico Responsável *
+						</label>
+						<select
+							id="idProfessorResponsavel"
+							name="idProfessorResponsavel"
+							bind:value={idProfessorResponsavel}
+							required
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						>
+							<option value="">Selecione o Sensei...</option>
+							{#each data.professores as prof}
+								<option value={prof.id_usuario}>
+									{prof.nome} ({prof.grau_faixa || 'Sensei'})
+								</option>
+							{/each}
+						</select>
+					</div>
 
-				<div>
-					<label for="responsavelCpf" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						CPF do Responsável {ehMenor ? '*' : ''}
-					</label>
-					<input
-						type="text"
-						id="responsavelCpf"
-						name="responsavelCpf"
-						required={ehMenor}
-						maxlength="14"
-						value={(form?.valores?.responsavelCpf as string) || ''}
-						placeholder="000.000.000-00"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label
-						for="responsavelTelefone"
-						class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
-					>
-						Telefone do Responsável {ehMenor ? '*' : ''}
-					</label>
-					<input
-						type="text"
-						id="responsavelTelefone"
-						name="responsavelTelefone"
-						required={ehMenor}
-						value={(form?.valores?.responsavelTelefone as string) || ''}
-						placeholder="(11) 98888-8888"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div>
-					<label
-						for="responsavelParentesco"
-						class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
-					>
-						Grau de Parentesco {ehMenor ? '*' : ''}
-					</label>
-					<select
-						id="responsavelParentesco"
-						name="responsavelParentesco"
-						required={ehMenor}
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					>
-						<option value="Mãe">Mãe</option>
-						<option value="Pai">Pai</option>
-						<option value="Avô / Avó">Avô / Avó</option>
-						<option value="Tio / Tia">Tio / Tia</option>
-						<option value="Tutor Legal">Tutor Legal</option>
-						<option value="Outro">Outro</option>
-					</select>
-				</div>
-
-				<div>
-					<label for="responsavelEmail" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						E-mail do Responsável (Opcional)
-					</label>
-					<input
-						type="email"
-						id="responsavelEmail"
-						name="responsavelEmail"
-						value={(form?.valores?.responsavelEmail as string) || ''}
-						placeholder="responsavel@exemplo.com"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
-				</div>
-
-				<div class="sm:col-span-2 pt-2">
-					<label class="flex items-center gap-2.5 cursor-pointer">
+					<div>
+						<label for="matricula" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Matrícula no Dojo
+						</label>
 						<input
-							type="checkbox"
-							name="responsavelFinanceiro"
-							checked={form?.valores?.responsavelFinanceiro === true}
-							class="w-4 h-4 rounded bg-zinc-900 border-zinc-800 text-red-600 focus:ring-red-600"
+							type="text"
+							id="matricula"
+							name="matricula"
+							bind:value={matricula}
+							placeholder="Ex: HIN-2026-0042"
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 						/>
-						<span class="text-xs text-zinc-300">
-							Responsável também pelo financeiro / mensalidades do judoca
-						</span>
-					</label>
+					</div>
+
+					<div>
+						<label for="peso" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Peso Atual (kg)
+						</label>
+						<input
+							type="number"
+							step="0.1"
+							id="peso"
+							name="peso"
+							bind:value={peso}
+							placeholder="Ex: 73.5"
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+					</div>
+
+					<div>
+						<label for="categoria" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Categoria de Peso / Idade
+						</label>
+						<input
+							type="text"
+							id="categoria"
+							name="categoria"
+							bind:value={categoria}
+							placeholder="Ex: Meio-Médio (-81kg) / Sub-21"
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+					</div>
+
+					<div>
+						<label for="nFederacao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Nº de Registro Federativo (FPJ/CBJ)
+						</label>
+						<input
+							type="text"
+							id="nFederacao"
+							name="nFederacao"
+							bind:value={nFederacao}
+							placeholder="Ex: FPJ-94821"
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+					</div>
+
+					<div>
+						<label for="statusFederacao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Status na Federação
+						</label>
+						<select
+							id="statusFederacao"
+							name="statusFederacao"
+							bind:value={statusFederacao}
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						>
+							<option value="Ativo">Ativo</option>
+							<option value="Inativo">Inativo</option>
+							<option value="Pendente">Pendente</option>
+						</select>
+					</div>
+
+					<div>
+						<label
+							for="grupoEspecialAspirante"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
+							Grupo Competitivo
+						</label>
+						<select
+							id="grupoEspecialAspirante"
+							name="grupoEspecialAspirante"
+							bind:value={grupoEspecialAspirante}
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						>
+							<option value="">Não classificado / Tradicional</option>
+							<option value="Aspirante">Aspirante</option>
+							<option value="Especial">Especial</option>
+						</select>
+					</div>
+
+					<div>
+						<label for="dataInicio" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+							Data de Início no Tatame
+						</label>
+						<input
+							type="date"
+							id="dataInicio"
+							name="dataInicio"
+							bind:value={dataInicio}
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+					</div>
+
+					<div>
+						<label
+							for="dataPrimeiraGraduacao"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
+							Data da 1ª Graduação (Faixa)
+						</label>
+						<input
+							type="date"
+							id="dataPrimeiraGraduacao"
+							name="dataPrimeiraGraduacao"
+							bind:value={dataPrimeiraGraduacao}
+							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+					</div>
 				</div>
-			</div>
-		</div>
+			</section>
+		{/if}
 
 		<!-- ========================================================================= -->
 		<!-- AÇÕES DE SUBMISSÃO -->
@@ -505,12 +696,12 @@
 
 			<button
 				type="submit"
-				disabled={carregando}
-				class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+				id="btn-confirmar-matricula"
+				disabled={carregando || !selecionado || menorSemResponsavel}
+				class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
 			>
 				{#if carregando}
-					<span
-						class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+					<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
 					></span>
 					<span>Gravando Matrícula...</span>
 				{:else}

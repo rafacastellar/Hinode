@@ -4,6 +4,7 @@ node_modules
 implemente.md
 .project
 migrations/001_adicionar_genero_usuario.sql
+plano-execucao-usuarios-judocas.md
 
 # Output
 .output

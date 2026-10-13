@@ -39,6 +39,16 @@ export interface UsuarioResumoDojo {
 	} | null;
 }
 
+export interface EnderecoUsuario {
+	logradouro: string;
+	numero: string | null;
+	complemento: string | null;
+	bairro: string | null;
+	cidade: string;
+	uf: string;
+	cep: string;
+}
+
 export interface UsuarioDetalhadoDojo {
 	id_usuario: number;
 	nome: string;
@@ -55,6 +65,31 @@ export interface UsuarioDetalhadoDojo {
 		n_federacao: string | null;
 		grau_faixa: string | null;
 	} | null;
+	endereco: EnderecoUsuario | null;
+	responsavel_legal: {
+		id_responsavel: number;
+		nome: string;
+		cpf: string;
+		cpf_mascarado?: string;
+		telefone?: string | null;
+		email?: string | null;
+		grau_parentesco: string | null;
+		financeiro: boolean;
+	} | null;
+	responsaveis_legais: Array<{
+		id_responsavel: number;
+		nome: string;
+		cpf: string;
+		cpf_mascarado: string;
+		telefone?: string | null;
+		email?: string | null;
+		grau_parentesco: string | null;
+		financeiro: boolean;
+	}>;
+	dependentes: Array<{
+		id_aluno: number;
+		nome: string;
+	}>;
 }
 
 /**
@@ -307,6 +342,70 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		role: String(p.role)
 	}));
 
+	// Busca endereço do usuário
+	const [enderecos] = await pool.query<RowDataPacket[]>(
+		`SELECT logradouro, numero, complemento, bairro, cidade, uf, cep 
+		 FROM Endereco_Usuario 
+		 WHERE id_usuario = ? LIMIT 1`,
+		[idUsuario]
+	);
+	const endereco: EnderecoUsuario | null =
+		enderecos.length > 0
+			? {
+					logradouro: String(enderecos[0].logradouro),
+					numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
+					complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
+					bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
+					cidade: String(enderecos[0].cidade),
+					uf: String(enderecos[0].uf),
+					cep: String(enderecos[0].cep)
+			  }
+			: null;
+
+	// Busca responsáveis legais (caso este usuário seja um aluno/menor com responsáveis vinculados)
+	const [responsaveis] = await pool.query<RowDataPacket[]>(
+		`SELECT 
+			ra.id_responsavel, 
+			resp_u.nome, 
+			resp_u.cpf, 
+			resp_u.telefone, 
+			resp_u.email, 
+			COALESCE(ra.grau_parentesco, r.grau_parentesco, 'Responsável Legal') AS grau_parentesco, 
+			COALESCE(ra.financeiro, r.financeiro, 0) AS financeiro
+		 FROM Responsavel_Aluno ra
+		 INNER JOIN Usuario resp_u ON ra.id_responsavel = resp_u.id_usuario
+		 LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
+		 WHERE ra.id_aluno = ?
+		 ORDER BY resp_u.nome ASC`,
+		[idUsuario]
+	);
+
+	const responsaveisLegais = responsaveis.map((row) => ({
+		id_responsavel: Number(row.id_responsavel),
+		nome: String(row.nome),
+		cpf: String(row.cpf),
+		cpf_mascarado: mascararCpf(String(row.cpf)),
+		telefone: row.telefone ? String(row.telefone) : null,
+		email: row.email ? String(row.email) : null,
+		grau_parentesco: row.grau_parentesco ? String(row.grau_parentesco) : null,
+		financeiro: Boolean(row.financeiro)
+	}));
+	const responsavelLegal = responsaveisLegais.length > 0 ? responsaveisLegais[0] : null;
+
+	// Busca dependentes vinculados (caso este usuário seja um responsável com menores associados)
+	const [dependentesLinhas] = await pool.query<RowDataPacket[]>(
+		`SELECT ra.id_aluno, aluno_u.nome
+		 FROM Responsavel_Aluno ra
+		 INNER JOIN Usuario aluno_u ON ra.id_aluno = aluno_u.id_usuario
+		 WHERE ra.id_responsavel = ?
+		 ORDER BY aluno_u.nome ASC`,
+		[idUsuario]
+	);
+	const dependentes = dependentesLinhas.map((d) => ({
+		id_aluno: Number(d.id_aluno),
+		nome: String(d.nome)
+	}));
+
 	return {
 		id_usuario: Number(u.id_usuario),
 		nome: String(u.nome),
@@ -319,12 +418,17 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		telefone: u.telefone ? String(u.telefone) : null,
 		ids_perfis: listaPerfis.map((p) => p.id_perfil),
 		perfis: listaPerfis,
-		dados_professor: u.n_federacao || u.grau_faixa
-			? {
-					n_federacao: u.n_federacao ? String(u.n_federacao) : null,
-					grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
-			  }
-			: null
+		dados_professor:
+			u.n_federacao || u.grau_faixa
+				? {
+						n_federacao: u.n_federacao ? String(u.n_federacao) : null,
+						grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
+				  }
+				: null,
+		endereco,
+		responsavel_legal: responsavelLegal,
+		responsaveis_legais: responsaveisLegais,
+		dependentes
 	};
 }
 
@@ -506,4 +610,196 @@ export async function removerVinculoUsuarioAcademiaTx(
 		'DELETE FROM Usuario_Academia WHERE id_usuario = ? AND id_academia = ?',
 		[idUsuario, idAcademia]
 	);
+}
+
+export async function salvarEnderecoUsuarioTx(
+	conn: PoolConnection,
+	idUsuario: number,
+	endereco: {
+		logradouro: string;
+		numero?: string | null;
+		complemento?: string | null;
+		bairro?: string | null;
+		cidade: string;
+		uf: string;
+		cep: string;
+	}
+): Promise<void> {
+	await conn.execute(
+		`INSERT INTO Endereco_Usuario (id_usuario, logradouro, numero, complemento, bairro, cidade, uf, cep)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		   logradouro = VALUES(logradouro),
+		   numero = VALUES(numero),
+		   complemento = VALUES(complemento),
+		   bairro = VALUES(bairro),
+		   cidade = VALUES(cidade),
+		   uf = VALUES(uf),
+		   cep = VALUES(cep)`,
+		[
+			idUsuario,
+			endereco.logradouro,
+			endereco.numero || null,
+			endereco.complemento || null,
+			endereco.bairro || null,
+			endereco.cidade,
+			endereco.uf.toUpperCase(),
+			endereco.cep
+		]
+	);
+}
+
+export async function vincularResponsavelAoUsuarioTx(
+	conn: PoolConnection,
+	idAluno: number,
+	idResponsavel: number,
+	grauParentesco: string = 'Responsável Legal',
+	financeiro: boolean = false
+): Promise<void> {
+	await conn.execute(
+		`INSERT INTO Responsavel (id_usuario, grau_parentesco, financeiro)
+		 VALUES (?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		   grau_parentesco = COALESCE(VALUES(grau_parentesco), grau_parentesco),
+		   financeiro = COALESCE(VALUES(financeiro), financeiro)`,
+		[idResponsavel, grauParentesco, financeiro ? 1 : 0]
+	);
+
+	await conn.execute(
+		`INSERT INTO Responsavel_Aluno (id_responsavel, id_aluno, grau_parentesco, financeiro)
+		 VALUES (?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		   grau_parentesco = VALUES(grau_parentesco),
+		   financeiro = VALUES(financeiro)`,
+		[idResponsavel, idAluno, grauParentesco, financeiro ? 1 : 0]
+	);
+}
+
+export async function sincronizarResponsaveisDoUsuarioTx(
+	conn: PoolConnection,
+	idAluno: number,
+	responsaveis: Array<{
+		idResponsavel: number;
+		grauParentesco?: string | null;
+		financeiro?: boolean;
+	}>
+): Promise<void> {
+	await conn.execute('DELETE FROM Responsavel_Aluno WHERE id_aluno = ?', [idAluno]);
+
+	for (const resp of responsaveis) {
+		if (!resp.idResponsavel) continue;
+		await conn.execute(
+			`INSERT INTO Responsavel (id_usuario, grau_parentesco, financeiro)
+			 VALUES (?, ?, ?)
+			 ON DUPLICATE KEY UPDATE
+			   grau_parentesco = COALESCE(VALUES(grau_parentesco), grau_parentesco),
+			   financeiro = COALESCE(VALUES(financeiro), financeiro)`,
+			[
+				resp.idResponsavel,
+				resp.grauParentesco || 'Responsável Legal',
+				resp.financeiro ? 1 : 0
+			]
+		);
+
+		await conn.execute(
+			`INSERT INTO Responsavel_Aluno (id_responsavel, id_aluno, grau_parentesco, financeiro)
+			 VALUES (?, ?, ?, ?)
+			 ON DUPLICATE KEY UPDATE
+			   grau_parentesco = VALUES(grau_parentesco),
+			   financeiro = VALUES(financeiro)`,
+			[
+				resp.idResponsavel,
+				idAluno,
+				resp.grauParentesco || 'Responsável Legal',
+				resp.financeiro ? 1 : 0
+			]
+		);
+	}
+}
+
+export async function desvincularResponsavelDoUsuarioTx(
+	conn: PoolConnection,
+	idAluno: number
+): Promise<void> {
+	await conn.execute('DELETE FROM Responsavel_Aluno WHERE id_aluno = ?', [idAluno]);
+}
+
+export interface UsuarioParaMatriculaItem {
+	id_usuario: number;
+	nome: string;
+	cpf: string;
+	cpf_mascarado: string;
+	data_nascimento: string;
+	idade: number;
+	genero: 'M' | 'F';
+	email: string;
+	telefone: string | null;
+	ja_aluno: boolean;
+}
+
+/**
+ * Busca usuários existentes no sistema para opção de vinculação na matrícula de judoca.
+ * Verifica também se o usuário já possui matrícula ativa como Aluno no dojo.
+ */
+export async function buscarUsuariosParaMatricula(
+	idAcademia: number,
+	termo: string
+): Promise<UsuarioParaMatriculaItem[]> {
+	const pool = getDbPool();
+	const termoLimpo = termo.trim();
+	if (!termoLimpo) return [];
+
+	const termoLike = `%${termoLimpo}%`;
+	const digitos = termoLimpo.replace(/\D/g, '');
+	const digitosLike = digitos ? `%${digitos}%` : termoLike;
+
+	const sql = `
+		SELECT 
+			u.id_usuario,
+			u.nome,
+			u.cpf,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) AS idade,
+			u.genero,
+			u.email,
+			u.telefone,
+			CASE 
+				WHEN EXISTS (
+					SELECT 1 FROM Aluno a 
+					INNER JOIN Usuario_Academia ua ON a.id_usuario = ua.id_usuario 
+					WHERE a.id_usuario = u.id_usuario AND ua.id_academia = ?
+				) THEN 1 
+				ELSE 0 
+			END AS ja_aluno
+		FROM Usuario u
+		WHERE (
+			u.nome LIKE ? 
+			OR u.email LIKE ? 
+			OR u.cpf LIKE ? 
+			OR REPLACE(REPLACE(u.cpf, '.', ''), '-', '') LIKE ?
+		)
+		ORDER BY u.nome ASC
+		LIMIT 15
+	`;
+
+	const [linhas] = await pool.query<RowDataPacket[]>(sql, [
+		idAcademia,
+		termoLike,
+		termoLike,
+		termoLike,
+		digitosLike
+	]);
+
+	return linhas.map((linha) => ({
+		id_usuario: Number(linha.id_usuario),
+		nome: String(linha.nome),
+		cpf: String(linha.cpf),
+		cpf_mascarado: mascararCpf(String(linha.cpf)),
+		data_nascimento: String(linha.data_nascimento),
+		idade: Number(linha.idade),
+		genero: (linha.genero || 'M') as 'M' | 'F',
+		email: String(linha.email),
+		telefone: linha.telefone ? String(linha.telefone) : null,
+		ja_aluno: Boolean(linha.ja_aluno)
+	}));
 }

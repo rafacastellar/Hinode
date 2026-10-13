@@ -2,18 +2,23 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { exigirPermissao } from '#lib/server/auth/rbac';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
-import { cadastrarAluno } from '#lib/server/servicos/aluno.service';
-import { alunoSchema } from '#lib/server/validacao/aluno.schema';
+import { listarCandidatosMatriculaDoDojo } from '#lib/server/repositorios/matricula.repo';
+import { matricularUsuarioExistente } from '#lib/server/servicos/aluno.service';
+import { matricularAlunoSchema } from '#lib/server/validacao/aluno.schema';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const perfis = locals.perfis || [];
 	exigirPermissao(perfis, 'ALUNOS_CRIAR');
 
 	const idAcademia = locals.idAcademia!;
-	const professores = await listarProfessoresDoDojo(idAcademia);
+	const [professores, candidatos] = await Promise.all([
+		listarProfessoresDoDojo(idAcademia),
+		listarCandidatosMatriculaDoDojo(idAcademia)
+	]);
 
 	return {
-		professores
+		professores,
+		candidatos
 	};
 };
 
@@ -26,46 +31,34 @@ export const actions: Actions = {
 		const formData = await request.formData();
 
 		const dadosBrutos = {
-			nome: formData.get('nome'),
-			cpf: formData.get('cpf'),
-			dataNascimento: formData.get('dataNascimento'),
-			email: formData.get('email'),
-			telefone: formData.get('telefone'),
+			idUsuario: formData.get('idUsuario'),
 			matricula: formData.get('matricula'),
 			peso: formData.get('peso'),
 			categoria: formData.get('categoria'),
 			nFederacao: formData.get('nFederacao'),
 			statusFederacao: formData.get('statusFederacao'),
 			dataInicio: formData.get('dataInicio'),
+			dataPrimeiraGraduacao: formData.get('dataPrimeiraGraduacao'),
 			graduacaoAtual: formData.get('graduacaoAtual'),
-			idProfessorResponsavel: formData.get('idProfessorResponsavel'),
-			responsavelNome: formData.get('responsavelNome'),
-			responsavelCpf: formData.get('responsavelCpf'),
-			responsavelEmail: formData.get('responsavelEmail'),
-			responsavelTelefone: formData.get('responsavelTelefone'),
-			responsavelParentesco: formData.get('responsavelParentesco'),
-			responsavelFinanceiro: formData.get('responsavelFinanceiro') === 'on'
+			grupoEspecialAspirante: formData.get('grupoEspecialAspirante'),
+			idProfessorResponsavel: formData.get('idProfessorResponsavel')
 		};
 
 		// 1. Validação estrutural via Zod
-		const resultadoValidacao = alunoSchema.safeParse(dadosBrutos);
-		if (!resultadoValidacao.success) {
-			const issue = resultadoValidacao.error.issues?.[0];
-			const campo =
-				issue?.path?.[0] !== undefined ? `[${String(issue.path[0])}] ` : '';
-			const primeiroErro = `${campo}${issue?.message || 'Dados inválidos para matrícula'}`;
+		const resultado = matricularAlunoSchema.safeParse(dadosBrutos);
+		if (!resultado.success) {
+			const issue = resultado.error.issues?.[0];
 			return fail(400, {
-				erro: primeiroErro,
+				erro: issue?.message || 'Dados inválidos para matrícula',
 				valores: dadosBrutos
 			});
 		}
 
-		// 2. Execução da regra de negócio com transação ACID
+		// 2. Regra de negócio + transação ACID
 		try {
-			await cadastrarAluno(idAcademia, resultadoValidacao.data);
+			await matricularUsuarioExistente(idAcademia, resultado.data);
 		} catch (erro: any) {
-			// Erros com status do SvelteKit (400, 409)
-			const mensagem = erro.body?.message || erro.message || 'Falha ao cadastrar judoca';
+			const mensagem = erro.body?.message || erro.message || 'Falha ao matricular judoca';
 			return fail(erro.status || 400, {
 				erro: mensagem,
 				valores: dadosBrutos

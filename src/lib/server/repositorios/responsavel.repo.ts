@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { getDbPool } from '../db/pool';
 import { gerarHashSenha } from '../auth/criptografia';
+import { mascararCpf } from './usuario.repo';
 
 export interface ResponsavelAluno {
 	id_usuario: number;
@@ -144,4 +145,117 @@ export async function buscarResponsavelDoAluno(
 		grau_parentesco: linha.grau_parentesco ? String(linha.grau_parentesco) : null,
 		financeiro: Boolean(linha.financeiro)
 	};
+}
+
+export interface ResponsavelOpcao {
+	id_usuario: number;
+	nome: string;
+	cpf: string;
+	cpf_mascarado: string;
+	email: string;
+	telefone: string | null;
+	grau_parentesco: string | null;
+	financeiro: boolean;
+	total_menores: number;
+	nomes_menores: string | null;
+}
+
+/**
+ * Lista todos os responsáveis já cadastrados no dojo (tenant), incluindo a contagem
+ * e nomes dos menores aos quais já estão vinculados.
+ */
+export async function listarResponsaveisDoDojo(idAcademia: number): Promise<ResponsavelOpcao[]> {
+	const pool = getDbPool();
+	const sql = `
+		SELECT 
+			u.id_usuario,
+			u.nome,
+			u.cpf,
+			u.email,
+			u.telefone,
+			COALESCE(r.grau_parentesco, 'Responsável Legal') AS grau_parentesco,
+			COALESCE(r.financeiro, 0) AS financeiro,
+			COUNT(DISTINCT ra.id_aluno) AS total_menores,
+			GROUP_CONCAT(DISTINCT menor_u.nome ORDER BY menor_u.nome SEPARATOR ', ') AS nomes_menores
+		FROM Usuario u
+		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+		LEFT JOIN Responsavel r ON u.id_usuario = r.id_usuario
+		LEFT JOIN Responsavel_Aluno ra ON u.id_usuario = ra.id_responsavel
+		LEFT JOIN Usuario menor_u ON ra.id_aluno = menor_u.id_usuario
+		WHERE ua.id_academia = ? 
+		  AND (
+		    r.id_usuario IS NOT NULL
+		    OR EXISTS (
+		      SELECT 1 FROM Usuario_Academia_Perfil uap
+		      INNER JOIN Perfil p ON uap.id_perfil = p.id_perfil
+		      WHERE uap.id_usuario = u.id_usuario 
+		        AND uap.id_academia = ua.id_academia 
+		        AND p.role = 'Responsável'
+		    )
+		  )
+		GROUP BY u.id_usuario, u.nome, u.cpf, u.email, u.telefone, r.grau_parentesco, r.financeiro
+		ORDER BY u.nome ASC
+	`;
+
+	const [linhas] = await pool.query<RowDataPacket[]>(sql, [idAcademia]);
+	return linhas.map((linha) => ({
+		id_usuario: Number(linha.id_usuario),
+		nome: String(linha.nome),
+		cpf: String(linha.cpf),
+		cpf_mascarado: mascararCpf(String(linha.cpf)),
+		email: String(linha.email),
+		telefone: linha.telefone ? String(linha.telefone) : null,
+		grau_parentesco: linha.grau_parentesco ? String(linha.grau_parentesco) : null,
+		financeiro: Boolean(linha.financeiro),
+		total_menores: Number(linha.total_menores || 0),
+		nomes_menores: linha.nomes_menores ? String(linha.nomes_menores) : null
+	}));
+}
+
+/**
+ * Vincula um responsável já existente a um aluno dentro de uma transação.
+ * Permite associar o mesmo responsável a múltiplos menores (irmãos/dependentes).
+ */
+export async function vincularResponsavelExistenteEmTransacao(
+	conn: PoolConnection,
+	idAcademia: number,
+	idResponsavel: number,
+	idAluno: number,
+	dados: {
+		grauParentesco: string;
+		financeiro: boolean;
+	}
+): Promise<void> {
+	// 1. Garante vínculo com a academia
+	await conn.execute(
+		'INSERT IGNORE INTO Usuario_Academia (id_usuario, id_academia) VALUES (?, ?)',
+		[idResponsavel, idAcademia]
+	);
+
+	// 2. Garante perfil de Responsável no tenant
+	const idPerfilResponsavel = await obterIdPerfil(conn, 'Responsável');
+	await conn.execute(
+		'INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)',
+		[idResponsavel, idAcademia, idPerfilResponsavel]
+	);
+
+	// 3. Cadastra/Atualiza registro na tabela Responsavel
+	await conn.execute(
+		`INSERT INTO Responsavel (id_usuario, grau_parentesco, financeiro)
+		 VALUES (?, ?, ?)
+		 ON DUPLICATE KEY UPDATE 
+		   grau_parentesco = COALESCE(VALUES(grau_parentesco), grau_parentesco),
+		   financeiro = COALESCE(VALUES(financeiro), financeiro)`,
+		[idResponsavel, dados.grauParentesco || 'Responsável Legal', dados.financeiro ? 1 : 0]
+	);
+
+	// 4. Vincula o Responsável ao novo Aluno na tabela associativa Responsavel_Aluno com grau e financeiro específicos
+	await conn.execute(
+		`INSERT INTO Responsavel_Aluno (id_responsavel, id_aluno, grau_parentesco, financeiro) 
+		 VALUES (?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		   grau_parentesco = VALUES(grau_parentesco),
+		   financeiro = VALUES(financeiro)`,
+		[idResponsavel, idAluno, dados.grauParentesco || 'Responsável Legal', dados.financeiro ? 1 : 0]
+	);
 }

@@ -6,7 +6,8 @@
 		UserPlus,
 		Search,
 		Award,
-		HeartHandshake
+		HeartHandshake,
+		Pencil
 	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -144,8 +145,10 @@
 							<th class="px-6 py-4">Judoca / Atleta</th>
 							<th class="px-6 py-4">Graduação (Faixa)</th>
 							<th class="px-6 py-4">Idade / Responsabilidade</th>
+							<th class="px-6 py-4">Federação / Grupo</th>
 							<th class="px-6 py-4">Sensei Responsável</th>
 							<th class="px-6 py-4">Matrícula</th>
+							<th class="px-6 py-4 text-right">Ações</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-zinc-900">
@@ -153,9 +156,12 @@
 							<tr class="hover:bg-zinc-900/30 transition-colors group">
 								<!-- Nome & CPF -->
 								<td class="px-6 py-4">
-									<div class="font-semibold text-white group-hover:text-red-400 transition-colors">
+									<a
+										href="/dashboard/alunos/{aluno.id_usuario}"
+										class="font-semibold text-white group-hover:text-red-400 transition-colors block"
+									>
 										{aluno.nome}
-									</div>
+									</a>
 									<div class="text-[11px] font-mono text-zinc-500 mt-0.5">
 										CPF: {aluno.cpf.slice(0, 3)}.***.***-{aluno.cpf.slice(-2)}
 									</div>
@@ -196,6 +202,29 @@
 									{/if}
 								</td>
 
+								<!-- Federação / Grupo -->
+								<td class="px-6 py-4">
+									<div class="flex items-center gap-1.5 flex-wrap">
+										{#if aluno.status_federacao}
+											<span
+												class="px-2 py-0.5 rounded text-[10px] font-mono font-medium {aluno.status_federacao === 'Ativo' ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}"
+											>
+												{aluno.status_federacao}
+											</span>
+										{/if}
+										{#if aluno.grupo_especial_aspirante}
+											<span
+												class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-950/50 text-purple-300 border border-purple-800/60"
+											>
+												{aluno.grupo_especial_aspirante}
+											</span>
+										{/if}
+										{#if !aluno.status_federacao && !aluno.grupo_especial_aspirante}
+											<span class="text-zinc-600 text-xs">-</span>
+										{/if}
+									</div>
+								</td>
+
 								<!-- Sensei Técnico -->
 								<td class="px-6 py-4">
 									<span class="text-zinc-200 font-medium">
@@ -206,6 +235,18 @@
 								<!-- Matrícula -->
 								<td class="px-6 py-4 font-mono text-zinc-400">
 									{aluno.matricula || '-'}
+								</td>
+
+								<!-- Ações -->
+								<td class="px-6 py-4 text-right">
+									<a
+										href="/dashboard/alunos/{aluno.id_usuario}"
+										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 hover:text-white transition-colors"
+										title="Visualizar e editar dados do judoca"
+									>
+										<Pencil class="w-3.5 h-3.5 text-zinc-400" />
+										<span>Editar</span>
+									</a>
 								</td>
 							</tr>
 						{/each}

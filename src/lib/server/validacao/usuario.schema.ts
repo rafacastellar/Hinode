@@ -53,7 +53,78 @@ export const criarUsuarioSchema = z.object({
 		.string()
 		.trim()
 		.nullish()
-		.transform((val) => (val && val.trim() ? val.trim() : null))
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+
+	// Endereço Completo (Opcional / Recomendado)
+	cep: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? apenasDigitos(val) : null)),
+	logradouro: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	numero: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	complemento: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	bairro: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	cidade: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	uf: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim().toUpperCase() : null)),
+
+	// Vínculo Familiar / Responsável Legal
+	idResponsavel: z.coerce
+		.number()
+		.int()
+		.positive()
+		.nullish()
+		.transform((val) => val || null),
+	responsavelParentesco: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : 'Responsável Legal')),
+	responsavelFinanceiro: z
+		.any()
+		.transform((val) => val === true || val === 'true' || val === 'on'),
+	responsaveisJson: z.any().transform((val) => {
+		if (!val || typeof val !== 'string') return [];
+		try {
+			const parsed = JSON.parse(val);
+			if (Array.isArray(parsed)) {
+				return parsed
+					.filter((item) => item && typeof item === 'object' && item.idResponsavel)
+					.map((item) => ({
+						idResponsavel: Number(item.idResponsavel),
+						grauParentesco: typeof item.grauParentesco === 'string' && item.grauParentesco.trim() ? item.grauParentesco.trim() : 'Responsável Legal',
+						financeiro: Boolean(item.financeiro)
+					}));
+			}
+			return [];
+		} catch {
+			return [];
+		}
+	})
 });
 
 /**
@@ -92,7 +163,78 @@ export const editarUsuarioSchema = z.object({
 		.string()
 		.trim()
 		.nullish()
-		.transform((val) => (val && val.trim() ? val.trim() : null))
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+
+	// Endereço Completo
+	cep: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? apenasDigitos(val) : null)),
+	logradouro: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	numero: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	complemento: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	bairro: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	cidade: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : null)),
+	uf: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim().toUpperCase() : null)),
+
+	// Vínculo Familiar / Responsável Legal
+	idResponsavel: z.coerce
+		.number()
+		.int()
+		.positive()
+		.nullish()
+		.transform((val) => val || null),
+	responsavelParentesco: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val && val.trim() ? val.trim() : 'Responsável Legal')),
+	responsavelFinanceiro: z
+		.any()
+		.transform((val) => val === true || val === 'true' || val === 'on'),
+	responsaveisJson: z.any().transform((val) => {
+		if (!val || typeof val !== 'string') return [];
+		try {
+			const parsed = JSON.parse(val);
+			if (Array.isArray(parsed)) {
+				return parsed
+					.filter((item) => item && typeof item === 'object' && item.idResponsavel)
+					.map((item) => ({
+						idResponsavel: Number(item.idResponsavel),
+						grauParentesco: typeof item.grauParentesco === 'string' && item.grauParentesco.trim() ? item.grauParentesco.trim() : 'Responsável Legal',
+						financeiro: Boolean(item.financeiro)
+					}));
+			}
+			return [];
+		} catch {
+			return [];
+		}
+	})
 });
 
 /**
