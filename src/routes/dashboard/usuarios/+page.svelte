@@ -212,10 +212,15 @@
 									{usuario.cpf_mascarado}
 								</td>
 
-								<!-- Idade -->
+								<!-- Idade & Gênero -->
 								<td class="px-5 py-4 whitespace-nowrap text-zinc-300">
-									<span>{usuario.idade} anos</span>
-									<span class="text-[11px] text-zinc-500 block font-mono">
+									<div class="flex items-center gap-1.5">
+										<span>{usuario.idade} anos</span>
+										<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+											{usuario.genero === 'F' ? 'Fem' : 'Masc'}
+										</span>
+									</div>
+									<span class="text-[11px] text-zinc-500 block font-mono mt-0.5">
 										{usuario.data_nascimento}
 									</span>
 								</td>

@@ -25,6 +25,7 @@ export const criarUsuarioSchema = z.object({
 		.string()
 		.trim()
 		.regex(regexData, { message: 'Data de nascimento inválida (use o formato AAAA-MM-DD)' }),
+	genero: z.enum(['M', 'F'], { message: 'Selecione o gênero (M ou F)' }).default('M'),
 	email: z
 		.string()
 		.trim()
@@ -68,6 +69,7 @@ export const editarUsuarioSchema = z.object({
 		.string()
 		.trim()
 		.regex(regexData, { message: 'Data de nascimento inválida (use o formato AAAA-MM-DD)' }),
+	genero: z.enum(['M', 'F'], { message: 'Selecione o gênero (M ou F)' }).default('M'),
 	email: z
 		.string()
 		.trim()

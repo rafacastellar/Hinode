@@ -56,6 +56,7 @@ export const actions: Actions = {
 			nome: String(formData.get('nome') || ''),
 			email: String(formData.get('email') || ''),
 			dataNascimento: String(formData.get('dataNascimento') || ''),
+			genero: (formData.get('genero') || 'M') as 'M' | 'F',
 			telefone: formData.get('telefone') ? String(formData.get('telefone')) : null,
 			idsPerfis: idsPerfisRaw.map((id) => Number(id)),
 			nFederacao: formData.get('nFederacao') ? String(formData.get('nFederacao')) : null,

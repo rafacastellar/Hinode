@@ -39,6 +39,7 @@ CREATE TABLE Usuario (
     cpf VARCHAR(14) UNIQUE NOT NULL,
     -- Maioridade é SEMPRE calculada no servidor a partir desta data (nunca por campo booleano)
     data_nascimento DATE NOT NULL,
+    genero ENUM('M', 'F') NOT NULL DEFAULT 'M',
     email VARCHAR(255) UNIQUE NOT NULL,
     senha_hash VARCHAR(255) NOT NULL, -- apenas hash (argon2id/bcrypt), nunca senha pura
     telefone VARCHAR(20)

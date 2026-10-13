@@ -27,6 +27,7 @@ export const actions: Actions = {
 			nome: String(formData.get('nome') || ''),
 			cpf: String(formData.get('cpf') || ''),
 			dataNascimento: String(formData.get('dataNascimento') || ''),
+			genero: (formData.get('genero') || 'M') as 'M' | 'F',
 			email: String(formData.get('email') || ''),
 			senha: String(formData.get('senha') || ''),
 			telefone: formData.get('telefone') ? String(formData.get('telefone')) : null,

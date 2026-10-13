@@ -6,6 +6,7 @@ export interface UsuarioAutenticavel {
 	nome: string;
 	cpf: string;
 	data_nascimento: string;
+	genero: 'M' | 'F';
 	email: string;
 	senha_hash: string;
 	telefone: string | null;
@@ -28,6 +29,7 @@ export interface UsuarioResumoDojo {
 	cpf_mascarado: string;
 	email: string;
 	data_nascimento: string;
+	genero: 'M' | 'F';
 	idade: number;
 	telefone: string | null;
 	perfis: PerfilItem[];
@@ -44,6 +46,7 @@ export interface UsuarioDetalhadoDojo {
 	cpf_mascarado: string;
 	email: string;
 	data_nascimento: string;
+	genero: 'M' | 'F';
 	idade: number;
 	telefone: string | null;
 	ids_perfis: number[];
@@ -74,6 +77,7 @@ export async function buscarUsuarioPorEmail(email: string): Promise<UsuarioAuten
 			nome,
 			cpf,
 			DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			genero,
 			email,
 			senha_hash,
 			telefone
@@ -91,6 +95,7 @@ export async function buscarUsuarioPorEmail(email: string): Promise<UsuarioAuten
 		nome: String(linha.nome),
 		cpf: String(linha.cpf),
 		data_nascimento: String(linha.data_nascimento),
+		genero: (linha.genero || 'M') as 'M' | 'F',
 		email: String(linha.email),
 		senha_hash: String(linha.senha_hash),
 		telefone: linha.telefone ? String(linha.telefone) : null
@@ -174,6 +179,7 @@ export async function listarUsuariosDoDojo(
 			u.cpf,
 			u.email,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			u.genero,
 			TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) AS idade,
 			u.telefone,
 			prof.n_federacao,
@@ -237,6 +243,7 @@ export async function listarUsuariosDoDojo(
 			cpf_mascarado: mascararCpf(String(u.cpf)),
 			email: String(u.email),
 			data_nascimento: String(u.data_nascimento),
+			genero: (u.genero || 'M') as 'M' | 'F',
 			idade: Number(u.idade),
 			telefone: u.telefone ? String(u.telefone) : null,
 			perfis: mapaPerfis.get(idUser) || [],
@@ -267,6 +274,7 @@ export async function buscarUsuarioDetalhadoNoDojo(
 			u.cpf,
 			u.email,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			u.genero,
 			TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) AS idade,
 			u.telefone,
 			prof.n_federacao,
@@ -306,6 +314,7 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		cpf_mascarado: mascararCpf(String(u.cpf)),
 		email: String(u.email),
 		data_nascimento: String(u.data_nascimento),
+		genero: (u.genero || 'M') as 'M' | 'F',
 		idade: Number(u.idade),
 		telefone: u.telefone ? String(u.telefone) : null,
 		ids_perfis: listaPerfis.map((p) => p.id_perfil),
@@ -375,18 +384,20 @@ export async function inserirUsuarioTx(
 		nome: string;
 		cpf: string;
 		dataNascimento: string;
+		genero: 'M' | 'F';
 		email: string;
 		senhaHash: string;
 		telefone: string | null;
 	}
 ): Promise<number> {
 	const [res] = await conn.query<ResultSetHeader>(
-		`INSERT INTO Usuario (nome, cpf, data_nascimento, email, senha_hash, telefone)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO Usuario (nome, cpf, data_nascimento, genero, email, senha_hash, telefone)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		[
 			dados.nome,
 			dados.cpf,
 			dados.dataNascimento,
+			dados.genero,
 			dados.email.toLowerCase().trim(),
 			dados.senhaHash,
 			dados.telefone
@@ -401,15 +412,16 @@ export async function atualizarUsuarioTx(
 	dados: {
 		nome: string;
 		dataNascimento: string;
+		genero: 'M' | 'F';
 		email: string;
 		telefone: string | null;
 	}
 ): Promise<void> {
 	await conn.query(
 		`UPDATE Usuario 
-		SET nome = ?, data_nascimento = ?, email = ?, telefone = ?
+		SET nome = ?, data_nascimento = ?, genero = ?, email = ?, telefone = ?
 		WHERE id_usuario = ?`,
-		[dados.nome, dados.dataNascimento, dados.email.toLowerCase().trim(), dados.telefone, idUsuario]
+		[dados.nome, dados.dataNascimento, dados.genero, dados.email.toLowerCase().trim(), dados.telefone, idUsuario]
 	);
 }
 

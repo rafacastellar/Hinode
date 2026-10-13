@@ -20,6 +20,7 @@
 
 	let perfisSelecionados = $state<number[]>([]);
 	let dataNasc = $state('');
+	let generoSelecionado = $state<'M' | 'F'>('M');
 
 	$effect(() => {
 		if (form?.valores?.idsPerfis) {
@@ -27,6 +28,9 @@
 		}
 		if (form?.valores?.dataNascimento) {
 			dataNasc = form.valores.dataNascimento;
+		}
+		if (form?.valores?.genero) {
+			generoSelecionado = form.valores.genero;
 		}
 	});
 
@@ -219,8 +223,25 @@
 					</div>
 				</div>
 
+				<!-- Gênero -->
+				<div>
+					<span class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						Gênero *
+					</span>
+					<div class="grid grid-cols-2 gap-2">
+						<label class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer select-none transition-colors {generoSelecionado === 'M' ? 'bg-red-950/30 border-red-800 text-white font-semibold' : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'}">
+							<input type="radio" name="genero" value="M" bind:group={generoSelecionado} class="sr-only" />
+							<span class="text-xs">Masculino</span>
+						</label>
+						<label class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer select-none transition-colors {generoSelecionado === 'F' ? 'bg-red-950/30 border-red-800 text-white font-semibold' : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'}">
+							<input type="radio" name="genero" value="F" bind:group={generoSelecionado} class="sr-only" />
+							<span class="text-xs">Feminino</span>
+						</label>
+					</div>
+				</div>
+
 				<!-- Telefone -->
-				<div class="md:col-span-2">
+				<div>
 					<label for="telefone" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Telefone de Contato (Opcional)
 					</label>

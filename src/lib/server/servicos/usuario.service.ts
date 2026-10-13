@@ -68,6 +68,7 @@ export async function cadastrarUsuarioNoDojo(
 				nome: dados.nome,
 				cpf: dados.cpf,
 				dataNascimento: dados.dataNascimento,
+				genero: dados.genero,
 				email: dados.email,
 				senhaHash,
 				telefone: dados.telefone
@@ -103,6 +104,7 @@ export async function cadastrarUsuarioNoDojo(
 		const logPayload = {
 			nome: dados.nome,
 			email: dados.email,
+			genero: dados.genero,
 			cpf_mascarado: mascararCpf(dados.cpf),
 			perfis_ids: dados.idsPerfis,
 			eh_professor: !!ehProfessor
@@ -168,6 +170,7 @@ export async function atualizarUsuarioNoDojo(
 		await atualizarUsuarioTx(conn, idUsuario, {
 			nome: dados.nome,
 			dataNascimento: dados.dataNascimento,
+			genero: dados.genero,
 			email: dados.email,
 			telefone: dados.telefone
 		});
@@ -197,6 +200,7 @@ export async function atualizarUsuarioNoDojo(
 		const logPayload = {
 			nome: dados.nome,
 			email: dados.email,
+			genero: dados.genero,
 			perfis_ids: dados.idsPerfis,
 			eh_professor: !!ehProfessor
 		};

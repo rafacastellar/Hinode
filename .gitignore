@@ -3,6 +3,7 @@ node_modules
 .claude
 implemente.md
 .project
+migrations/001_adicionar_genero_usuario.sql
 
 # Output
 .output

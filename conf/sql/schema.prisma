@@ -36,6 +36,7 @@ model Usuario {
   nome            String             @db.VarChar(255)
   cpf             String             @unique @db.VarChar(14)
   data_nascimento DateTime           @db.Date
+  genero          String             @default("M") @db.Char(1)
   email           String             @unique @db.VarChar(255)
   senha_hash      String             @db.VarChar(255)
   telefone        String?            @db.VarChar(20)
