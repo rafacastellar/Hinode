@@ -220,7 +220,29 @@
 			</div>
 		</div>
 
-		{#if aluno.nome_responsavel}
+		{#if aluno.responsaveis && aluno.responsaveis.length > 0}
+			<div class="pt-3 border-t border-zinc-900 space-y-2">
+				<span class="text-zinc-500 font-mono text-[11px] block">
+					Responsáveis Legais Vinculados ({aluno.responsaveis.length}):
+				</span>
+				<div class="flex flex-wrap gap-2">
+					{#each aluno.responsaveis as r}
+						<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
+							<HeartHandshake class="w-3.5 h-3.5 text-amber-400 shrink-0" />
+							<span class="text-zinc-200 font-medium">{r.nome}</span>
+							<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+								{r.grau_parentesco}
+							</span>
+							{#if r.financeiro}
+								<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/60 border border-emerald-800 text-emerald-400">
+									Financeiro
+								</span>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</div>
+		{:else if aluno.nome_responsavel}
 			<div class="pt-3 border-t border-zinc-900 flex items-center gap-3 text-xs">
 				<HeartHandshake class="w-4 h-4 text-amber-400 shrink-0" />
 				<div class="flex items-center gap-2 flex-wrap">

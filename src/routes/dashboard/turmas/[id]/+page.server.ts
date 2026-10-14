@@ -1,9 +1,16 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { exigirPermissao } from '#lib/server/auth/rbac';
 import { buscarTurmaPorId } from '#lib/server/repositorios/turma.repo';
 import { listarAlunos } from '#lib/server/repositorios/aluno.repo';
-import { adicionarAlunoNaTurma, removerAlunoDaTurma } from '#lib/server/servicos/turma.service';
+import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
+import {
+	adicionarAlunoNaTurma,
+	removerAlunoDaTurma,
+	atualizarTurma,
+	removerTurma
+} from '#lib/server/servicos/turma.service';
+import { turmaSchema } from '#lib/server/validacao/turma.schema';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const perfis = locals.perfis || [];
@@ -26,13 +33,63 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const idsJaMatriculados = new Set(turma.alunos_matriculados.map((a) => a.id_usuario));
 	const alunosDisponiveis = todosAlunos.filter((a) => !idsJaMatriculados.has(a.id_usuario));
 
+	// Lista de todos os professores do dojo para alocação múltipla
+	const professoresDojo = await listarProfessoresDoDojo(idAcademia);
+
 	return {
 		turma,
-		alunosDisponiveis
+		alunosDisponiveis,
+		professoresDojo
 	};
 };
 
 export const actions: Actions = {
+	atualizar: async ({ request, params, locals }) => {
+		const perfis = locals.perfis || [];
+		exigirPermissao(perfis, 'TURMAS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia!;
+		const idTreino = Number(params.id);
+		const formData = await request.formData();
+
+		// Trata múltiplos dias selecionados
+		const diasSelecionados = formData.getAll('dias');
+		const diaSemanaTexto =
+			diasSelecionados.length > 0
+				? diasSelecionados.join(' e ')
+				: (formData.get('diaSemana') as string) || '';
+
+		const dadosBrutos = {
+			descricao: formData.get('descricao'),
+			diaSemana: diaSemanaTexto,
+			horarioInicio: formData.get('horarioInicio'),
+			horarioFim: formData.get('horarioFim'),
+			professoresIds: formData.getAll('professoresIds')
+		};
+
+		const resultadoValidacao = turmaSchema.safeParse(dadosBrutos);
+		if (!resultadoValidacao.success) {
+			const issue = resultadoValidacao.error.issues?.[0];
+			const campo =
+				issue?.path?.[0] !== undefined ? `[${String(issue.path[0])}] ` : '';
+			const primeiroErro = `${campo}${issue?.message || 'Dados inválidos para turma'}`;
+			return fail(400, {
+				erroEdicao: primeiroErro
+			});
+		}
+
+		try {
+			await atualizarTurma(idAcademia, idTreino, resultadoValidacao.data);
+		} catch (erro: any) {
+			const mensagem = erro.body?.message || erro.message || 'Falha ao atualizar turma';
+			return fail(erro.status || 400, {
+				erroEdicao: mensagem
+			});
+		}
+
+		return { sucessoEdicao: true };
+	},
+
 	matricular: async ({ request, params, locals }) => {
 		const perfis = locals.perfis || [];
 		exigirPermissao(perfis, 'TURMAS_GERENCIAR');
@@ -75,5 +132,21 @@ export const actions: Actions = {
 		}
 
 		return { sucessoRemocao: true };
+	},
+
+	excluir: async ({ params, locals }) => {
+		const perfis = locals.perfis || [];
+		exigirPermissao(perfis, 'TURMAS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia!;
+		const idTreino = Number(params.id);
+
+		try {
+			await removerTurma(idAcademia, idTreino);
+		} catch (err: any) {
+			return fail(400, { erro: err.message || 'Falha ao excluir turma.' });
+		}
+
+		throw redirect(303, '/dashboard/turmas');
 	}
 };

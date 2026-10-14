@@ -299,3 +299,62 @@ export async function desmatricularAlunoDeTurma(
 		[idAluno, idTreino]
 	);
 }
+
+/**
+ * Atualiza os dados de uma turma e sincroniza os múltiplos professores alocados.
+ * MULTI-TENANT: garante que a turma pertença ao idAcademia.
+ */
+export async function atualizarTurmaEmTransacao(
+	conn: PoolConnection,
+	idAcademia: number,
+	idTreino: number,
+	dados: TurmaInput
+): Promise<void> {
+	const sqlUpdate = `
+		UPDATE Treino_Turma
+		SET descricao = ?,
+		    horario_inicio = ?,
+		    horario_fim = ?,
+		    dia_semana = ?
+		WHERE id_treino = ? AND id_academia = ?
+	`;
+
+	const [res] = await conn.execute<ResultSetHeader>(sqlUpdate, [
+		dados.descricao,
+		dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
+		dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
+		dados.diaSemana,
+		idTreino,
+		idAcademia
+	]);
+
+	if (res.affectedRows === 0) {
+		throw new Error('Turma não encontrada para esta academia.');
+	}
+
+	// Sincroniza equipe de professores (remove anteriores e insere novos)
+	await conn.execute('DELETE FROM Professor_Treino WHERE id_treino = ?', [idTreino]);
+
+	for (const idProfessor of dados.professoresIds) {
+		await conn.execute(
+			'INSERT INTO Professor_Treino (id_professor, id_treino) VALUES (?, ?)',
+			[idProfessor, idTreino]
+		);
+	}
+}
+
+/**
+ * Exclui a turma do dojo (as relações em Professor_Treino e Aluno_Treino caem por CASCADE).
+ */
+export async function excluirTurma(idAcademia: number, idTreino: number): Promise<void> {
+	const pool = getDbPool();
+	const [res] = await pool.execute<ResultSetHeader>(
+		'DELETE FROM Treino_Turma WHERE id_treino = ? AND id_academia = ?',
+		[idTreino, idAcademia]
+	);
+
+	if (res.affectedRows === 0) {
+		throw new Error('Turma não encontrada para esta academia.');
+	}
+}
+

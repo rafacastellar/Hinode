@@ -21,6 +21,13 @@ export interface AlunoListaItem {
 	parentesco_responsavel: string | null;
 }
 
+export interface ResponsavelVinculadoAluno {
+	id_responsavel: number;
+	nome: string;
+	grau_parentesco: string;
+	financeiro: boolean;
+}
+
 export interface AlunoDetalhado extends AlunoListaItem {
 	telefone: string | null;
 	n_federacao: string | null;
@@ -28,6 +35,7 @@ export interface AlunoDetalhado extends AlunoListaItem {
 	data_inicio: string | null;
 	data_primeira_graduacao: string | null;
 	grupo_especial_aspirante: string | null;
+	responsaveis?: ResponsavelVinculadoAluno[];
 }
 
 export interface InserirAlunoDados {
@@ -89,8 +97,8 @@ export async function listarAlunos(
 			a.grupo_especial_aspirante,
 			a.id_professor_responsavel,
 			prof_u.nome AS nome_professor_responsavel,
-			resp_u.nome AS nome_responsavel,
-			r.grau_parentesco AS parentesco_responsavel
+			GROUP_CONCAT(DISTINCT resp_u.nome ORDER BY resp_u.nome SEPARATOR ', ') AS nome_responsavel,
+			GROUP_CONCAT(DISTINCT COALESCE(ra.grau_parentesco, r.grau_parentesco) ORDER BY resp_u.nome SEPARATOR ', ') AS parentesco_responsavel
 		FROM Aluno a
 		INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
 		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
@@ -98,7 +106,7 @@ export async function listarAlunos(
 		INNER JOIN Usuario prof_u ON p.id_usuario = prof_u.id_usuario
 		LEFT JOIN Responsavel_Aluno ra ON a.id_usuario = ra.id_aluno
 		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
-		LEFT JOIN Usuario resp_u ON r.id_usuario = resp_u.id_usuario
+		LEFT JOIN Usuario resp_u ON ra.id_responsavel = resp_u.id_usuario
 		WHERE ua.id_academia = ?
 	`;
 
@@ -110,7 +118,23 @@ export async function listarAlunos(
 		params.push(buscaLike, buscaLike, buscaLike);
 	}
 
-	sql += ` ORDER BY u.nome ASC`;
+	sql += `
+		GROUP BY 
+			u.id_usuario,
+			u.nome,
+			u.cpf,
+			u.email,
+			u.data_nascimento,
+			a.matricula,
+			a.graduacao_atual,
+			a.peso,
+			a.categoria,
+			a.status_federacao,
+			a.grupo_especial_aspirante,
+			a.id_professor_responsavel,
+			prof_u.nome
+		ORDER BY u.nome ASC
+	`;
 
 	const [linhas] = await pool.execute<RowDataPacket[]>(sql, params);
 
@@ -171,8 +195,8 @@ export async function buscarAlunoPorId(
 			a.grupo_especial_aspirante,
 			a.id_professor_responsavel,
 			prof_u.nome AS nome_professor_responsavel,
-			resp_u.nome AS nome_responsavel,
-			r.grau_parentesco AS parentesco_responsavel
+			GROUP_CONCAT(DISTINCT resp_u.nome ORDER BY resp_u.nome SEPARATOR ', ') AS nome_responsavel,
+			GROUP_CONCAT(DISTINCT COALESCE(ra.grau_parentesco, r.grau_parentesco) ORDER BY resp_u.nome SEPARATOR ', ') AS parentesco_responsavel
 		FROM Aluno a
 		INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
 		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
@@ -180,8 +204,26 @@ export async function buscarAlunoPorId(
 		INNER JOIN Usuario prof_u ON p.id_usuario = prof_u.id_usuario
 		LEFT JOIN Responsavel_Aluno ra ON a.id_usuario = ra.id_aluno
 		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
-		LEFT JOIN Usuario resp_u ON r.id_usuario = resp_u.id_usuario
+		LEFT JOIN Usuario resp_u ON ra.id_responsavel = resp_u.id_usuario
 		WHERE a.id_usuario = ? AND ua.id_academia = ?
+		GROUP BY 
+			u.id_usuario,
+			u.nome,
+			u.cpf,
+			u.email,
+			u.telefone,
+			u.data_nascimento,
+			a.matricula,
+			a.graduacao_atual,
+			a.peso,
+			a.categoria,
+			a.n_federacao,
+			a.status_federacao,
+			a.data_inicio,
+			a.data_primeira_graduacao,
+			a.grupo_especial_aspirante,
+			a.id_professor_responsavel,
+			prof_u.nome
 		LIMIT 1
 	`;
 
@@ -191,6 +233,21 @@ export async function buscarAlunoPorId(
 	const linha = linhas[0];
 	const dataNasc = String(linha.data_nascimento);
 	const idade = calcularIdadeServidor(dataNasc);
+
+	// Busca lista de responsáveis detalhados
+	const [linhasResp] = await pool.query<RowDataPacket[]>(
+		`SELECT 
+			ra.id_responsavel,
+			ru.nome,
+			COALESCE(ra.grau_parentesco, r.grau_parentesco, 'Responsável Legal') AS grau_parentesco,
+			COALESCE(ra.financeiro, r.financeiro, 0) AS financeiro
+		 FROM Responsavel_Aluno ra
+		 INNER JOIN Usuario ru ON ra.id_responsavel = ru.id_usuario
+		 LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
+		 WHERE ra.id_aluno = ?
+		 ORDER BY ru.nome ASC`,
+		[idAluno]
+	);
 
 	return {
 		id_usuario: Number(linha.id_usuario),
@@ -219,7 +276,13 @@ export async function buscarAlunoPorId(
 		nome_responsavel: linha.nome_responsavel ? String(linha.nome_responsavel) : null,
 		parentesco_responsavel: linha.parentesco_responsavel
 			? String(linha.parentesco_responsavel)
-			: null
+			: null,
+		responsaveis: linhasResp.map((lr) => ({
+			id_responsavel: Number(lr.id_responsavel),
+			nome: String(lr.nome),
+			grau_parentesco: String(lr.grau_parentesco),
+			financeiro: Boolean(lr.financeiro)
+		}))
 	};
 }
 

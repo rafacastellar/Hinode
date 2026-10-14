@@ -193,11 +193,16 @@
 									</div>
 									{#if aluno.nome_responsavel}
 										<div class="text-[11px] text-zinc-400 mt-1 flex items-center gap-1">
-											<HeartHandshake class="w-3 h-3 text-zinc-500" />
-											<span class="truncate max-w-[150px]">{aluno.nome_responsavel}</span>
-											{#if aluno.parentesco_responsavel}
-												<span class="text-zinc-600">({aluno.parentesco_responsavel})</span>
-											{/if}
+											<HeartHandshake class="w-3 h-3 text-amber-400 shrink-0" />
+											<span
+												class="truncate max-w-[220px]"
+												title="{aluno.nome_responsavel}{aluno.parentesco_responsavel ? ` (${aluno.parentesco_responsavel})` : ''}"
+											>
+												{aluno.nome_responsavel}
+												{#if aluno.parentesco_responsavel}
+													<span class="text-zinc-500 font-mono">({aluno.parentesco_responsavel})</span>
+												{/if}
+											</span>
 										</div>
 									{/if}
 								</td>
