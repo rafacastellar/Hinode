@@ -11,6 +11,12 @@ export interface MetricasDojo {
 		nome: string;
 		edicao: string | null;
 		data_inicio: string | null;
+		faixa_inicio?: string | null;
+		faixa_fim?: string | null;
+		limite_graduacao?: string | null;
+		limite_grupo?: string | null;
+		valor_inscricao?: number | null;
+		eh_campeonato: boolean;
 	}>;
 }
 
@@ -64,21 +70,34 @@ export async function obterMetricasDoDojo(idAcademia: number): Promise<MetricasD
 	// 5. Próximos Eventos cadastrados para o Tenant
 	const sqlEventos = `
 		SELECT 
-			id_evento,
-			nome,
-			edicao,
-			DATE_FORMAT(data_inicio, '%d/%m/%Y') AS data_inicio
-		FROM Evento
-		WHERE id_academia = ?
-		ORDER BY data_inicio ASC
-		LIMIT 3
+			e.id_evento,
+			e.nome,
+			e.edicao,
+			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
+			c.faixa_inicio,
+			c.faixa_fim,
+			c.limite_graduacao,
+			c.limite_grupo,
+			c.valor_inscricao,
+			(c.id_evento IS NOT NULL) AS eh_campeonato
+		FROM Evento e
+		LEFT JOIN Campeonato c ON e.id_evento = c.id_evento
+		WHERE e.id_academia = ?
+		ORDER BY e.data_inicio ASC
+		LIMIT 4
 	`;
 	const [linhasEventos] = await pool.execute<RowDataPacket[]>(sqlEventos, [idAcademia]);
 	const proximosEventos = linhasEventos.map((linha) => ({
 		id_evento: Number(linha.id_evento),
 		nome: String(linha.nome),
 		edicao: linha.edicao ? String(linha.edicao) : null,
-		data_inicio: linha.data_inicio ? String(linha.data_inicio) : null
+		data_inicio: linha.data_inicio ? String(linha.data_inicio) : null,
+		faixa_inicio: linha.faixa_inicio ? String(linha.faixa_inicio) : null,
+		faixa_fim: linha.faixa_fim ? String(linha.faixa_fim) : null,
+		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
+		limite_grupo: linha.limite_grupo ? String(linha.limite_grupo) : null,
+		valor_inscricao: linha.valor_inscricao !== null && linha.valor_inscricao !== undefined ? Number(linha.valor_inscricao) : null,
+		eh_campeonato: Boolean(linha.eh_campeonato)
 	}));
 
 	return {

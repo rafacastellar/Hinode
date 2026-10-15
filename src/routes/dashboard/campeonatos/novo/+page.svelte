@@ -7,12 +7,23 @@
 		MapPin,
 		ArrowLeft,
 		AlertCircle,
-		CheckCircle2
+		CheckCircle2,
+		DollarSign,
+		Sparkles
 	} from '@lucide/svelte';
+	import { FAIXAS_JUDO_LISTA } from '#lib/dominio/campeonato';
 
 	let { form }: { form: ActionData } = $props();
 
 	let carregando = $state(false);
+
+	let faixaInicio = $state('Branca');
+	let faixaFim = $state('Preta');
+
+	$effect(() => {
+		if (form?.valores?.faixaInicio) faixaInicio = form.valores.faixaInicio as string;
+		if (form?.valores?.faixaFim) faixaFim = form.valores.faixaFim as string;
+	});
 
 	const tiposCampeonato = [
 		'Regional',
@@ -22,6 +33,11 @@
 		'Copa Interna / Amistoso',
 		'Internacional'
 	];
+
+	function selecionarTodasFaixas() {
+		faixaInicio = 'Branca';
+		faixaFim = 'Preta';
+	}
 </script>
 
 <svelte:head>
@@ -50,8 +66,7 @@
 			Novo Campeonato
 		</h1>
 		<p class="text-xs sm:text-sm text-zinc-400 mt-1">
-			Agende uma competição oficial, configure limites de graduação e prepare as inscrições dos
-			judocas do dojo.
+			Agende uma competição oficial, configure faixas limites, idades, categoria e o valor da taxa de inscrição.
 		</p>
 	</div>
 
@@ -90,7 +105,7 @@
 				</div>
 				<div>
 					<h2 class="text-sm font-bold text-white font-display">Dados da Competição</h2>
-					<p class="text-[11px] text-zinc-500">Nome, chancela federativa e tipo de torneio</p>
+					<p class="text-[11px] text-zinc-500">Nome, nível federativo, data e taxa de inscrição</p>
 				</div>
 			</div>
 
@@ -154,23 +169,152 @@
 					/>
 				</div>
 
+				<!-- Taxa de Inscrição -->
 				<div>
-					<label for="limiteGraduacao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Limites de Faixa / Categorias
+					<label for="valorInscricao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Taxa de Inscrição (R$)
 					</label>
-					<input
-						type="text"
-						id="limiteGraduacao"
-						name="limiteGraduacao"
-						value={(form?.valores?.limiteGraduacao as string) || ''}
-						placeholder="Ex: Sub-18 / Adulto (Faixas Amarela a Preta)"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					/>
+					<div class="relative">
+						<span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-xs font-mono text-zinc-500">
+							R$
+						</span>
+						<input
+							type="number"
+							id="valorInscricao"
+							name="valorInscricao"
+							step="0.01"
+							min="0"
+							value={(form?.valores?.valorInscricao as string) || '0.00'}
+							placeholder="0.00"
+							class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+					</div>
+					<span class="text-[10px] text-zinc-500 mt-1 block">
+						Valor padrão cobrado de cada judoca. Deixe 0.00 se for isento/gratuito.
+					</span>
 				</div>
 			</div>
 		</div>
 
-		<!-- 2. LOCAL E ENDEREÇO DA COMPETIÇÃO -->
+		<!-- 2. REGRAS DE PARTICIPAÇÃO (GRADUAÇÃO, IDADE E CATEGORIA) -->
+		<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
+			<div class="flex items-center justify-between pb-4 border-b border-zinc-900">
+				<div>
+					<h2 class="text-sm font-bold text-white font-display">Regras de Elegibilidade dos Judocas</h2>
+					<p class="text-[11px] text-zinc-500">Intervalo de faixas, limites de idade e divisão por categoria</p>
+				</div>
+
+				<button
+					type="button"
+					onclick={selecionarTodasFaixas}
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-mono text-zinc-300 hover:text-white transition-colors"
+				>
+					<Sparkles class="w-3.5 h-3.5 text-amber-400" />
+					<span>Todas as Faixas</span>
+				</button>
+			</div>
+
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				<!-- Faixa Limite Inicial -->
+				<div>
+					<label for="faixaInicio" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Faixa Limite Inicial (Mínima) *
+					</label>
+					<select
+						id="faixaInicio"
+						name="faixaInicio"
+						bind:value={faixaInicio}
+						required
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					>
+						{#each FAIXAS_JUDO_LISTA as f}
+							<option value={f}>{f}</option>
+						{/each}
+					</select>
+					<span class="text-[10px] text-zinc-500 mt-1 block">Graduação mínima para disputar o torneio.</span>
+				</div>
+
+				<!-- Faixa Limite Final -->
+				<div>
+					<label for="faixaFim" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Faixa Limite Final (Máxima) *
+					</label>
+					<select
+						id="faixaFim"
+						name="faixaFim"
+						bind:value={faixaFim}
+						required
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					>
+						{#each FAIXAS_JUDO_LISTA as f}
+							<option value={f}>{f}</option>
+						{/each}
+					</select>
+					<span class="text-[10px] text-zinc-500 mt-1 block">Graduação máxima permitida (teto).</span>
+				</div>
+
+				<!-- Idade Mínima -->
+				<div>
+					<label for="idadeMinima" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Idade Mínima (Opcional)
+					</label>
+					<input
+						type="number"
+						id="idadeMinima"
+						name="idadeMinima"
+						min="0"
+						max="100"
+						value={(form?.valores?.idadeMinima as string) || ''}
+						placeholder="Ex: 12 (anos)"
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					/>
+					<span class="text-[10px] text-zinc-500 mt-1 block">Deixe em branco se não houver piso de idade.</span>
+				</div>
+
+				<!-- Idade Máxima -->
+				<div>
+					<label for="idadeMaxima" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Idade Máxima (Opcional)
+					</label>
+					<input
+						type="number"
+						id="idadeMaxima"
+						name="idadeMaxima"
+						min="0"
+						max="100"
+						value={(form?.valores?.idadeMaxima as string) || ''}
+						placeholder="Ex: 14 (para Sub-15)"
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					/>
+					<span class="text-[10px] text-zinc-500 mt-1 block">Deixe em branco se não houver teto de idade.</span>
+				</div>
+
+				<!-- Categoria do Campeonato -->
+				<div class="sm:col-span-2">
+					<label for="limiteGrupo" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Categoria / Divisão Competitiva *
+					</label>
+					<select
+						id="limiteGrupo"
+						name="limiteGrupo"
+						required
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					>
+						<option value="Todos" selected={!form?.valores?.limiteGrupo || (form?.valores?.limiteGrupo as string) === 'Todos'}>
+							Todos (Especial e Aspirante)
+						</option>
+						<option value="Especial" selected={(form?.valores?.limiteGrupo as string) === 'Especial'}>
+							Apenas Especial (Alto Rendimento Federado)
+						</option>
+						<option value="Aspirante" selected={(form?.valores?.limiteGrupo as string) === 'Aspirante'}>
+							Apenas Aspirante (Circuito Escolar / Aspirante)
+						</option>
+					</select>
+				</div>
+			</div>
+		</div>
+
+		<!-- 3. LOCAL E ENDEREÇO DA COMPETIÇÃO -->
 		<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
 			<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
 				<div

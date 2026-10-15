@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/prom
 import { getDbPool } from '../db/pool';
 import { gerarHashSenha } from '../auth/criptografia';
 import { mascararCpf } from './usuario.repo';
+import { calcularIdadeServidor } from './aluno.repo';
 
 export interface ResponsavelAluno {
 	id_usuario: number;
@@ -259,3 +260,73 @@ export async function vincularResponsavelExistenteEmTransacao(
 		[idResponsavel, idAluno, dados.grauParentesco || 'Responsável Legal', dados.financeiro ? 1 : 0]
 	);
 }
+
+export interface DependenteResponsavel {
+	id_usuario: number;
+	nome: string;
+	cpf: string;
+	data_nascimento: string;
+	idade: number;
+	menor_idade: boolean;
+	matricula: string | null;
+	graduacao_atual: string;
+	peso: number | null;
+	categoria: string | null;
+	status_federacao: string | null;
+	grupo_especial_aspirante: string | null;
+	grau_parentesco: string;
+}
+
+/**
+ * Lista todos os alunos/dependentes vinculados ao responsável legal na academia.
+ */
+export async function listarAlunosDoResponsavel(
+	idAcademia: number,
+	idResponsavel: number
+): Promise<DependenteResponsavel[]> {
+	const pool = getDbPool();
+	const sql = `
+		SELECT 
+			a.id_usuario,
+			u.nome,
+			u.cpf,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			a.matricula,
+			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
+			a.peso,
+			a.categoria,
+			a.status_federacao,
+			a.grupo_especial_aspirante,
+			COALESCE(ra.grau_parentesco, r.grau_parentesco, 'Responsável Legal') AS grau_parentesco
+		FROM Responsavel_Aluno ra
+		INNER JOIN Aluno a ON ra.id_aluno = a.id_usuario
+		INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
+		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
+		WHERE ua.id_academia = ? AND ra.id_responsavel = ?
+		ORDER BY u.nome ASC
+	`;
+	const [linhas] = await pool.query<RowDataPacket[]>(sql, [idAcademia, idResponsavel]);
+	return linhas.map((linha) => {
+		const dataNasc = String(linha.data_nascimento);
+		const idade = calcularIdadeServidor(dataNasc);
+		return {
+			id_usuario: Number(linha.id_usuario),
+			nome: String(linha.nome),
+			cpf: String(linha.cpf),
+			data_nascimento: dataNasc,
+			idade,
+			menor_idade: idade < 18,
+			matricula: linha.matricula ? String(linha.matricula) : null,
+			graduacao_atual: String(linha.graduacao_atual),
+			peso: linha.peso !== null ? Number(linha.peso) : null,
+			categoria: linha.categoria ? String(linha.categoria) : null,
+			status_federacao: linha.status_federacao ? String(linha.status_federacao) : null,
+			grupo_especial_aspirante: linha.grupo_especial_aspirante
+				? String(linha.grupo_especial_aspirante)
+				: null,
+			grau_parentesco: String(linha.grau_parentesco)
+		};
+	});
+}
+

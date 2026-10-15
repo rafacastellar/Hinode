@@ -235,19 +235,52 @@
 				{#if data.metricas.proximosEventos.length > 0}
 					<div class="space-y-3">
 						{#each data.metricas.proximosEventos as evento}
-							<div class="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-								<div class="flex items-center justify-between">
-									<span class="text-xs font-semibold text-white truncate">{evento.nome}</span>
-									{#if evento.data_inicio}
-										<span class="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">
-											{evento.data_inicio}
+							{#if evento.eh_campeonato}
+								<a
+									href="/dashboard/campeonatos/{evento.id_evento}"
+									class="block p-3.5 rounded-xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-red-900/60 transition-all group"
+								>
+									<div class="flex items-center justify-between gap-2">
+										<div class="flex items-center gap-2 min-w-0">
+											<Trophy class="w-3.5 h-3.5 text-red-500 shrink-0 group-hover:scale-110 transition-transform" />
+											<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors truncate">
+												{evento.nome}
+											</span>
+										</div>
+										{#if evento.data_inicio}
+											<span class="text-[10px] font-mono text-zinc-400 shrink-0">
+												{evento.data_inicio}
+											</span>
+										{/if}
+									</div>
+
+									<div class="flex flex-wrap items-center gap-1.5 mt-2">
+										<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-950 border border-zinc-800 text-zinc-300">
+											🥋 {evento.faixa_inicio && evento.faixa_fim ? `${evento.faixa_inicio} - ${evento.faixa_fim}` : (evento.limite_graduacao || 'Todas')}
 										</span>
+										<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-950 border border-zinc-800 text-emerald-400">
+											{evento.valor_inscricao !== null && Number(evento.valor_inscricao) > 0 ? `R$ ${Number(evento.valor_inscricao).toFixed(2)}` : 'Gratuito'}
+										</span>
+										<span class="text-[10px] text-red-400 font-medium ml-auto group-hover:underline">
+											Inscrever-se &rarr;
+										</span>
+									</div>
+								</a>
+							{:else}
+								<div class="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+									<div class="flex items-center justify-between">
+										<span class="text-xs font-semibold text-white truncate">{evento.nome}</span>
+										{#if evento.data_inicio}
+											<span class="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">
+												{evento.data_inicio}
+											</span>
+										{/if}
+									</div>
+									{#if evento.edicao}
+										<span class="text-[11px] text-zinc-500 block mt-0.5">{evento.edicao}</span>
 									{/if}
 								</div>
-								{#if evento.edicao}
-									<span class="text-[11px] text-zinc-500 block mt-0.5">{evento.edicao}</span>
-								{/if}
-							</div>
+							{/if}
 						{/each}
 					</div>
 				{:else}

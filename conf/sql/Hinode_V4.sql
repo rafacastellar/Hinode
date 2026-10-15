@@ -247,6 +247,10 @@ CREATE TABLE Inscricao_Evento (
     data_inicio_inscricao DATE,
     data_fim_inscricao DATE,
     status_inscricao VARCHAR(50) NOT NULL DEFAULT 'Pendente',
+    confirmado_atleta TINYINT(1) NOT NULL DEFAULT 0,
+    confirmado_responsavel TINYINT(1) NOT NULL DEFAULT 0,
+    data_confirmacao_atleta DATETIME NULL,
+    data_confirmacao_responsavel DATETIME NULL,
     valor DECIMAL(10,2),
     FOREIGN KEY (id_aluno) REFERENCES Aluno(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_professor) REFERENCES Professor(id_usuario) ON DELETE CASCADE,
@@ -265,7 +269,12 @@ CREATE TABLE Campeonato (
     tipo_campeonato VARCHAR(100),
     classificacao_academia VARCHAR(100),
     limite_graduacao VARCHAR(100),
+    faixa_inicio VARCHAR(50) NOT NULL DEFAULT 'Branca',
+    faixa_fim VARCHAR(50) NOT NULL DEFAULT 'Preta',
     limite_grupo VARCHAR(100),
+    idade_minima INT NULL,
+    idade_maxima INT NULL,
+    valor_inscricao DECIMAL(10,2) NULL DEFAULT 0.00,
     FOREIGN KEY (id_evento) REFERENCES Evento(id_evento) ON DELETE CASCADE
 );
 

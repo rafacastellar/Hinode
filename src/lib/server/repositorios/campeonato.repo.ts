@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { getDbPool } from '../db/pool';
+import { calcularIdadeServidor } from './aluno.repo';
 import type { CampeonatoInput, ResultadoInput } from '../validacao/campeonato.schema';
 
 export interface CampeonatoResumo {
@@ -9,6 +10,12 @@ export interface CampeonatoResumo {
 	data_inicio: string;
 	tipo_campeonato: string | null;
 	limite_graduacao: string | null;
+	faixa_inicio: string;
+	faixa_fim: string;
+	limite_grupo: string | null;
+	idade_minima: number | null;
+	idade_maxima: number | null;
+	valor_inscricao: number;
 	cidade: string;
 	uf: string;
 	total_inscritos: number;
@@ -21,8 +28,15 @@ export interface CampeonatoDetalhado {
 	nome: string;
 	edicao: string | null;
 	data_inicio: string;
+	data_inicio_iso: string;
 	tipo_campeonato: string | null;
 	limite_graduacao: string | null;
+	faixa_inicio: string;
+	faixa_fim: string;
+	limite_grupo: string | null;
+	idade_minima: number | null;
+	idade_maxima: number | null;
+	valor_inscricao: number;
 	logradouro: string;
 	cidade: string;
 	uf: string;
@@ -35,6 +49,17 @@ export interface InscricaoItem {
 	id_participante: number;
 	nome_participante: string;
 	faixa_participante: string;
+	grupo_participante: string | null;
+	data_nascimento: string | null;
+	idade: number;
+	menor_idade: boolean;
+	id_responsavel: number | null;
+	nome_responsavel: string | null;
+	parentesco_responsavel: string | null;
+	confirmado_atleta: boolean;
+	confirmado_responsavel: boolean;
+	data_confirmacao_atleta: string | null;
+	data_confirmacao_responsavel: string | null;
 	status_inscricao: 'Pendente' | 'Confirmada' | 'Cancelada';
 	valor: number | null;
 }
@@ -66,6 +91,12 @@ export async function listarCampeonatosDoDojo(
 			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
 			c.tipo_campeonato,
 			c.limite_graduacao,
+			COALESCE(c.faixa_inicio, 'Branca') AS faixa_inicio,
+			COALESCE(c.faixa_fim, 'Preta') AS faixa_fim,
+			c.limite_grupo,
+			c.idade_minima,
+			c.idade_maxima,
+			COALESCE(c.valor_inscricao, 0.00) AS valor_inscricao,
 			COALESCE(ee.cidade, 'São Paulo') AS cidade,
 			COALESCE(ee.uf, 'SP') AS uf,
 			(
@@ -99,6 +130,12 @@ export async function listarCampeonatosDoDojo(
 		data_inicio: String(linha.data_inicio),
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
+		faixa_inicio: String(linha.faixa_inicio),
+		faixa_fim: String(linha.faixa_fim),
+		limite_grupo: linha.limite_grupo ? String(linha.limite_grupo) : null,
+		idade_minima: linha.idade_minima !== null ? Number(linha.idade_minima) : null,
+		idade_maxima: linha.idade_maxima !== null ? Number(linha.idade_maxima) : null,
+		valor_inscricao: Number(linha.valor_inscricao || 0),
 		cidade: String(linha.cidade),
 		uf: String(linha.uf),
 		total_inscritos: Number(linha.total_inscritos || 0),
@@ -122,8 +159,15 @@ export async function buscarCampeonatoPorId(
 			e.nome,
 			e.edicao,
 			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
+			DATE_FORMAT(e.data_inicio, '%Y-%m-%d') AS data_inicio_iso,
 			c.tipo_campeonato,
 			c.limite_graduacao,
+			COALESCE(c.faixa_inicio, 'Branca') AS faixa_inicio,
+			COALESCE(c.faixa_fim, 'Preta') AS faixa_fim,
+			c.limite_grupo,
+			c.idade_minima,
+			c.idade_maxima,
+			COALESCE(c.valor_inscricao, 0.00) AS valor_inscricao,
 			COALESCE(ee.logradouro, 'Local Principal') AS logradouro,
 			COALESCE(ee.cidade, 'São Paulo') AS cidade,
 			COALESCE(ee.uf, 'SP') AS uf,
@@ -144,8 +188,15 @@ export async function buscarCampeonatoPorId(
 		nome: String(linha.nome),
 		edicao: linha.edicao ? String(linha.edicao) : null,
 		data_inicio: String(linha.data_inicio),
+		data_inicio_iso: String(linha.data_inicio_iso),
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
+		faixa_inicio: String(linha.faixa_inicio),
+		faixa_fim: String(linha.faixa_fim),
+		limite_grupo: linha.limite_grupo ? String(linha.limite_grupo) : null,
+		idade_minima: linha.idade_minima !== null ? Number(linha.idade_minima) : null,
+		idade_maxima: linha.idade_maxima !== null ? Number(linha.idade_maxima) : null,
+		valor_inscricao: Number(linha.valor_inscricao || 0),
 		logradouro: String(linha.logradouro),
 		cidade: String(linha.cidade),
 		uf: String(linha.uf),
@@ -176,18 +227,126 @@ export async function inserirCampeonatoEmTransacao(
 		[idEvento, dados.logradouro, dados.cidade, dados.uf, dados.cep]
 	);
 
-	// 3. Inserir subtipo Campeonato
+	// 3. Inserir subtipo Campeonato com limites e taxas
 	await conn.execute(
-		`INSERT INTO Campeonato (id_evento, tipo_campeonato, limite_graduacao)
-		 VALUES (?, ?, ?)`,
-		[idEvento, dados.tipoCampeonato, dados.limiteGraduacao]
+		`INSERT INTO Campeonato (
+			id_evento,
+			tipo_campeonato,
+			limite_graduacao,
+			faixa_inicio,
+			faixa_fim,
+			limite_grupo,
+			idade_minima,
+			idade_maxima,
+			valor_inscricao
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		[
+			idEvento,
+			dados.tipoCampeonato,
+			dados.limiteGraduacao,
+			dados.faixaInicio || 'Branca',
+			dados.faixaFim || 'Preta',
+			dados.limiteGrupo || 'Todos',
+			dados.idadeMinima || null,
+			dados.idadeMaxima || null,
+			dados.valorInscricao || 0
+		]
 	);
 
 	return idEvento;
 }
 
 /**
- * Lista as inscrições mistas (atletas e professores) de um evento.
+ * Atualiza um campeonato existente no banco em transação atômica.
+ */
+export async function atualizarCampeonatoEmTransacao(
+	conn: PoolConnection,
+	idAcademia: number,
+	idEvento: number,
+	dados: CampeonatoInput
+): Promise<void> {
+	// 1. Valida existência no tenant
+	const [check] = await conn.execute<RowDataPacket[]>(
+		'SELECT id_evento FROM Evento WHERE id_evento = ? AND id_academia = ? LIMIT 1',
+		[idEvento, idAcademia]
+	);
+	if (check.length === 0) {
+		throw new Error('Campeonato não encontrado ou não pertence a esta academia.');
+	}
+
+	// 2. Atualizar Evento
+	await conn.execute(
+		`UPDATE Evento 
+		 SET nome = ?, edicao = ?, data_inicio = ?
+		 WHERE id_evento = ? AND id_academia = ?`,
+		[dados.nome, dados.edicao, dados.dataInicio, idEvento, idAcademia]
+	);
+
+	// 3. Atualizar Endereco_Evento
+	await conn.execute(
+		`INSERT INTO Endereco_Evento (id_evento, logradouro, numero, complemento, cidade, uf, cep)
+		 VALUES (?, ?, 'S/N', NULL, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+			logradouro = VALUES(logradouro),
+			cidade = VALUES(cidade),
+			uf = VALUES(uf),
+			cep = VALUES(cep)`,
+		[idEvento, dados.logradouro, dados.cidade, dados.uf, dados.cep]
+	);
+
+	// 4. Atualizar Campeonato
+	await conn.execute(
+		`UPDATE Campeonato
+		 SET tipo_campeonato = ?,
+		     limite_graduacao = ?,
+		     faixa_inicio = ?,
+		     faixa_fim = ?,
+		     limite_grupo = ?,
+		     idade_minima = ?,
+		     idade_maxima = ?,
+		     valor_inscricao = ?
+		 WHERE id_evento = ?`,
+		[
+			dados.tipoCampeonato,
+			dados.limiteGraduacao,
+			dados.faixaInicio || 'Branca',
+			dados.faixaFim || 'Preta',
+			dados.limiteGrupo || 'Todos',
+			dados.idadeMinima || null,
+			dados.idadeMaxima || null,
+			dados.valorInscricao || 0,
+			idEvento
+		]
+	);
+}
+
+/**
+ * Exclui um campeonato criado no dojo com remoção em cascata segura.
+ */
+export async function excluirCampeonato(
+	idAcademia: number,
+	idEvento: number
+): Promise<void> {
+	const pool = getDbPool();
+
+	const [check] = await pool.execute<RowDataPacket[]>(
+		'SELECT id_evento FROM Evento WHERE id_evento = ? AND id_academia = ? LIMIT 1',
+		[idEvento, idAcademia]
+	);
+	if (check.length === 0) {
+		throw new Error('Campeonato não encontrado ou você não tem permissão para excluí-lo.');
+	}
+
+	// A FK com ON DELETE CASCADE em Campeonato, Inscricao_Evento, etc. limpa as tabelas filhas
+	await pool.execute('DELETE FROM Evento WHERE id_evento = ? AND id_academia = ?', [
+		idEvento,
+		idAcademia
+	]);
+}
+
+/**
+ * Lista as inscrições detalhadas de um campeonato (atletas e professores),
+ * incluindo status de confirmação do atleta e do responsável legal.
  */
 export async function listarInscricoesDoCampeonato(
 	idAcademia: number,
@@ -195,37 +354,67 @@ export async function listarInscricoesDoCampeonato(
 ): Promise<InscricaoItem[]> {
 	const pool = getDbPool();
 
-	// Garante que o evento pertence ao tenant
 	const sql = `
 		SELECT 
 			ie.id_inscricao,
 			CASE WHEN ie.id_aluno IS NOT NULL THEN 'aluno' ELSE 'professor' END AS tipo_participante,
 			COALESCE(ie.id_aluno, ie.id_professor) AS id_participante,
 			u.nome AS nome_participante,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			COALESCE(a.graduacao_atual, p.grau_faixa, 'Faixa Preta') AS faixa_participante,
+			a.grupo_especial_aspirante AS grupo_participante,
+			COALESCE(ie.confirmado_atleta, 0) AS confirmado_atleta,
+			COALESCE(ie.confirmado_responsavel, 0) AS confirmado_responsavel,
+			DATE_FORMAT(ie.data_confirmacao_atleta, '%d/%m/%Y %H:%i') AS data_confirmacao_atleta,
+			DATE_FORMAT(ie.data_confirmacao_responsavel, '%d/%m/%Y %H:%i') AS data_confirmacao_responsavel,
 			ie.status_inscricao,
-			ie.valor
+			ie.valor,
+			ra.id_responsavel,
+			resp_u.nome AS nome_responsavel,
+			COALESCE(ra.grau_parentesco, r.grau_parentesco) AS parentesco_responsavel
 		FROM Inscricao_Evento ie
 		INNER JOIN Evento e ON ie.id_evento = e.id_evento
 		LEFT JOIN Aluno a ON ie.id_aluno = a.id_usuario
 		LEFT JOIN Professor p ON ie.id_professor = p.id_usuario
 		INNER JOIN Usuario u ON u.id_usuario = COALESCE(ie.id_aluno, ie.id_professor)
 		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+		LEFT JOIN Responsavel_Aluno ra ON a.id_usuario = ra.id_aluno
+		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
+		LEFT JOIN Usuario resp_u ON ra.id_responsavel = resp_u.id_usuario
 		WHERE ie.id_evento = ? AND e.id_academia = ? AND ua.id_academia = ?
-		ORDER BY ie.status_inscricao ASC, u.nome ASC
+		ORDER BY 
+			CASE WHEN ie.status_inscricao = 'Confirmada' THEN 0 ELSE 1 END,
+			u.nome ASC
 	`;
 
 	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idEvento, idAcademia, idAcademia]);
 
-	return linhas.map((linha) => ({
-		id_inscricao: Number(linha.id_inscricao),
-		tipo_participante: linha.tipo_participante as 'aluno' | 'professor',
-		id_participante: Number(linha.id_participante),
-		nome_participante: String(linha.nome_participante),
-		faixa_participante: String(linha.faixa_participante),
-		status_inscricao: linha.status_inscricao as 'Pendente' | 'Confirmada' | 'Cancelada',
-		valor: linha.valor !== null ? Number(linha.valor) : null
-	}));
+	return linhas.map((linha) => {
+		const dataNasc = linha.data_nascimento ? String(linha.data_nascimento) : '2000-01-01';
+		const idade = calcularIdadeServidor(dataNasc);
+		const menorIdade = linha.tipo_participante === 'aluno' ? idade < 18 : false;
+
+		return {
+			id_inscricao: Number(linha.id_inscricao),
+			tipo_participante: linha.tipo_participante as 'aluno' | 'professor',
+			id_participante: Number(linha.id_participante),
+			nome_participante: String(linha.nome_participante),
+			faixa_participante: String(linha.faixa_participante),
+			grupo_participante: linha.grupo_participante ? String(linha.grupo_participante) : null,
+			data_nascimento: linha.data_nascimento ? String(linha.data_nascimento) : null,
+			idade,
+			menor_idade: menorIdade,
+			id_responsavel: linha.id_responsavel ? Number(linha.id_responsavel) : null,
+			nome_responsavel: linha.nome_responsavel ? String(linha.nome_responsavel) : null,
+			parentesco_responsavel: linha.parentesco_responsavel ? String(linha.parentesco_responsavel) : null,
+			confirmado_atleta: Boolean(linha.confirmado_atleta),
+			confirmado_responsavel: Boolean(linha.confirmado_responsavel),
+			data_confirmacao_atleta: linha.data_confirmacao_atleta ? String(linha.data_confirmacao_atleta) : null,
+			data_confirmacao_responsavel: linha.data_confirmacao_responsavel ? String(linha.data_confirmacao_responsavel) : null,
+			status_inscricao: linha.status_inscricao as 'Pendente' | 'Confirmada' | 'Cancelada',
+			valor: linha.valor !== null ? Number(linha.valor) : null
+		};
+	});
 }
 
 /**
@@ -238,6 +427,8 @@ export async function registrarInscricaoEmTransacao(
 		idAluno?: number | null;
 		idProfessor?: number | null;
 		statusInscricao: 'Pendente' | 'Confirmada' | 'Cancelada';
+		confirmadoAtleta?: boolean;
+		confirmadoResponsavel?: boolean;
 		valor: number | null;
 	}
 ): Promise<number> {
@@ -247,11 +438,15 @@ export async function registrarInscricaoEmTransacao(
 			id_aluno,
 			id_professor,
 			status_inscricao,
+			confirmado_atleta,
+			confirmado_responsavel,
 			valor,
 			data_inicio_inscricao
-		) VALUES (?, ?, ?, ?, ?, CURDATE())
+		) VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE())
 		ON DUPLICATE KEY UPDATE 
 			status_inscricao = VALUES(status_inscricao),
+			confirmado_atleta = VALUES(confirmado_atleta),
+			confirmado_responsavel = VALUES(confirmado_responsavel),
 			valor = VALUES(valor)
 	`;
 
@@ -260,10 +455,124 @@ export async function registrarInscricaoEmTransacao(
 		dados.idAluno || null,
 		dados.idProfessor || null,
 		dados.statusInscricao,
+		dados.confirmadoAtleta ? 1 : 0,
+		dados.confirmadoResponsavel ? 1 : 0,
 		dados.valor
 	]);
 
 	return res.insertId;
+}
+
+/**
+ * Confirmação da inscrição pelo Atleta.
+ */
+export async function confirmarInscricaoAtleta(
+	idAcademia: number,
+	idInscricao: number
+): Promise<{ novoStatus: 'Pendente' | 'Confirmada'; menorIdade: boolean }> {
+	const pool = getDbPool();
+
+	const sqlValida = `
+		SELECT 
+			ie.id_inscricao,
+			ie.confirmado_responsavel,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			CASE WHEN ie.id_aluno IS NOT NULL THEN 'aluno' ELSE 'professor' END AS tipo_participante
+		FROM Inscricao_Evento ie
+		INNER JOIN Evento e ON ie.id_evento = e.id_evento
+		INNER JOIN Usuario u ON u.id_usuario = COALESCE(ie.id_aluno, ie.id_professor)
+		WHERE ie.id_inscricao = ? AND e.id_academia = ?
+		LIMIT 1
+	`;
+
+	const [linhas] = await pool.execute<RowDataPacket[]>(sqlValida, [idInscricao, idAcademia]);
+	if (linhas.length === 0) {
+		throw new Error('Inscrição não encontrada ou não pertence a esta academia.');
+	}
+
+	const item = linhas[0];
+	const idade = calcularIdadeServidor(String(item.data_nascimento));
+	const menorIdade = item.tipo_participante === 'aluno' ? idade < 18 : false;
+	const respJaConfirmou = Boolean(item.confirmado_responsavel);
+
+	const novoStatus = (!menorIdade || respJaConfirmou) ? 'Confirmada' : 'Pendente';
+
+	await pool.execute(
+		`UPDATE Inscricao_Evento 
+		 SET confirmado_atleta = 1,
+		     data_confirmacao_atleta = NOW(),
+		     status_inscricao = ?
+		 WHERE id_inscricao = ?`,
+		[novoStatus, idInscricao]
+	);
+
+	return { novoStatus, menorIdade };
+}
+
+/**
+ * Confirmação da inscrição pelo Responsável Legal do Judoca Menor.
+ */
+export async function confirmarInscricaoResponsavel(
+	idAcademia: number,
+	idInscricao: number
+): Promise<{ novoStatus: 'Pendente' | 'Confirmada' }> {
+	const pool = getDbPool();
+
+	const sqlValida = `
+		SELECT 
+			ie.id_inscricao,
+			ie.confirmado_atleta
+		FROM Inscricao_Evento ie
+		INNER JOIN Evento e ON ie.id_evento = e.id_evento
+		WHERE ie.id_inscricao = ? AND e.id_academia = ?
+		LIMIT 1
+	`;
+
+	const [linhas] = await pool.execute<RowDataPacket[]>(sqlValida, [idInscricao, idAcademia]);
+	if (linhas.length === 0) {
+		throw new Error('Inscrição não encontrada ou não pertence a esta academia.');
+	}
+
+	const item = linhas[0];
+	const atletaJaConfirmou = Boolean(item.confirmado_atleta);
+
+	const novoStatus = atletaJaConfirmou ? 'Confirmada' : 'Pendente';
+
+	await pool.execute(
+		`UPDATE Inscricao_Evento 
+		 SET confirmado_responsavel = 1,
+		     data_confirmacao_responsavel = NOW(),
+		     status_inscricao = ?
+		 WHERE id_inscricao = ?`,
+		[novoStatus, idInscricao]
+	);
+
+	return { novoStatus };
+}
+
+/**
+ * Permite ao Professor remover um atleta da lista de participantes ou inscrições do campeonato.
+ */
+export async function removerInscricaoDoCampeonato(
+	idAcademia: number,
+	idInscricao: number
+): Promise<void> {
+	const pool = getDbPool();
+
+	const sqlValida = `
+		SELECT ie.id_inscricao 
+		FROM Inscricao_Evento ie
+		INNER JOIN Evento e ON ie.id_evento = e.id_evento
+		WHERE ie.id_inscricao = ? AND e.id_academia = ?
+		LIMIT 1
+	`;
+
+	const [valido] = await pool.execute<RowDataPacket[]>(sqlValida, [idInscricao, idAcademia]);
+	if (valido.length === 0) {
+		throw new Error('Inscrição não encontrada ou não pertence a esta academia.');
+	}
+
+	await pool.execute('DELETE FROM Inscricao_Evento WHERE id_inscricao = ?', [idInscricao]);
 }
 
 /**
