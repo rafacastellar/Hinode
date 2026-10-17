@@ -299,8 +299,15 @@ CREATE TABLE Classificacao (
 -- Subtipo de Evento
 CREATE TABLE Graduacao_Evento (
     id_evento INT PRIMARY KEY,
-    tipo_graduacao VARCHAR(100),
-    status VARCHAR(50),
+    tipo_graduacao VARCHAR(100) DEFAULT 'Troca de Faixa',
+    status VARCHAR(50) DEFAULT 'Agendado',
+    faixa_inicio VARCHAR(50) NOT NULL DEFAULT 'Branca',
+    faixa_fim VARCHAR(50) NOT NULL DEFAULT 'Marrom',
+    tempo_minimo_judo_meses INT NULL DEFAULT 0,
+    tempo_minimo_ultima_graduacao_meses INT NULL DEFAULT 0,
+    taxa_graduacao DECIMAL(10,2) NULL DEFAULT 0.00,
+    data_inicio_inscricao DATE NULL,
+    data_fim_inscricao DATE NULL,
     requisitos TEXT,
     FOREIGN KEY (id_evento) REFERENCES Evento(id_evento) ON DELETE CASCADE
 );

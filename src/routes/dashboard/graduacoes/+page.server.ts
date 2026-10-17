@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import {
+	listarEventosGraduacaoDoDojo,
 	listarGraduacoesDoDojo,
 	obterDistribuicaoFaixasDoDojo
 } from '#lib/server/repositorios/graduacao.repo';
@@ -10,13 +11,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 	exigirPermissao(perfis, 'GRADUACOES_VER');
 
 	const idAcademia = locals.idAcademia!;
-	const [graduacoes, distribuicao] = await Promise.all([
+	const [eventos, graduacoes, distribuicao] = await Promise.all([
+		listarEventosGraduacaoDoDojo(idAcademia),
 		listarGraduacoesDoDojo(idAcademia),
 		obterDistribuicaoFaixasDoDojo(idAcademia)
 	]);
 
 	return {
+		eventos,
 		graduacoes,
-		distribuicao
+		distribuicao,
+		podeHomologar: temPermissao(perfis, 'GRADUACOES_HOMOLOGAR')
 	};
 };
