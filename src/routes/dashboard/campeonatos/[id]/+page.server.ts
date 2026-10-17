@@ -22,7 +22,9 @@ import {
 import {
 	validarElegibilidadeCompleta,
 	formatarIntervaloFaixas,
-	formatarIdadeLimite
+	formatarIdadeLimite,
+	validarPeriodoInscricao,
+	formatarPeriodoInscricao
 } from '#lib/server/servicos/regras-campeonato';
 import { inscricaoSchema, resultadoSchema } from '#lib/server/validacao/campeonato.schema';
 
@@ -164,10 +166,21 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}
 	}
 
+	const statusPeriodoInscricao = validarPeriodoInscricao(
+		campeonato.data_inicio_inscricao_iso,
+		campeonato.data_fim_inscricao_iso
+	);
+	const rotuloPeriodoInscricao = formatarPeriodoInscricao(
+		campeonato.data_inicio_inscricao,
+		campeonato.data_fim_inscricao
+	);
+
 	return {
 		campeonato,
 		rotuloFaixas,
 		rotuloIdade,
+		statusPeriodoInscricao,
+		rotuloPeriodoInscricao,
 		inscricoes,
 		resultados,
 		alunos,

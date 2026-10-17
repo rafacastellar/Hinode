@@ -100,7 +100,7 @@
 				</h1>
 				<p class="text-xs sm:text-sm text-zinc-400 mt-1">
 					{data.campeonato.edicao ? `${data.campeonato.edicao} • ` : ''}
-					{data.campeonato.logradouro}, {data.campeonato.cidade} - {data.campeonato.uf}
+					{data.campeonato.logradouro}{data.campeonato.numero && data.campeonato.numero !== 'S/N' ? `, nº ${data.campeonato.numero}` : ''}{data.campeonato.complemento ? ` (${data.campeonato.complemento})` : ''}{data.campeonato.bairro ? ` - ${data.campeonato.bairro}` : ''}, {data.campeonato.cidade} - {data.campeonato.uf}
 				</p>
 
 				<!-- Restrições do Campeonato: Graduação, Categoria, Idade e Taxa -->
@@ -124,6 +124,11 @@
 						<span class="text-emerald-400 font-bold uppercase text-[10px]">Taxa:</span>
 						<span class="font-semibold text-emerald-300 font-mono">{taxaFormatada}</span>
 					</div>
+
+					<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-zinc-900/90 border border-zinc-800 text-zinc-300">
+						<span class="text-purple-400 font-bold uppercase text-[10px]">Período de Inscrição:</span>
+						<span class="font-semibold text-white">{data.rotuloPeriodoInscricao}</span>
+					</div>
 				</div>
 			</div>
 
@@ -133,6 +138,14 @@
 					<div class="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
 						<span class="text-[10px] font-mono uppercase text-zinc-500 block">Data de Disputa</span>
 						<span class="text-xs font-mono font-bold text-white">{data.campeonato.data_inicio}</span>
+					</div>
+					<div class="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
+						<span class="text-[10px] font-mono uppercase text-zinc-500 block">Inscrições</span>
+						{#if data.statusPeriodoInscricao.aberta}
+							<span class="text-xs font-mono font-bold text-emerald-400">Abertas</span>
+						{:else}
+							<span class="text-xs font-mono font-bold text-red-400">Encerradas</span>
+						{/if}
 					</div>
 					<div class="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
 						<span class="text-[10px] font-mono uppercase text-zinc-500 block">Lista Oficial</span>
@@ -265,7 +278,17 @@
 				</div>
 			{:else}
 				<!-- Judoca ainda não inscrito -->
-				{#if data.alunoLogadoAuto.elegivel}
+				{#if !data.statusPeriodoInscricao.aberta}
+					<div class="p-4 rounded-xl bg-amber-950/40 border border-amber-800/80 flex items-start gap-3">
+						<Clock class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+						<div>
+							<span class="text-xs font-bold text-amber-300 block">Inscrições Não Disponíveis</span>
+							<p class="text-xs text-amber-200/80 mt-0.5">
+								{data.statusPeriodoInscricao.motivo}
+							</p>
+						</div>
+					</div>
+				{:else if data.alunoLogadoAuto.elegivel}
 					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
 						<div class="space-y-1">
 							<div class="flex items-center gap-2">
@@ -390,16 +413,23 @@
 									</form>
 								{/if}
 							{:else if dep.elegivel}
-								<form action="?/autoInscrever" method="POST" use:enhance>
-									<input type="hidden" name="idAluno" value={dep.id_usuario} />
-									<button
-										type="submit"
-										class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
-									>
-										<UserPlus class="w-3.5 h-3.5" />
-										<span>Inscrever Judoca ({taxaFormatada})</span>
-									</button>
-								</form>
+								{#if !data.statusPeriodoInscricao.aberta}
+									<div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-center gap-1.5 text-center">
+										<Clock class="w-3.5 h-3.5 text-amber-400 shrink-0" />
+										<span>{data.statusPeriodoInscricao.motivo || 'Inscrições encerradas'}</span>
+									</div>
+								{:else}
+									<form action="?/autoInscrever" method="POST" use:enhance>
+										<input type="hidden" name="idAluno" value={dep.id_usuario} />
+										<button
+											type="submit"
+											class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
+										>
+											<UserPlus class="w-3.5 h-3.5" />
+											<span>Inscrever Judoca ({taxaFormatada})</span>
+										</button>
+									</form>
+								{/if}
 							{/if}
 						</div>
 					</div>
@@ -462,6 +492,16 @@
 							</span>
 						</div>
 					</div>
+
+					{#if !data.statusPeriodoInscricao.aberta}
+						<div class="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-200 text-xs flex items-center gap-2.5">
+							<Clock class="w-4 h-4 text-amber-400 shrink-0" />
+							<div>
+								<span class="font-bold block">{data.statusPeriodoInscricao.motivo}</span>
+								<span class="text-[11px] text-amber-300/70">Novas inscrições estão bloqueadas para este campeonato.</span>
+							</div>
+						</div>
+					{/if}
 
 					<form
 						action="?/inscrever"
@@ -532,7 +572,7 @@
 						<div>
 							<button
 								type="submit"
-								disabled={carregandoInscricao || !participanteSelecionado}
+								disabled={!data.statusPeriodoInscricao.aberta || carregandoInscricao || !participanteSelecionado}
 								class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all disabled:opacity-50"
 							>
 								{#if carregandoInscricao}
@@ -693,8 +733,8 @@
 
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						{#each inscricoesPendentes as pend}
-							{@const souOAtleta = data.usuarioLogadoId === pend.id_participante}
-							{@const souOResponsavel = data.usuarioLogadoId === pend.id_responsavel}
+							{@const souOAtleta = Boolean(data.usuarioLogadoId && data.usuarioLogadoId === pend.id_participante)}
+							{@const souOResponsavel = Boolean(data.usuarioLogadoId && (pend.ids_responsaveis?.includes(data.usuarioLogadoId) || data.usuarioLogadoId === pend.id_responsavel))}
 
 							<div class="p-5 rounded-2xl bg-zinc-950 border border-zinc-900 hover:border-zinc-800 transition-all flex flex-col justify-between space-y-4">
 								<div>

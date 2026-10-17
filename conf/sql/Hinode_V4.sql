@@ -229,6 +229,7 @@ CREATE TABLE Endereco_Evento (
     logradouro VARCHAR(255) NOT NULL,
     numero VARCHAR(20),
     complemento VARCHAR(100),
+    bairro VARCHAR(100),
     cidade VARCHAR(100) NOT NULL,
     uf CHAR(2) NOT NULL,
     cep VARCHAR(20) NOT NULL,
@@ -244,8 +245,6 @@ CREATE TABLE Inscricao_Evento (
     id_aluno INT,
     id_professor INT,
     id_evento INT NOT NULL,
-    data_inicio_inscricao DATE,
-    data_fim_inscricao DATE,
     status_inscricao VARCHAR(50) NOT NULL DEFAULT 'Pendente',
     confirmado_atleta TINYINT(1) NOT NULL DEFAULT 0,
     confirmado_responsavel TINYINT(1) NOT NULL DEFAULT 0,
@@ -275,6 +274,8 @@ CREATE TABLE Campeonato (
     idade_minima INT NULL,
     idade_maxima INT NULL,
     valor_inscricao DECIMAL(10,2) NULL DEFAULT 0.00,
+    data_inicio_inscricao DATE NULL,
+    data_fim_inscricao DATE NULL,
     FOREIGN KEY (id_evento) REFERENCES Evento(id_evento) ON DELETE CASCADE
 );
 

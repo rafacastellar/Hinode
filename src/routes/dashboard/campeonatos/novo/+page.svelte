@@ -9,7 +9,9 @@
 		AlertCircle,
 		CheckCircle2,
 		DollarSign,
-		Sparkles
+		Sparkles,
+		Search,
+		Loader2
 	} from '@lucide/svelte';
 	import { FAIXAS_JUDO_LISTA } from '#lib/dominio/campeonato';
 
@@ -20,10 +22,53 @@
 	let faixaInicio = $state('Branca');
 	let faixaFim = $state('Preta');
 
+	let cep = $state('');
+	let logradouro = $state('');
+	let numero = $state('');
+	let complemento = $state('');
+	let bairro = $state('');
+	let cidade = $state('São Paulo');
+	let uf = $state('SP');
+	let buscandoCep = $state(false);
+	let cepMensagem = $state('');
+
 	$effect(() => {
 		if (form?.valores?.faixaInicio) faixaInicio = form.valores.faixaInicio as string;
 		if (form?.valores?.faixaFim) faixaFim = form.valores.faixaFim as string;
+		if (form?.valores?.cep) cep = String(form.valores.cep);
+		if (form?.valores?.logradouro) logradouro = String(form.valores.logradouro);
+		if (form?.valores?.numero) numero = String(form.valores.numero);
+		if (form?.valores?.complemento) complemento = String(form.valores.complemento);
+		if (form?.valores?.bairro) bairro = String(form.valores.bairro);
+		if (form?.valores?.cidade) cidade = String(form.valores.cidade);
+		if (form?.valores?.uf) uf = String(form.valores.uf);
 	});
+
+	async function consultarCep() {
+		const cepLimpo = cep.replace(/\D/g, '');
+		if (cepLimpo.length !== 8) {
+			cepMensagem = 'Informe um CEP válido com 8 dígitos';
+			return;
+		}
+		buscandoCep = true;
+		cepMensagem = '';
+		try {
+			const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+			const dados = await res.json();
+			if (dados.erro) {
+				cepMensagem = 'CEP não encontrado';
+			} else {
+				logradouro = dados.logradouro || '';
+				bairro = dados.bairro || '';
+				cidade = dados.localidade || '';
+				uf = dados.uf || '';
+			}
+		} catch {
+			cepMensagem = 'Falha ao buscar CEP. Preencha manualmente.';
+		} finally {
+			buscandoCep = false;
+		}
+	}
 
 	const tiposCampeonato = [
 		'Regional',
@@ -193,6 +238,40 @@
 						Valor padrão cobrado de cada judoca. Deixe 0.00 se for isento/gratuito.
 					</span>
 				</div>
+
+				<!-- Período de Inscrição: Início -->
+				<div>
+					<label for="dataInicioInscricao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Abertura das Inscrições
+					</label>
+					<input
+						type="date"
+						id="dataInicioInscricao"
+						name="dataInicioInscricao"
+						value={(form?.valores?.dataInicioInscricao as string) || ''}
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					/>
+					<span class="text-[10px] text-zinc-500 mt-1 block">
+						Data inicial para alunos e responsáveis realizarem a inscrição.
+					</span>
+				</div>
+
+				<!-- Período de Inscrição: Fim -->
+				<div>
+					<label for="dataFimInscricao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Prazo Limite das Inscrições
+					</label>
+					<input
+						type="date"
+						id="dataFimInscricao"
+						name="dataFimInscricao"
+						value={(form?.valores?.dataFimInscricao as string) || ''}
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					/>
+					<span class="text-[10px] text-zinc-500 mt-1 block">
+						Após esta data, não serão aceitas inscrições tardias de alunos.
+					</span>
+				</div>
 			</div>
 		</div>
 
@@ -328,23 +407,105 @@
 				</div>
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="sm:col-span-2">
-					<label for="logradouro" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Ginásio / Complexo Esportivo
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<!-- CEP com busca automática -->
+				<div>
+					<label for="cep" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						CEP *
+					</label>
+					<div class="flex items-center gap-2">
+						<input
+							type="text"
+							id="cep"
+							name="cep"
+							maxlength="9"
+							bind:value={cep}
+							placeholder="00000-000"
+							onblur={consultarCep}
+							class="flex-1 px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-600 transition-colors"
+						/>
+						<button
+							type="button"
+							onclick={consultarCep}
+							disabled={buscandoCep || cep.replace(/\D/g, '').length !== 8}
+							class="px-3 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-semibold transition-colors disabled:opacity-40"
+							title="Consultar endereço via CEP"
+						>
+							{#if buscandoCep}
+								<Loader2 class="w-4 h-4 animate-spin" />
+							{:else}
+								<Search class="w-4 h-4" />
+							{/if}
+						</button>
+					</div>
+					{#if cepMensagem}
+						<span class="text-[10px] text-amber-400 mt-1 block font-mono">{cepMensagem}</span>
+					{/if}
+				</div>
+
+				<!-- Logradouro (Rua / Ginásio / Arena) -->
+				<div class="md:col-span-2">
+					<label for="logradouro" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						Logradouro / Ginásio (Rua, Avenida, Complexo)
 					</label>
 					<input
 						type="text"
 						id="logradouro"
 						name="logradouro"
-						value={(form?.valores?.logradouro as string) || ''}
-						placeholder="Ex: Ginásio Poliesportivo do Ibirapuera"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						bind:value={logradouro}
+						placeholder="Ex: Ginásio do Ibirapuera, Rua Manuel da Nóbrega"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
 					/>
 				</div>
 
+				<!-- Número -->
 				<div>
-					<label for="cidade" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+					<label for="numero" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						Número
+					</label>
+					<input
+						type="text"
+						id="numero"
+						name="numero"
+						bind:value={numero}
+						placeholder="Ex: 1361 ou S/N"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
+					/>
+				</div>
+
+				<!-- Complemento -->
+				<div>
+					<label for="complemento" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						Complemento
+					</label>
+					<input
+						type="text"
+						id="complemento"
+						name="complemento"
+						bind:value={complemento}
+						placeholder="Ex: Portão 7, Quadra B"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
+					/>
+				</div>
+
+				<!-- Bairro -->
+				<div>
+					<label for="bairro" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						Bairro
+					</label>
+					<input
+						type="text"
+						id="bairro"
+						name="bairro"
+						bind:value={bairro}
+						placeholder="Ex: Paraíso"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
+					/>
+				</div>
+
+				<!-- Cidade -->
+				<div class="md:col-span-2">
+					<label for="cidade" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Cidade *
 					</label>
 					<input
@@ -352,15 +513,16 @@
 						id="cidade"
 						name="cidade"
 						required
-						value={(form?.valores?.cidade as string) || 'São Paulo'}
+						bind:value={cidade}
 						placeholder="Ex: São Paulo"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
 					/>
 				</div>
 
+				<!-- UF -->
 				<div>
-					<label for="uf" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Estado (UF) *
+					<label for="uf" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						UF (Estado) *
 					</label>
 					<input
 						type="text"
@@ -368,9 +530,9 @@
 						name="uf"
 						required
 						maxlength="2"
-						value={(form?.valores?.uf as string) || 'SP'}
+						bind:value={uf}
 						placeholder="SP"
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono uppercase placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white uppercase font-mono focus:outline-none focus:border-red-600 transition-colors"
 					/>
 				</div>
 			</div>

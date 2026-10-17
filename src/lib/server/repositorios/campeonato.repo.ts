@@ -8,6 +8,8 @@ export interface CampeonatoResumo {
 	nome: string;
 	edicao: string | null;
 	data_inicio: string;
+	data_inicio_inscricao: string | null;
+	data_fim_inscricao: string | null;
 	tipo_campeonato: string | null;
 	limite_graduacao: string | null;
 	faixa_inicio: string;
@@ -29,6 +31,10 @@ export interface CampeonatoDetalhado {
 	edicao: string | null;
 	data_inicio: string;
 	data_inicio_iso: string;
+	data_inicio_inscricao: string | null;
+	data_inicio_inscricao_iso: string | null;
+	data_fim_inscricao: string | null;
+	data_fim_inscricao_iso: string | null;
 	tipo_campeonato: string | null;
 	limite_graduacao: string | null;
 	faixa_inicio: string;
@@ -38,6 +44,9 @@ export interface CampeonatoDetalhado {
 	idade_maxima: number | null;
 	valor_inscricao: number;
 	logradouro: string;
+	numero: string;
+	complemento: string | null;
+	bairro: string | null;
 	cidade: string;
 	uf: string;
 	cep: string;
@@ -54,6 +63,7 @@ export interface InscricaoItem {
 	idade: number;
 	menor_idade: boolean;
 	id_responsavel: number | null;
+	ids_responsaveis?: number[];
 	nome_responsavel: string | null;
 	parentesco_responsavel: string | null;
 	confirmado_atleta: boolean;
@@ -89,6 +99,8 @@ export async function listarCampeonatosDoDojo(
 			e.nome,
 			e.edicao,
 			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
+			DATE_FORMAT(c.data_inicio_inscricao, '%d/%m/%Y') AS data_inicio_inscricao,
+			DATE_FORMAT(c.data_fim_inscricao, '%d/%m/%Y') AS data_fim_inscricao,
 			c.tipo_campeonato,
 			c.limite_graduacao,
 			COALESCE(c.faixa_inicio, 'Branca') AS faixa_inicio,
@@ -128,6 +140,8 @@ export async function listarCampeonatosDoDojo(
 		nome: String(linha.nome),
 		edicao: linha.edicao ? String(linha.edicao) : null,
 		data_inicio: String(linha.data_inicio),
+		data_inicio_inscricao: linha.data_inicio_inscricao ? String(linha.data_inicio_inscricao) : null,
+		data_fim_inscricao: linha.data_fim_inscricao ? String(linha.data_fim_inscricao) : null,
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
 		faixa_inicio: String(linha.faixa_inicio),
@@ -160,6 +174,10 @@ export async function buscarCampeonatoPorId(
 			e.edicao,
 			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
 			DATE_FORMAT(e.data_inicio, '%Y-%m-%d') AS data_inicio_iso,
+			DATE_FORMAT(c.data_inicio_inscricao, '%d/%m/%Y') AS data_inicio_inscricao,
+			DATE_FORMAT(c.data_inicio_inscricao, '%Y-%m-%d') AS data_inicio_inscricao_iso,
+			DATE_FORMAT(c.data_fim_inscricao, '%d/%m/%Y') AS data_fim_inscricao,
+			DATE_FORMAT(c.data_fim_inscricao, '%Y-%m-%d') AS data_fim_inscricao_iso,
 			c.tipo_campeonato,
 			c.limite_graduacao,
 			COALESCE(c.faixa_inicio, 'Branca') AS faixa_inicio,
@@ -169,6 +187,9 @@ export async function buscarCampeonatoPorId(
 			c.idade_maxima,
 			COALESCE(c.valor_inscricao, 0.00) AS valor_inscricao,
 			COALESCE(ee.logradouro, 'Local Principal') AS logradouro,
+			COALESCE(ee.numero, 'S/N') AS numero,
+			ee.complemento,
+			ee.bairro,
 			COALESCE(ee.cidade, 'São Paulo') AS cidade,
 			COALESCE(ee.uf, 'SP') AS uf,
 			COALESCE(ee.cep, '01000-000') AS cep
@@ -189,6 +210,10 @@ export async function buscarCampeonatoPorId(
 		edicao: linha.edicao ? String(linha.edicao) : null,
 		data_inicio: String(linha.data_inicio),
 		data_inicio_iso: String(linha.data_inicio_iso),
+		data_inicio_inscricao: linha.data_inicio_inscricao ? String(linha.data_inicio_inscricao) : null,
+		data_inicio_inscricao_iso: linha.data_inicio_inscricao_iso ? String(linha.data_inicio_inscricao_iso) : null,
+		data_fim_inscricao: linha.data_fim_inscricao ? String(linha.data_fim_inscricao) : null,
+		data_fim_inscricao_iso: linha.data_fim_inscricao_iso ? String(linha.data_fim_inscricao_iso) : null,
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
 		faixa_inicio: String(linha.faixa_inicio),
@@ -198,6 +223,9 @@ export async function buscarCampeonatoPorId(
 		idade_maxima: linha.idade_maxima !== null ? Number(linha.idade_maxima) : null,
 		valor_inscricao: Number(linha.valor_inscricao || 0),
 		logradouro: String(linha.logradouro),
+		numero: linha.numero ? String(linha.numero) : 'S/N',
+		complemento: linha.complemento ? String(linha.complemento) : null,
+		bairro: linha.bairro ? String(linha.bairro) : null,
 		cidade: String(linha.cidade),
 		uf: String(linha.uf),
 		cep: String(linha.cep)
@@ -222,9 +250,18 @@ export async function inserirCampeonatoEmTransacao(
 
 	// 2. Inserir endereço do evento
 	await conn.execute(
-		`INSERT INTO Endereco_Evento (id_evento, logradouro, numero, complemento, cidade, uf, cep)
-		 VALUES (?, ?, 'S/N', NULL, ?, ?, ?)`,
-		[idEvento, dados.logradouro, dados.cidade, dados.uf, dados.cep]
+		`INSERT INTO Endereco_Evento (id_evento, logradouro, numero, complemento, bairro, cidade, uf, cep)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		[
+			idEvento,
+			dados.logradouro,
+			dados.numero || 'S/N',
+			dados.complemento || null,
+			dados.bairro || null,
+			dados.cidade,
+			dados.uf,
+			dados.cep
+		]
 	);
 
 	// 3. Inserir subtipo Campeonato com limites e taxas
@@ -238,8 +275,10 @@ export async function inserirCampeonatoEmTransacao(
 			limite_grupo,
 			idade_minima,
 			idade_maxima,
-			valor_inscricao
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			valor_inscricao,
+			data_inicio_inscricao,
+			data_fim_inscricao
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			idEvento,
 			dados.tipoCampeonato,
@@ -249,7 +288,9 @@ export async function inserirCampeonatoEmTransacao(
 			dados.limiteGrupo || 'Todos',
 			dados.idadeMinima || null,
 			dados.idadeMaxima || null,
-			dados.valorInscricao || 0
+			dados.valorInscricao || 0,
+			dados.dataInicioInscricao || null,
+			dados.dataFimInscricao || null
 		]
 	);
 
@@ -284,14 +325,26 @@ export async function atualizarCampeonatoEmTransacao(
 
 	// 3. Atualizar Endereco_Evento
 	await conn.execute(
-		`INSERT INTO Endereco_Evento (id_evento, logradouro, numero, complemento, cidade, uf, cep)
-		 VALUES (?, ?, 'S/N', NULL, ?, ?, ?)
+		`INSERT INTO Endereco_Evento (id_evento, logradouro, numero, complemento, bairro, cidade, uf, cep)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE
 			logradouro = VALUES(logradouro),
+			numero = VALUES(numero),
+			complemento = VALUES(complemento),
+			bairro = VALUES(bairro),
 			cidade = VALUES(cidade),
 			uf = VALUES(uf),
 			cep = VALUES(cep)`,
-		[idEvento, dados.logradouro, dados.cidade, dados.uf, dados.cep]
+		[
+			idEvento,
+			dados.logradouro,
+			dados.numero || 'S/N',
+			dados.complemento || null,
+			dados.bairro || null,
+			dados.cidade,
+			dados.uf,
+			dados.cep
+		]
 	);
 
 	// 4. Atualizar Campeonato
@@ -304,7 +357,9 @@ export async function atualizarCampeonatoEmTransacao(
 		     limite_grupo = ?,
 		     idade_minima = ?,
 		     idade_maxima = ?,
-		     valor_inscricao = ?
+		     valor_inscricao = ?,
+		     data_inicio_inscricao = ?,
+		     data_fim_inscricao = ?
 		 WHERE id_evento = ?`,
 		[
 			dados.tipoCampeonato,
@@ -315,6 +370,8 @@ export async function atualizarCampeonatoEmTransacao(
 			dados.idadeMinima || null,
 			dados.idadeMaxima || null,
 			dados.valorInscricao || 0,
+			dados.dataInicioInscricao || null,
+			dados.dataFimInscricao || null,
 			idEvento
 		]
 	);
@@ -369,9 +426,9 @@ export async function listarInscricoesDoCampeonato(
 			DATE_FORMAT(ie.data_confirmacao_responsavel, '%d/%m/%Y %H:%i') AS data_confirmacao_responsavel,
 			ie.status_inscricao,
 			ie.valor,
-			ra.id_responsavel,
-			resp_u.nome AS nome_responsavel,
-			COALESCE(ra.grau_parentesco, r.grau_parentesco) AS parentesco_responsavel
+			GROUP_CONCAT(DISTINCT ra.id_responsavel SEPARATOR ',') AS ids_responsaveis,
+			GROUP_CONCAT(DISTINCT resp_u.nome ORDER BY resp_u.nome SEPARATOR ', ') AS nomes_responsaveis,
+			GROUP_CONCAT(DISTINCT CONCAT(resp_u.nome, ' (', COALESCE(ra.grau_parentesco, r.grau_parentesco, 'Responsável Legal'), ')') ORDER BY resp_u.nome SEPARATOR ', ') AS responsaveis_completos
 		FROM Inscricao_Evento ie
 		INNER JOIN Evento e ON ie.id_evento = e.id_evento
 		LEFT JOIN Aluno a ON ie.id_aluno = a.id_usuario
@@ -382,6 +439,21 @@ export async function listarInscricoesDoCampeonato(
 		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
 		LEFT JOIN Usuario resp_u ON ra.id_responsavel = resp_u.id_usuario
 		WHERE ie.id_evento = ? AND e.id_academia = ? AND ua.id_academia = ?
+		GROUP BY 
+			ie.id_inscricao,
+			ie.id_aluno,
+			ie.id_professor,
+			u.nome,
+			u.data_nascimento,
+			a.graduacao_atual,
+			p.grau_faixa,
+			a.grupo_especial_aspirante,
+			ie.confirmado_atleta,
+			ie.confirmado_responsavel,
+			ie.data_confirmacao_atleta,
+			ie.data_confirmacao_responsavel,
+			ie.status_inscricao,
+			ie.valor
 		ORDER BY 
 			CASE WHEN ie.status_inscricao = 'Confirmada' THEN 0 ELSE 1 END,
 			u.nome ASC
@@ -394,6 +466,14 @@ export async function listarInscricoesDoCampeonato(
 		const idade = calcularIdadeServidor(dataNasc);
 		const menorIdade = linha.tipo_participante === 'aluno' ? idade < 18 : false;
 
+		const idsResponsaveisStr = linha.ids_responsaveis ? String(linha.ids_responsaveis) : '';
+		const idsResponsaveis = idsResponsaveisStr
+			? idsResponsaveisStr
+				.split(',')
+				.map((id) => Number(id.trim()))
+				.filter((id) => !isNaN(id) && id > 0)
+			: [];
+
 		return {
 			id_inscricao: Number(linha.id_inscricao),
 			tipo_participante: linha.tipo_participante as 'aluno' | 'professor',
@@ -404,9 +484,14 @@ export async function listarInscricoesDoCampeonato(
 			data_nascimento: linha.data_nascimento ? String(linha.data_nascimento) : null,
 			idade,
 			menor_idade: menorIdade,
-			id_responsavel: linha.id_responsavel ? Number(linha.id_responsavel) : null,
-			nome_responsavel: linha.nome_responsavel ? String(linha.nome_responsavel) : null,
-			parentesco_responsavel: linha.parentesco_responsavel ? String(linha.parentesco_responsavel) : null,
+			id_responsavel: idsResponsaveis[0] ?? null,
+			ids_responsaveis: idsResponsaveis,
+			nome_responsavel: linha.responsaveis_completos
+				? String(linha.responsaveis_completos)
+				: linha.nomes_responsaveis
+					? String(linha.nomes_responsaveis)
+					: null,
+			parentesco_responsavel: null,
 			confirmado_atleta: Boolean(linha.confirmado_atleta),
 			confirmado_responsavel: Boolean(linha.confirmado_responsavel),
 			data_confirmacao_atleta: linha.data_confirmacao_atleta ? String(linha.data_confirmacao_atleta) : null,
@@ -440,9 +525,8 @@ export async function registrarInscricaoEmTransacao(
 			status_inscricao,
 			confirmado_atleta,
 			confirmado_responsavel,
-			valor,
-			data_inicio_inscricao
-		) VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE())
+			valor
+		) VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE 
 			status_inscricao = VALUES(status_inscricao),
 			confirmado_atleta = VALUES(confirmado_atleta),

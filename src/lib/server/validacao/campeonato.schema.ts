@@ -38,6 +38,22 @@ export const campeonatoSchema = z
 			.string()
 			.trim()
 			.regex(regexData, { message: 'Data do evento inválida (utilize AAAA-MM-DD)' }),
+		dataInicioInscricao: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || null)
+			.refine((val) => !val || regexData.test(val), {
+				message: 'Data de início das inscrições inválida (utilize AAAA-MM-DD)'
+			}),
+		dataFimInscricao: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || null)
+			.refine((val) => !val || regexData.test(val), {
+				message: 'Data final das inscrições inválida (utilize AAAA-MM-DD)'
+			}),
 		faixaInicio: z
 			.string()
 			.trim()
@@ -75,6 +91,21 @@ export const campeonatoSchema = z
 			.trim()
 			.nullish()
 			.transform((val) => val || 'Ginásio Principal'),
+		numero: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || 'S/N'),
+		complemento: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || null),
+		bairro: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || null),
 		cep: z
 			.string()
 			.trim()
@@ -102,6 +133,30 @@ export const campeonatoSchema = z
 		{
 			message: 'A idade mínima não pode ser maior do que a idade máxima',
 			path: ['idadeMinima']
+		}
+	)
+	.refine(
+		(dados) => {
+			if (dados.dataInicioInscricao && dados.dataFimInscricao) {
+				return dados.dataInicioInscricao <= dados.dataFimInscricao;
+			}
+			return true;
+		},
+		{
+			message: 'A data de início das inscrições não pode ser posterior à data de término',
+			path: ['dataInicioInscricao']
+		}
+	)
+	.refine(
+		(dados) => {
+			if (dados.dataFimInscricao && dados.dataInicio) {
+				return dados.dataFimInscricao <= dados.dataInicio;
+			}
+			return true;
+		},
+		{
+			message: 'A data limite de inscrição não pode ser posterior à data de início do campeonato',
+			path: ['dataFimInscricao']
 		}
 	)
 	.transform((dados) => {

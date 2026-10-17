@@ -126,3 +126,79 @@ export function determinarStatusInscricao(
 	}
 	return 'Confirmada';
 }
+
+function obterDataHojeIso(): string {
+	const agora = new Date();
+	const ano = agora.getFullYear();
+	const mes = String(agora.getMonth() + 1).padStart(2, '0');
+	const dia = String(agora.getDate()).padStart(2, '0');
+	return `${ano}-${mes}-${dia}`;
+}
+
+export function formatarDataIsoParaBr(dataIso?: string | null): string {
+	if (!dataIso) return '';
+	if (dataIso.includes('/')) return dataIso;
+	const partes = dataIso.split('-');
+	if (partes.length !== 3) return dataIso;
+	const [ano, mes, dia] = partes;
+	return `${dia}/${mes}/${ano}`;
+}
+
+/**
+ * Validação do período oficial de inscrições do campeonato:
+ * Retorna se as inscrições estão abertas ou bloqueadas por data anterior à abertura ou após o prazo limite.
+ */
+export function validarPeriodoInscricao(
+	dataInicioInscricaoIso?: string | null,
+	dataFimInscricaoIso?: string | null
+): { aberta: boolean; motivo?: string } {
+	const hoje = obterDataHojeIso();
+
+	if (dataInicioInscricaoIso) {
+		const inicio = dataInicioInscricaoIso.includes('/')
+			? dataInicioInscricaoIso.split('/').reverse().join('-')
+			: dataInicioInscricaoIso;
+		if (hoje < inicio) {
+			return {
+				aberta: false,
+				motivo: `As inscrições para este campeonato ainda não foram abertas (abertura em ${formatarDataIsoParaBr(inicio)}).`
+			};
+		}
+	}
+
+	if (dataFimInscricaoIso) {
+		const fim = dataFimInscricaoIso.includes('/')
+			? dataFimInscricaoIso.split('/').reverse().join('-')
+			: dataFimInscricaoIso;
+		if (hoje > fim) {
+			return {
+				aberta: false,
+				motivo: `O período de inscrições para este campeonato encerrou em ${formatarDataIsoParaBr(fim)}. Inscrições tardias não são aceitas.`
+			};
+		}
+	}
+
+	return { aberta: true };
+}
+
+/**
+ * Rótulo amigável do período de inscrições para visualização no dashboard e lista.
+ */
+export function formatarPeriodoInscricao(
+	dataInicioInscricao?: string | null,
+	dataFimInscricao?: string | null
+): string {
+	const inicioBr = formatarDataIsoParaBr(dataInicioInscricao);
+	const fimBr = formatarDataIsoParaBr(dataFimInscricao);
+
+	if (inicioBr && fimBr) {
+		return `${inicioBr} até ${fimBr}`;
+	}
+	if (fimBr) {
+		return `Até ${fimBr}`;
+	}
+	if (inicioBr) {
+		return `A partir de ${inicioBr}`;
+	}
+	return 'Aberto sem prazo limite';
+}

@@ -245,6 +245,7 @@ model Endereco_Evento {
   logradouro  String  @db.VarChar(255)
   numero      String? @db.VarChar(20)
   complemento String? @db.VarChar(100)
+  bairro      String? @db.VarChar(100)
   cidade      String  @db.VarChar(100)
   uf          String  @db.Char(2)
   cep         String  @db.VarChar(20)
@@ -257,8 +258,6 @@ model Inscricao_Evento {
   id_aluno              Int?
   id_professor          Int?
   id_evento             Int
-  data_inicio_inscricao DateTime?  @db.Date
-  data_fim_inscricao    DateTime?  @db.Date
   status_inscricao      String     @default("Pendente") @db.VarChar(50)
   valor                 Decimal?   @db.Decimal(10, 2)
 
@@ -276,6 +275,8 @@ model Campeonato {
   classificacao_academia String?         @db.VarChar(100)
   limite_graduacao       String?         @db.VarChar(100)
   limite_grupo           String?         @db.VarChar(100)
+  data_inicio_inscricao  DateTime?       @db.Date
+  data_fim_inscricao     DateTime?       @db.Date
 
   evento                 Evento          @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
   classificacoes         Classificacao[]

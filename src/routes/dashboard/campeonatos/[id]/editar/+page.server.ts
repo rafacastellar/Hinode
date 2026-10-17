@@ -45,6 +45,8 @@ export const actions: Actions = {
 			edicao: formData.get('edicao'),
 			tipoCampeonato: formData.get('tipoCampeonato'),
 			dataInicio: formData.get('dataInicio'),
+			dataInicioInscricao: formData.get('dataInicioInscricao'),
+			dataFimInscricao: formData.get('dataFimInscricao'),
 			faixaInicio: formData.get('faixaInicio'),
 			faixaFim: formData.get('faixaFim'),
 			limiteGrupo: formData.get('limiteGrupo'),
@@ -54,6 +56,9 @@ export const actions: Actions = {
 			cidade: formData.get('cidade'),
 			uf: formData.get('uf'),
 			logradouro: formData.get('logradouro'),
+			numero: formData.get('numero'),
+			complemento: formData.get('complemento'),
+			bairro: formData.get('bairro'),
 			cep: formData.get('cep')
 		};
 

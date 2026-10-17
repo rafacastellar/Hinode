@@ -17,7 +17,8 @@ import { buscarAlunoPorId } from '../repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '../repositorios/professor.repo';
 import {
 	validarElegibilidadeCompleta,
-	determinarStatusInscricao
+	determinarStatusInscricao,
+	validarPeriodoInscricao
 } from './regras-campeonato';
 import type {
 	CampeonatoInput,
@@ -78,6 +79,15 @@ export async function inscreverCompetidor(
 	const campeonato = await buscarCampeonatoPorId(idAcademia, dados.idEvento);
 	if (!campeonato) {
 		throw error(404, { message: 'Campeonato não encontrado para este dojo.' });
+	}
+
+	// 1.1. Validação estrita do período de inscrições do campeonato
+	const validacaoPeriodo = validarPeriodoInscricao(
+		campeonato.data_inicio_inscricao_iso,
+		campeonato.data_fim_inscricao_iso
+	);
+	if (!validacaoPeriodo.aberta) {
+		throw error(400, { message: validacaoPeriodo.motivo || 'Período de inscrições encerrado para este campeonato.' });
 	}
 
 	// 2. Valida participante e regras de negócio
@@ -155,6 +165,15 @@ export async function autoInscreverCompetidor(
 	const campeonato = await buscarCampeonatoPorId(idAcademia, idEvento);
 	if (!campeonato) {
 		throw error(404, { message: 'Campeonato não encontrado.' });
+	}
+
+	// 1.1. Validação estrita do período de inscrições do campeonato
+	const validacaoPeriodo = validarPeriodoInscricao(
+		campeonato.data_inicio_inscricao_iso,
+		campeonato.data_fim_inscricao_iso
+	);
+	if (!validacaoPeriodo.aberta) {
+		throw error(400, { message: validacaoPeriodo.motivo || 'Período de inscrições encerrado para este campeonato.' });
 	}
 
 	const aluno = await buscarAlunoPorId(idAcademia, idAluno);

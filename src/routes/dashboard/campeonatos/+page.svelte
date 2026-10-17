@@ -8,7 +8,8 @@
 		Award,
 		PlusCircle,
 		ArrowRight,
-		Medal
+		Medal,
+		Clock
 	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -145,6 +146,12 @@
 							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-emerald-400">
 								<span>{camp.valor_inscricao !== null && camp.valor_inscricao !== undefined && Number(camp.valor_inscricao) > 0 ? `R$ ${Number(camp.valor_inscricao).toFixed(2)}` : 'Gratuito'}</span>
 							</span>
+							{#if camp.data_inicio_inscricao || camp.data_fim_inscricao}
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-purple-300">
+									<Clock class="w-3 h-3 text-purple-400" />
+									<span>Inscrições: {camp.data_inicio_inscricao && camp.data_fim_inscricao ? `${camp.data_inicio_inscricao} a ${camp.data_fim_inscricao}` : camp.data_fim_inscricao ? `Até ${camp.data_fim_inscricao}` : `A partir de ${camp.data_inicio_inscricao}`}</span>
+								</span>
+							{/if}
 						</div>
 					</div>
 
