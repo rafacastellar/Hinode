@@ -15,7 +15,14 @@
 		Clock,
 		AlertCircle,
 		Medal,
-		Swords
+		Trash2,
+		ShieldCheck,
+		UserCheck,
+		AlertTriangle,
+		Filter,
+		Edit3,
+		DollarSign,
+		Sparkles
 	} from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -24,9 +31,13 @@
 	let tipoParticipante = $state<'aluno' | 'professor'>('aluno');
 	let participanteSelecionado = $state<number | ''>('');
 	let carregandoInscricao = $state(false);
+	let carregandoAcao = $state(false);
 	let carregandoResultado = $state(false);
+	let carregandoAutoInscricao = $state(false);
+	let carregandoExclusao = $state(false);
+	let modalExclusaoAberto = $state(false);
 
-	// Filtra alunos que já estão inscritos para facilitar seleção
+	// Filtro de alunos já inscritos no campeonato
 	const idsAlunosInscritos = $derived(
 		new Set(
 			data.inscricoes
@@ -35,13 +46,29 @@
 		)
 	);
 
-	const alunosInscritosDisponiveis = $derived(
-		data.inscricoes.filter((i) => i.tipo_participante === 'aluno')
+	// Separa participantes confirmados da lista oficial vs inscrições com confirmação pendente
+	const participantesConfirmados = $derived(
+		data.inscricoes.filter((i) => i.status_inscricao === 'Confirmada')
+	);
+
+	const inscricoesPendentes = $derived(
+		data.inscricoes.filter((i) => i.status_inscricao === 'Pendente')
+	);
+
+	// Alunos disponíveis para inscrição (ainda não inscritos neste torneio)
+	const alunosDisponiveis = $derived(
+		data.alunos.filter((a) => !idsAlunosInscritos.has(a.id_usuario))
+	);
+
+	const taxaFormatada = $derived(
+		data.campeonato.valor_inscricao !== null && Number(data.campeonato.valor_inscricao) > 0
+			? `R$ ${Number(data.campeonato.valor_inscricao).toFixed(2)}`
+			: 'Isento / Gratuito'
 	);
 </script>
 
 <svelte:head>
-	<title>{data.campeonato.nome} - Gestão do Torneio</title>
+	<title>{data.campeonato.nome} - Gestão de Participantes e Campeonato</title>
 </svelte:head>
 
 <div class="space-y-8">
@@ -55,9 +82,12 @@
 			<span>Voltar para Campeonatos</span>
 		</a>
 
-		<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-2xl">
-			<div>
-				<div class="flex items-center gap-2 mb-2">
+		<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-2xl relative overflow-hidden">
+			<!-- Brilho sutil vermelho de fundo -->
+			<div class="absolute -top-24 -right-24 w-80 h-80 bg-red-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+			<div class="relative z-10 flex-1">
+				<div class="flex flex-wrap items-center gap-2 mb-2">
 					<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 						{data.campeonato.tipo_campeonato || 'Competição Oficial'}
 					</span>
@@ -70,24 +100,343 @@
 				</h1>
 				<p class="text-xs sm:text-sm text-zinc-400 mt-1">
 					{data.campeonato.edicao ? `${data.campeonato.edicao} • ` : ''}
-					{data.campeonato.logradouro}, {data.campeonato.cidade} - {data.campeonato.uf}
+					{data.campeonato.logradouro}{data.campeonato.numero && data.campeonato.numero !== 'S/N' ? `, nº ${data.campeonato.numero}` : ''}{data.campeonato.complemento ? ` (${data.campeonato.complemento})` : ''}{data.campeonato.bairro ? ` - ${data.campeonato.bairro}` : ''}, {data.campeonato.cidade} - {data.campeonato.uf}
 				</p>
+
+				<!-- Restrições do Campeonato: Graduação, Categoria, Idade e Taxa -->
+				<div class="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-zinc-900">
+					<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-zinc-900/90 border border-zinc-800 text-zinc-300">
+						<span class="text-red-400 font-bold uppercase text-[10px]">Faixas:</span>
+						<span class="font-semibold text-white">{data.rotuloFaixas}</span>
+					</div>
+
+					<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-zinc-900/90 border border-zinc-800 text-zinc-300">
+						<span class="text-amber-400 font-bold uppercase text-[10px]">Categoria:</span>
+						<span class="font-semibold text-white">{data.campeonato.limite_grupo || 'Todos'}</span>
+					</div>
+
+					<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-zinc-900/90 border border-zinc-800 text-zinc-300">
+						<span class="text-sky-400 font-bold uppercase text-[10px]">Idade:</span>
+						<span class="font-semibold text-white">{data.rotuloIdade}</span>
+					</div>
+
+					<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-zinc-900/90 border border-zinc-800 text-zinc-300">
+						<span class="text-emerald-400 font-bold uppercase text-[10px]">Taxa:</span>
+						<span class="font-semibold text-emerald-300 font-mono">{taxaFormatada}</span>
+					</div>
+
+					<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-zinc-900/90 border border-zinc-800 text-zinc-300">
+						<span class="text-purple-400 font-bold uppercase text-[10px]">Período de Inscrição:</span>
+						<span class="font-semibold text-white">{data.rotuloPeriodoInscricao}</span>
+					</div>
+				</div>
 			</div>
 
-			<div class="flex items-center gap-3">
-				<div class="px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
-					<span class="text-[10px] font-mono uppercase text-zinc-500 block">Data de Disputa</span>
-					<span class="text-xs font-mono font-bold text-white">{data.campeonato.data_inicio}</span>
+			<!-- CONTADORES E AÇÕES DO PROFESSOR -->
+			<div class="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end gap-3 relative z-10 shrink-0">
+				<div class="flex flex-wrap items-center gap-2">
+					<div class="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
+						<span class="text-[10px] font-mono uppercase text-zinc-500 block">Data de Disputa</span>
+						<span class="text-xs font-mono font-bold text-white">{data.campeonato.data_inicio}</span>
+					</div>
+					<div class="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
+						<span class="text-[10px] font-mono uppercase text-zinc-500 block">Inscrições</span>
+						{#if data.statusPeriodoInscricao.aberta}
+							<span class="text-xs font-mono font-bold text-emerald-400">Abertas</span>
+						{:else}
+							<span class="text-xs font-mono font-bold text-red-400">Encerradas</span>
+						{/if}
+					</div>
+					<div class="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
+						<span class="text-[10px] font-mono uppercase text-zinc-500 block">Lista Oficial</span>
+						<span class="text-xs font-mono font-bold text-emerald-400">
+							{participantesConfirmados.length} judocas
+						</span>
+					</div>
+					{#if inscricoesPendentes.length > 0}
+						<div class="px-3.5 py-2 rounded-xl bg-amber-950/30 border border-amber-900/50 text-center">
+							<span class="text-[10px] font-mono uppercase text-amber-500 block">Pendentes</span>
+							<span class="text-xs font-mono font-bold text-amber-400">
+								{inscricoesPendentes.length}
+							</span>
+						</div>
+					{/if}
 				</div>
-				<div class="px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-center">
-					<span class="text-[10px] font-mono uppercase text-zinc-500 block">Inscritos do Dojo</span>
-					<span class="text-xs font-mono font-bold text-emerald-400">
-						{data.inscricoes.length} competidores
-					</span>
-				</div>
+
+				<!-- Botões de Ação do Professor/Admin -->
+				{#if data.ehProfessorOuAdmin}
+					<div class="flex items-center gap-2 pt-2 lg:pt-0">
+						<a
+							href="/dashboard/campeonatos/{data.campeonato.id_evento}/editar"
+							class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs font-medium text-zinc-200 hover:text-white transition-all shadow-sm"
+						>
+							<Edit3 class="w-3.5 h-3.5 text-zinc-400" />
+							<span>Editar Campeonato</span>
+						</a>
+
+						<button
+							type="button"
+							onclick={() => (modalExclusaoAberto = true)}
+							class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 text-xs font-medium text-red-300 hover:text-red-200 transition-all shadow-sm"
+						>
+							<Trash2 class="w-3.5 h-3.5" />
+							<span>Excluir</span>
+						</button>
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>
+
+	<!-- MENSAGENS DE FEEDBACK -->
+	{#if form?.sucessoAutoInscricao}
+		<div class="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-emerald-400 shrink-0" />
+			<span>{form.sucessoAutoInscricao}</span>
+		</div>
+	{/if}
+
+	{#if form?.sucessoConfirmacao}
+		<div class="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-emerald-400 shrink-0" />
+			<span>{form.sucessoConfirmacao}</span>
+		</div>
+	{/if}
+
+	{#if form?.sucessoRemocao}
+		<div class="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-red-400 shrink-0" />
+			<span>{form.sucessoRemocao}</span>
+		</div>
+	{/if}
+
+	{#if form?.sucessoInscricao}
+		<div class="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-emerald-400 shrink-0" />
+			<span>Judoca adicionado com sucesso! A confirmação do atleta (e do responsável, se menor) foi solicitada.</span>
+		</div>
+	{/if}
+
+	{#if form?.erroInscricao || form?.erro}
+		<div class="p-4 rounded-xl bg-red-950/40 border border-red-800/80 text-red-200 text-xs sm:text-sm flex items-center gap-3">
+			<AlertCircle class="w-5 h-5 text-red-400 shrink-0" />
+			<span>{form.erroInscricao || form.erro}</span>
+		</div>
+	{/if}
+
+	<!-- ========================================================================= -->
+	<!-- ABORDAGEM B: AUTO-INSCRIÇÃO DO JUDOCA OU DO RESPONSÁVEL LEGAL -->
+	<!-- ========================================================================= -->
+	{#if data.alunoLogadoAuto}
+		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2">
+					<UserCheck class="w-4 h-4 text-red-500" />
+					<h3 class="text-sm font-bold text-white font-display">
+						Sua Inscrição no Campeonato (Judoca)
+					</h3>
+				</div>
+				<BadgeFaixa faixa={data.alunoLogadoAuto.graduacao_atual} size="sm" />
+			</div>
+
+			{#if data.alunoLogadoAuto.inscricao}
+				<!-- Judoca já possui inscrição no campeonato -->
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl {data.alunoLogadoAuto.inscricao.status_inscricao === 'Confirmada' ? 'bg-emerald-950/30 border border-emerald-800/60' : 'bg-amber-950/30 border border-amber-800/60'}">
+					<div class="space-y-1">
+						<div class="flex items-center gap-2">
+							{#if data.alunoLogadoAuto.inscricao.status_inscricao === 'Confirmada'}
+								<CheckCircle2 class="w-4 h-4 text-emerald-400" />
+								<span class="text-xs font-bold text-emerald-300">Você está na Lista Oficial de Participantes!</span>
+							{:else}
+								<Clock class="w-4 h-4 text-amber-400" />
+								<span class="text-xs font-bold text-amber-300">Inscrição em processamento (Pendente)</span>
+							{/if}
+						</div>
+						<p class="text-xs text-zinc-400">
+							{#if data.alunoLogadoAuto.inscricao.status_inscricao === 'Confirmada'}
+								Sua participação foi validada e seu tatame de disputa está garantido. Boa luta!
+							{:else if !data.alunoLogadoAuto.inscricao.confirmado_atleta}
+								Você precisa confirmar sua participação abaixo para validar sua vaga.
+							{:else}
+								Sua confirmação foi registrada. Como você é menor de idade, aguarda autorização do responsável legal.
+							{/if}
+						</p>
+					</div>
+
+					{#if data.alunoLogadoAuto.inscricao.status_inscricao === 'Pendente' && !data.alunoLogadoAuto.inscricao.confirmado_atleta}
+						<form action="?/confirmarAtleta" method="POST" use:enhance>
+							<input type="hidden" name="idInscricao" value={data.alunoLogadoAuto.inscricao.id_inscricao} />
+							<button
+								type="submit"
+								class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-md transition-all"
+							>
+								<UserCheck class="w-4 h-4" />
+								<span>Confirmar Minha Vaga</span>
+							</button>
+						</form>
+					{/if}
+				</div>
+			{:else}
+				<!-- Judoca ainda não inscrito -->
+				{#if !data.statusPeriodoInscricao.aberta}
+					<div class="p-4 rounded-xl bg-amber-950/40 border border-amber-800/80 flex items-start gap-3">
+						<Clock class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+						<div>
+							<span class="text-xs font-bold text-amber-300 block">Inscrições Não Disponíveis</span>
+							<p class="text-xs text-amber-200/80 mt-0.5">
+								{data.statusPeriodoInscricao.motivo}
+							</p>
+						</div>
+					</div>
+				{:else if data.alunoLogadoAuto.elegivel}
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+						<div class="space-y-1">
+							<div class="flex items-center gap-2">
+								<Sparkles class="w-4 h-4 text-emerald-400" />
+								<span class="text-xs font-bold text-white">Você está elegível para disputar este torneio!</span>
+							</div>
+							<p class="text-xs text-zinc-400">
+								Sua graduação ({data.alunoLogadoAuto.graduacao_atual}) e idade ({data.alunoLogadoAuto.idade} anos) estão dentro das exigências.
+								Taxa de inscrição: <span class="font-bold text-emerald-400">{taxaFormatada}</span>.
+							</p>
+						</div>
+
+						<form
+							action="?/autoInscrever"
+							method="POST"
+							use:enhance={() => {
+								carregandoAutoInscricao = true;
+								return async ({ update }) => {
+									await update();
+									carregandoAutoInscricao = false;
+								};
+							}}
+						>
+							<input type="hidden" name="idAluno" value={data.alunoLogadoAuto.id_usuario} />
+							<button
+								type="submit"
+								disabled={carregandoAutoInscricao}
+								class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs shadow-[0_0_15px_rgba(220,38,38,0.25)] transition-all disabled:opacity-50"
+							>
+								{#if carregandoAutoInscricao}
+									<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+									<span>Inscrevendo...</span>
+								{:else}
+									<UserPlus class="w-4 h-4" />
+									<span>Inscrever-se no Campeonato</span>
+								{/if}
+							</button>
+						</form>
+					</div>
+				{:else}
+					<div class="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/80 flex items-start gap-3">
+						<AlertTriangle class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+						<div>
+							<span class="text-xs font-bold text-zinc-300 block">Inscrição indisponível para seu perfil</span>
+							<p class="text-xs text-zinc-500 mt-0.5">
+								Motivo: {data.alunoLogadoAuto.motivoInelegivel || 'Graduação ou categoria fora dos limites do campeonato.'}
+							</p>
+						</div>
+					</div>
+				{/if}
+			{/if}
+		</div>
+	{/if}
+
+	<!-- AUTO-INSCRIÇÃO DE DEPENDENTES PELO RESPONSÁVEL LEGAL -->
+	{#if data.dependentesResponsavel && data.dependentesResponsavel.length > 0}
+		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2">
+					<ShieldCheck class="w-4 h-4 text-sky-400" />
+					<h3 class="text-sm font-bold text-white font-display">
+						Inscrição de Dependentes (Responsável Legal)
+					</h3>
+				</div>
+				<span class="text-xs font-mono text-zinc-400">
+					{data.dependentesResponsavel.length} judoca(s) sob sua tutela
+				</span>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				{#each data.dependentesResponsavel as dep}
+					<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 flex flex-col justify-between space-y-3">
+						<div>
+							<div class="flex items-start justify-between gap-2">
+								<div>
+									<h4 class="text-xs font-bold text-white">{dep.nome}</h4>
+									<span class="text-[10px] font-mono text-zinc-500">{dep.grau_parentesco} • {dep.idade} anos</span>
+								</div>
+								<BadgeFaixa faixa={dep.graduacao_atual} size="sm" />
+							</div>
+
+							<!-- Status ou Elegibilidade -->
+							<div class="mt-2 text-xs">
+								{#if dep.inscricao}
+									{#if dep.inscricao.status_inscricao === 'Confirmada'}
+										<span class="inline-flex items-center gap-1 text-emerald-400 font-medium">
+											<CheckCircle2 class="w-3.5 h-3.5" />
+											<span>Confirmado na Lista Oficial</span>
+										</span>
+									{:else}
+										<div class="space-y-1">
+											<span class="inline-flex items-center gap-1 text-amber-400 font-medium">
+												<Clock class="w-3.5 h-3.5" />
+												<span>Inscrição Pendente</span>
+											</span>
+											{#if !dep.inscricao.confirmado_responsavel}
+												<p class="text-[11px] text-zinc-400">Aguardando sua autorização como responsável.</p>
+											{/if}
+										</div>
+									{/if}
+								{:else if dep.elegivel}
+									<span class="text-emerald-400 text-[11px]">✓ Elegível para este torneio</span>
+								{:else}
+									<span class="text-amber-400 text-[11px]">🚫 Inelegível: {dep.motivoInelegivel}</span>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Botão de Inscrição ou Autorização -->
+						<div class="pt-2 border-t border-zinc-900">
+							{#if dep.inscricao}
+								{#if dep.inscricao.status_inscricao === 'Pendente' && !dep.inscricao.confirmado_responsavel}
+									<form action="?/confirmarResponsavel" method="POST" use:enhance>
+										<input type="hidden" name="idInscricao" value={dep.inscricao.id_inscricao} />
+										<button
+											type="submit"
+											class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs transition-colors"
+										>
+											<ShieldCheck class="w-3.5 h-3.5" />
+											<span>Autorizar Participação</span>
+										</button>
+									</form>
+								{/if}
+							{:else if dep.elegivel}
+								{#if !data.statusPeriodoInscricao.aberta}
+									<div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-center gap-1.5 text-center">
+										<Clock class="w-3.5 h-3.5 text-amber-400 shrink-0" />
+										<span>{data.statusPeriodoInscricao.motivo || 'Inscrições encerradas'}</span>
+									</div>
+								{:else}
+									<form action="?/autoInscrever" method="POST" use:enhance>
+										<input type="hidden" name="idAluno" value={dep.id_usuario} />
+										<button
+											type="submit"
+											class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
+										>
+											<UserPlus class="w-3.5 h-3.5" />
+											<span>Inscrever Judoca ({taxaFormatada})</span>
+										</button>
+									</form>
+								{/if}
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<!-- NAVEGAÇÃO DE ABAS -->
 	<div class="flex items-center gap-2 border-b border-zinc-900 pb-2">
@@ -98,7 +447,7 @@
 				? 'bg-zinc-900 text-white border border-zinc-800 shadow-sm'
 				: 'text-zinc-500 hover:text-zinc-300'}"
 		>
-			Inscrições de Atletas ({data.inscricoes.length})
+			Participantes & Inscrições ({data.inscricoes.length})
 		</button>
 
 		<button
@@ -113,187 +462,395 @@
 	</div>
 
 	<!-- ========================================================================= -->
-	<!-- ABA 1: INSCRIÇÕES DE COMPETIDORES -->
+	<!-- ABA 1: GESTÃO DE PARTICIPANTES, CONFIRMAÇÕES E LISTA DO CAMPEONATO -->
 	<!-- ========================================================================= -->
 	{#if abaAtiva === 'inscricoes'}
-		<div class="space-y-6">
-			<!-- Alerta de erro de inscrição -->
-			{#if form?.erroInscricao}
-				<div class="p-4 rounded-xl bg-red-950/40 border border-red-800/80 text-red-200 text-xs flex items-center gap-2">
-					<AlertCircle class="w-4 h-4 text-red-400 shrink-0" />
-					<span>{form.erroInscricao}</span>
+		<div class="space-y-8">
+			<!-- 1. PROFESSOR ADICIONA ATLETAS AO CAMPEONATO -->
+			{#if data.ehProfessorOuAdmin}
+				<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-900">
+						<div>
+							<div class="flex items-center gap-2">
+								<UserPlus class="w-4 h-4 text-red-500" />
+								<h3 class="text-sm font-bold text-white font-display">
+									Adicionar Judoca ao Campeonato (Sensei)
+								</h3>
+							</div>
+							<p class="text-[11px] text-zinc-500 mt-0.5">
+								O atleta será convidado. Ele confirma sua vaga e, se for menor de idade, o responsável legal também confirma.
+							</p>
+						</div>
+
+						<div class="flex items-center gap-2 text-[11px] font-mono text-zinc-400">
+							<span class="text-zinc-500">Regras:</span>
+							<span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-red-300 font-semibold">
+								{data.rotuloFaixas}
+							</span>
+							<span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-sky-300 font-semibold">
+								{data.rotuloIdade}
+							</span>
+						</div>
+					</div>
+
+					{#if !data.statusPeriodoInscricao.aberta}
+						<div class="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-200 text-xs flex items-center gap-2.5">
+							<Clock class="w-4 h-4 text-amber-400 shrink-0" />
+							<div>
+								<span class="font-bold block">{data.statusPeriodoInscricao.motivo}</span>
+								<span class="text-[11px] text-amber-300/70">Novas inscrições estão bloqueadas para este campeonato.</span>
+							</div>
+						</div>
+					{/if}
+
+					<form
+						action="?/inscrever"
+						method="POST"
+						use:enhance={() => {
+							carregandoInscricao = true;
+							return async ({ update }) => {
+								await update();
+								carregandoInscricao = false;
+								participanteSelecionado = '';
+							};
+						}}
+						class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+					>
+						<!-- Tipo de Competidor -->
+						<div>
+							<label for="tipoParticipante" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
+								Tipo
+							</label>
+							<select
+								id="tipoParticipante"
+								name="tipoParticipante"
+								bind:value={tipoParticipante}
+								class="w-full px-3 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
+							>
+								<option value="aluno">Judoca / Aluno</option>
+								<option value="professor">Sensei Competidor</option>
+							</select>
+						</div>
+
+						<!-- Seleção do Competidor filtrando elegibilidade -->
+						<div class="sm:col-span-2">
+							<label for="idParticipante" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
+								Selecione o Competidor *
+							</label>
+							<select
+								id="idParticipante"
+								name="idParticipante"
+								bind:value={participanteSelecionado}
+								required
+								class="w-full px-3 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
+							>
+								<option value="">Selecione quem irá disputar...</option>
+								{#if tipoParticipante === 'aluno'}
+									{#each alunosDisponiveis as aluno}
+										<option
+											value={aluno.id_usuario}
+											disabled={!aluno.elegivel}
+										>
+											{#if aluno.elegivel}
+												🥋 {aluno.nome} ({aluno.graduacao_atual}) • {aluno.grupo_especial_aspirante || 'Geral'} • {aluno.idade} anos {aluno.menor_idade ? '[Menor]' : '[Maior]'}
+											{:else}
+												🚫 {aluno.nome} ({aluno.graduacao_atual}) • Inelegível: {aluno.motivoInelegivel}
+											{/if}
+										</option>
+									{/each}
+								{:else}
+									{#each data.professores as prof}
+										<option value={prof.id_usuario}>
+											🥋 Sensei {prof.nome} ({prof.grau_faixa || 'Faixa Preta'})
+										</option>
+									{/each}
+								{/if}
+							</select>
+						</div>
+
+						<!-- Botão de Inscrição -->
+						<div>
+							<button
+								type="submit"
+								disabled={!data.statusPeriodoInscricao.aberta || carregandoInscricao || !participanteSelecionado}
+								class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all disabled:opacity-50"
+							>
+								{#if carregandoInscricao}
+									<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+									<span>Adicionando...</span>
+								{:else}
+									<UserPlus class="w-4 h-4" />
+									<span>Adicionar Atleta</span>
+								{/if}
+							</button>
+						</div>
+					</form>
 				</div>
 			{/if}
 
-			<!-- Formulário de Inscrição Mista (Judoca ou Sensei) -->
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-				<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-400">
-					Inscrever Competidor no Torneio (Misto: Atletas & Professores)
-				</h3>
-
-				<form
-					action="?/inscrever"
-					method="POST"
-					use:enhance={() => {
-						carregandoInscricao = true;
-						return async ({ update }) => {
-							await update();
-							carregandoInscricao = false;
-							participanteSelecionado = '';
-						};
-					}}
-					class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
-				>
-					<!-- Tipo de Competidor -->
-					<div>
-						<label for="tipoParticipante" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
-							Categoria
-						</label>
-						<select
-							id="tipoParticipante"
-							name="tipoParticipante"
-							bind:value={tipoParticipante}
-							class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
-						>
-							<option value="aluno">Judoca / Aluno</option>
-							<option value="professor">Sensei / Professor</option>
-						</select>
+			<!-- 2. LISTA OFICIAL DE PARTICIPANTES DO CAMPEONATO (CONFIRMADOS) -->
+			<div class="space-y-3">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<ShieldCheck class="w-4 h-4 text-emerald-400" />
+						<h2 class="text-sm font-bold text-white font-display">
+							Lista Oficial de Participantes do Campeonato
+						</h2>
+						<span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-800 text-emerald-300">
+							{participantesConfirmados.length} confirmados
+						</span>
 					</div>
+					<span class="text-[11px] text-zinc-500 font-mono">
+						Atletas com confirmação validada
+					</span>
+				</div>
 
-					<!-- Seleção do Competidor -->
-					<div class="sm:col-span-2">
-						<label for="idParticipante" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
-							Competidor *
-						</label>
-						<select
-							id="idParticipante"
-							name="idParticipante"
-							bind:value={participanteSelecionado}
-							required
-							class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
-						>
-							<option value="">Selecione o participante...</option>
-							{#if tipoParticipante === 'aluno'}
-								{#each data.alunos as aluno}
-									<option value={aluno.id_usuario}>
-										{aluno.nome} ({aluno.graduacao_atual}) - {aluno.idade} anos
-									</option>
-								{/each}
-							{:else}
-								{#each data.professores as prof}
-									<option value={prof.id_usuario}>
-										{prof.nome} ({prof.grau_faixa || 'Sensei'})
-									</option>
-								{/each}
-							{/if}
-						</select>
-					</div>
+				{#if participantesConfirmados.length > 0}
+					<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
+						<div class="overflow-x-auto">
+							<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
+								<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
+									<tr>
+										<th class="px-6 py-4">Judoca Competidor</th>
+										<th class="px-6 py-4">Graduação / Faixa</th>
+										<th class="px-6 py-4">Categoria / Idade</th>
+										<th class="px-6 py-4">Taxa</th>
+										<th class="px-6 py-4">Confirmações Validadas</th>
+										{#if data.ehProfessorOuAdmin}
+											<th class="px-6 py-4 text-right">Ação do Professor</th>
+										{/if}
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-zinc-900">
+									{#each participantesConfirmados as inscr}
+										<tr class="hover:bg-zinc-900/30 transition-colors">
+											<td class="px-6 py-4">
+												<div class="font-semibold text-white">
+													{inscr.nome_participante}
+												</div>
+												<span class="text-[10px] font-mono text-zinc-500 uppercase">
+													{inscr.tipo_participante === 'aluno' ? 'Judoca Oficial' : 'Professor Competidor'}
+												</span>
+											</td>
 
-					<!-- Botão de Inscrição -->
-					<div>
-						<button
-							type="submit"
-							disabled={carregandoInscricao || !participanteSelecionado}
-							class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all disabled:opacity-50"
-						>
-							{#if carregandoInscricao}
-								<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-								<span>Inscrevendo...</span>
-							{:else}
-								<UserPlus class="w-4 h-4" />
-								<span>Confirmar Inscrição</span>
-							{/if}
-						</button>
+											<td class="px-6 py-4">
+												<BadgeFaixa faixa={inscr.faixa_participante} size="sm" />
+											</td>
+
+											<td class="px-6 py-4">
+												<div class="text-xs text-zinc-300 font-medium">
+													{inscr.grupo_participante || 'Aspirante'}
+												</div>
+												<span class="text-[11px] font-mono text-zinc-500">
+													{inscr.idade} anos • {inscr.menor_idade ? 'Menor' : 'Maior'}
+												</span>
+											</td>
+
+											<td class="px-6 py-4 font-mono text-xs text-emerald-400">
+												{inscr.valor !== null && Number(inscr.valor) > 0 ? `R$ ${Number(inscr.valor).toFixed(2)}` : 'Isento'}
+											</td>
+
+											<td class="px-6 py-4">
+												<div class="space-y-1">
+													<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
+														<CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
+														<span>Atleta confirmou {inscr.data_confirmacao_atleta ? `(${inscr.data_confirmacao_atleta})` : ''}</span>
+													</div>
+													{#if inscr.menor_idade}
+														<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 block">
+															<CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
+															<span>Responsável ({inscr.nome_responsavel || 'Legal'}) autorizou</span>
+														</div>
+													{:else}
+														<div class="text-[10px] font-mono text-zinc-500">
+															Dispensado: Maior de 18 anos
+														</div>
+													{/if}
+												</div>
+											</td>
+
+											{#if data.ehProfessorOuAdmin}
+												<td class="px-6 py-4 text-right">
+													<form
+														action="?/removerAtleta"
+														method="POST"
+														use:enhance={() => {
+															carregandoAcao = true;
+															return async ({ update }) => {
+																await update();
+																carregandoAcao = false;
+															};
+														}}
+														class="inline-block"
+													>
+														<input type="hidden" name="idInscricao" value={inscr.id_inscricao} />
+														<button
+															type="submit"
+															disabled={carregandoAcao}
+															title="Remover atleta da lista do campeonato"
+															class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-[11px] text-zinc-400 hover:text-red-300 transition-colors"
+														>
+															<Trash2 class="w-3.5 h-3.5 text-zinc-500 hover:text-red-400" />
+															<span>Remover da Lista</span>
+														</button>
+													</form>
+												</td>
+											{/if}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
 					</div>
-				</form>
+				{:else}
+					<div class="p-8 rounded-2xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
+						<Users class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+						<h4 class="text-sm font-bold text-white font-display">Nenhum competidor confirmado ainda</h4>
+						<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+							Atletas adicionados pelo professor ou auto-inscritos aparecerão aqui assim que confirmarem (e o responsável autorizar, caso seja menor).
+						</p>
+					</div>
+				{/if}
 			</div>
 
-			<!-- TABELA DE INSCRIÇÕES -->
-			{#if data.inscricoes.length > 0}
-				<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
-					<div class="overflow-x-auto">
-						<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
-							<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
-								<tr>
-									<th class="px-6 py-4">Competidor</th>
-									<th class="px-6 py-4">Categoria / Faixa</th>
-									<th class="px-6 py-4">Status da Inscrição</th>
-									<th class="px-6 py-4 text-right">Gerenciar Status</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-zinc-900">
-								{#each data.inscricoes as inscricao}
-									<tr class="hover:bg-zinc-900/30 transition-colors">
-										<td class="px-6 py-4">
-											<div class="font-semibold text-white">
-												{inscricao.nome_participante}
-											</div>
-											<span class="text-[10px] font-mono text-zinc-500 uppercase">
-												{inscricao.tipo_participante === 'aluno' ? 'Judoca' : 'Professor Competidor'}
-											</span>
-										</td>
+			<!-- 3. INSCRIÇÕES PENDENTES DE CONFIRMAÇÃO (AGUARDANDO ATLETA / RESPONSÁVEL) -->
+			{#if inscricoesPendentes.length > 0}
+				<div class="space-y-3 pt-4 border-t border-zinc-900">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<Clock class="w-4 h-4 text-amber-400" />
+							<h2 class="text-sm font-bold text-white font-display">
+								Inscrições Pendentes de Confirmação
+							</h2>
+							<span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 border border-amber-800 text-amber-300">
+								{inscricoesPendentes.length} aguardando
+							</span>
+						</div>
+						<span class="text-[11px] text-zinc-500 font-mono">
+							Ingressam na lista oficial após as confirmações
+						</span>
+					</div>
 
-										<td class="px-6 py-4">
-											<BadgeFaixa faixa={inscricao.faixa_participante} size="sm" />
-										</td>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						{#each inscricoesPendentes as pend}
+							{@const souOAtleta = Boolean(data.usuarioLogadoId && data.usuarioLogadoId === pend.id_participante)}
+							{@const souOResponsavel = Boolean(data.usuarioLogadoId && (pend.ids_responsaveis?.includes(data.usuarioLogadoId) || data.usuarioLogadoId === pend.id_responsavel))}
 
-										<td class="px-6 py-4">
-											{#if inscricao.status_inscricao === 'Confirmada'}
-												<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-emerald-950/40 border border-emerald-800/80 text-emerald-300">
-													<CheckCircle2 class="w-3.5 h-3.5 text-emerald-400" />
-													<span>Confirmada</span>
+							<div class="p-5 rounded-2xl bg-zinc-950 border border-zinc-900 hover:border-zinc-800 transition-all flex flex-col justify-between space-y-4">
+								<div>
+									<!-- Topo do Card -->
+									<div class="flex items-start justify-between gap-3 mb-2">
+										<div>
+											<h4 class="text-sm font-bold text-white font-display">
+												{pend.nome_participante}
+											</h4>
+											<div class="flex items-center gap-2 mt-1">
+												<BadgeFaixa faixa={pend.faixa_participante} size="sm" />
+												<span class="text-[11px] font-mono text-zinc-400">
+													{pend.grupo_participante || 'Aspirante'} • {pend.idade} anos
 												</span>
-											{:else if inscricao.status_inscricao === 'Pendente'}
-												<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-amber-950/40 border border-amber-800/80 text-amber-300">
-													<Clock class="w-3.5 h-3.5 text-amber-400" />
-													<span>Pendente</span>
+											</div>
+										</div>
+
+										{#if pend.menor_idade}
+											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-950/60 border border-amber-800/80 text-amber-300 shrink-0">
+												Menor de Idade
+											</span>
+										{:else}
+											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
+												Maior de Idade
+											</span>
+										{/if}
+									</div>
+
+									<!-- Status de Cada Confirmação Exigida -->
+									<div class="space-y-2 mt-3 pt-3 border-t border-zinc-900/80 text-xs font-mono">
+										<!-- 1. Atleta -->
+										<div class="flex items-center justify-between gap-2">
+											<span class="text-zinc-500 text-[11px]">1. Confirmação do Atleta:</span>
+											{#if pend.confirmado_atleta}
+												<span class="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
+													<CheckCircle2 class="w-3 h-3" />
+													<span>Confirmado</span>
 												</span>
 											{:else}
-												<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-zinc-900 border border-zinc-800 text-zinc-500">
-													<XCircle class="w-3.5 h-3.5 text-zinc-500" />
-													<span>Cancelada</span>
+												<span class="inline-flex items-center gap-1 text-amber-400 text-[11px]">
+													<Clock class="w-3 h-3" />
+													<span>Pendente</span>
 												</span>
 											{/if}
-										</td>
+										</div>
 
-										<td class="px-6 py-4 text-right">
-											<form action="?/alterarStatus" method="POST" use:enhance class="inline-flex items-center gap-1.5">
-												<input type="hidden" name="idInscricao" value={inscricao.id_inscricao} />
-												{#if inscricao.status_inscricao !== 'Confirmada'}
-													<button
-														type="submit"
-														name="novoStatus"
-														value="Confirmada"
-														class="px-2.5 py-1 rounded-lg bg-emerald-950/50 hover:bg-emerald-900/70 border border-emerald-800 text-[11px] text-emerald-200 transition-colors"
-													>
-														Confirmar
-													</button>
-												{/if}
-												{#if inscricao.status_inscricao !== 'Cancelada'}
-													<button
-														type="submit"
-														name="novoStatus"
-														value="Cancelada"
-														class="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-400 transition-colors"
-													>
-														Cancelar
-													</button>
-												{/if}
+										<!-- 2. Responsável -->
+										<div class="flex items-center justify-between gap-2">
+											<span class="text-zinc-500 text-[11px]">2. Autorização do Responsável:</span>
+											{#if !pend.menor_idade}
+												<span class="text-zinc-500 text-[11px]">Dispensado (18+ anos)</span>
+											{:else if pend.confirmado_responsavel}
+												<span class="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
+													<CheckCircle2 class="w-3 h-3" />
+													<span>Autorizado ({pend.nome_responsavel || 'Legal'})</span>
+												</span>
+											{:else}
+												<span class="inline-flex items-center gap-1 text-amber-400 text-[11px]">
+													<Clock class="w-3 h-3" />
+													<span>Aguardando {pend.nome_responsavel ? `(${pend.nome_responsavel})` : 'autorização'}</span>
+												</span>
+											{/if}
+										</div>
+									</div>
+								</div>
+
+								<!-- Ações de Confirmação & Remoção -->
+								<div class="pt-3 border-t border-zinc-900 flex flex-wrap items-center justify-between gap-2">
+									<div class="flex flex-wrap items-center gap-2">
+										<!-- Botão de Confirmação pelo Atleta -->
+										{#if !pend.confirmado_atleta && (souOAtleta || data.ehProfessorOuAdmin)}
+											<form action="?/confirmarAtleta" method="POST" use:enhance class="inline-block">
+												<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
+												<button
+													type="submit"
+													class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800 text-xs font-semibold text-emerald-300 transition-colors"
+												>
+													<UserCheck class="w-3.5 h-3.5" />
+													<span>{souOAtleta ? 'Confirmar Minha Vaga' : 'Confirmar pelo Atleta'}</span>
+												</button>
 											</form>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+										{/if}
+
+										<!-- Botão de Autorização pelo Responsável (se menor) -->
+										{#if pend.menor_idade && !pend.confirmado_responsavel && (souOResponsavel || data.ehProfessorOuAdmin)}
+											<form action="?/confirmarResponsavel" method="POST" use:enhance class="inline-block">
+												<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
+												<button
+													type="submit"
+													class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/80 border border-sky-800 text-xs font-semibold text-sky-300 transition-colors"
+												>
+													<ShieldCheck class="w-3.5 h-3.5" />
+													<span>{souOResponsavel ? 'Autorizar como Responsável' : 'Autorizar pelo Responsável'}</span>
+												</button>
+											</form>
+										{/if}
+									</div>
+
+									<!-- Professor pode remover atletas da lista -->
+									{#if data.ehProfessorOuAdmin}
+										<form action="?/removerAtleta" method="POST" use:enhance class="inline-block">
+											<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
+											<button
+												type="submit"
+												title="Remover atleta da lista do campeonato"
+												class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-[11px] text-zinc-400 hover:text-red-300 transition-colors"
+											>
+												<Trash2 class="w-3 h-3" />
+												<span>Remover</span>
+											</button>
+										</form>
+									{/if}
+								</div>
+							</div>
+						{/each}
 					</div>
-				</div>
-			{:else}
-				<div class="p-8 rounded-xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
-					<Users class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-					<h4 class="text-sm font-bold text-white font-display">Nenhum competidor inscrito ainda</h4>
-					<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
-						Utilize o formulário acima para inscrever judocas ou professores neste campeonato.
-					</p>
 				</div>
 			{/if}
 		</div>
@@ -313,171 +870,243 @@
 			{/if}
 
 			<!-- Formulário de Lançamento de Resultado Pós-Campeonato -->
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-				<div class="flex items-center gap-2">
-					<Medal class="w-4 h-4 text-amber-500" />
+			{#if data.ehProfessorOuAdmin}
+				<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+					<div class="flex items-center gap-2">
+						<Medal class="w-4 h-4 text-amber-500" />
+						<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-400">
+							Lançar Desempenho do Judoca (Pós-Torneio)
+						</h3>
+					</div>
+
+					<form
+						action="?/lancarResultado"
+						method="POST"
+						use:enhance={() => {
+							carregandoResultado = true;
+							return async ({ update }) => {
+								await update();
+								carregandoResultado = false;
+							};
+						}}
+						class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+					>
+						<div>
+							<label for="idAlunoResultado" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
+								Judoca Competidor *
+							</label>
+							<select
+								id="idAlunoResultado"
+								name="idAluno"
+								required
+								class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
+							>
+								<option value="">Selecione o atleta confirmado...</option>
+								{#each participantesConfirmados as inscr}
+									{#if inscr.tipo_participante === 'aluno'}
+										<option value={inscr.id_participante}>
+											{inscr.nome_participante} ({inscr.faixa_participante})
+										</option>
+									{/if}
+								{/each}
+							</select>
+						</div>
+
+						<div>
+							<label for="classificacaoAluno" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
+								Classificação / Pódio *
+							</label>
+							<select
+								id="classificacaoAluno"
+								name="classificacaoAluno"
+								required
+								class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
+							>
+								<option value="Ouro / Campeão">🥇 Ouro / Campeão</option>
+								<option value="Prata / Vice-Campeão">🥈 Prata / Vice-Campeão</option>
+								<option value="Bronze (3º Lugar)">🥉 Bronze (3º Lugar)</option>
+								<option value="5º Lugar">5º Lugar</option>
+								<option value="Participação">Participação</option>
+							</select>
+						</div>
+
+						<div class="grid grid-cols-2 gap-2">
+							<div>
+								<label for="qtdLutas" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
+									Lutas *
+								</label>
+								<input
+									type="number"
+									id="qtdLutas"
+									name="qtdLutas"
+									required
+									min="0"
+									value="3"
+									class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-600"
+								/>
+							</div>
+							<div>
+								<label for="qtdVitorias" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
+									Vitórias *
+								</label>
+								<input
+									type="number"
+									id="qtdVitorias"
+									name="qtdVitorias"
+									required
+									min="0"
+									value="3"
+									class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-600"
+								/>
+							</div>
+						</div>
+
+						<div>
+							<button
+								type="submit"
+								disabled={carregandoResultado}
+								class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-xs border border-zinc-700 transition-colors disabled:opacity-50"
+							>
+								<Medal class="w-4 h-4 text-amber-500" />
+								<span>{carregandoResultado ? 'Gravando...' : 'Lançar Pódio'}</span>
+							</button>
+						</div>
+					</form>
+				</div>
+			{/if}
+
+			<!-- Tabela de Resultados -->
+			<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
+				<div class="px-6 py-4 border-b border-zinc-900 flex items-center justify-between">
 					<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-400">
-						Lançar Desempenho do Judoca (Pós-Torneio)
+						Quadro Oficial de Medalhas do Dojo
 					</h3>
+					<span class="text-xs font-mono text-zinc-500">
+						{data.resultados.length} resultado(s)
+					</span>
 				</div>
 
-				<form
-					action="?/lancarResultado"
-					method="POST"
-					use:enhance={() => {
-						carregandoResultado = true;
-						return async ({ update }) => {
-							await update();
-							carregandoResultado = false;
-						};
-					}}
-					class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
-				>
-					<div>
-						<label for="idAlunoResultado" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
-							Judoca Competidor *
-						</label>
-						<select
-							id="idAlunoResultado"
-							name="idAluno"
-							required
-							class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
-						>
-							<option value="">Selecione o atleta...</option>
-							{#each alunosInscritosDisponiveis as inscr}
-								<option value={inscr.id_participante}>
-									{inscr.nome_participante} ({inscr.faixa_participante})
-								</option>
-							{/each}
-						</select>
-					</div>
-
-					<div>
-						<label for="classificacaoAluno" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
-							Classificação / Pódio *
-						</label>
-						<select
-							id="classificacaoAluno"
-							name="classificacaoAluno"
-							required
-							class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
-						>
-							<option value="Ouro / Campeão">🥇 Ouro / Campeão</option>
-							<option value="Prata / Vice-Campeão">🥈 Prata / Vice-Campeão</option>
-							<option value="Bronze (3º Lugar)">🥉 Bronze (3º Lugar)</option>
-							<option value="5º Lugar">5º Lugar</option>
-							<option value="Participação">Participação</option>
-						</select>
-					</div>
-
-					<div class="grid grid-cols-2 gap-2">
-						<div>
-							<label for="qtdLutas" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
-								Lutas *
-							</label>
-							<input
-								type="number"
-								id="qtdLutas"
-								name="qtdLutas"
-								required
-								min="0"
-								value="3"
-								class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-600"
-							/>
-						</div>
-						<div>
-							<label for="qtdVitorias" class="block text-[11px] font-mono uppercase text-zinc-500 mb-1">
-								Vitórias *
-							</label>
-							<input
-								type="number"
-								id="qtdVitorias"
-								name="qtdVitorias"
-								required
-								min="0"
-								value="2"
-								class="w-full px-3 py-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-600"
-							/>
-						</div>
-					</div>
-
-					<div>
-						<button
-							type="submit"
-							disabled={carregandoResultado}
-							class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all disabled:opacity-50"
-						>
-							{#if carregandoResultado}
-								<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-								<span>Gravando...</span>
-							{:else}
-								<Medal class="w-4 h-4" />
-								<span>Salvar Resultado</span>
-							{/if}
-						</button>
-					</div>
-				</form>
-			</div>
-
-			<!-- QUADRO DE MEDALHAS DO TORNEIO -->
-			{#if data.resultados.length > 0}
-				<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
+				{#if data.resultados.length > 0}
 					<div class="overflow-x-auto">
 						<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
 							<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
 								<tr>
-									<th class="px-6 py-4">Judoca</th>
-									<th class="px-6 py-4">Faixa</th>
-									<th class="px-6 py-4">Classificação / Medalha</th>
-									<th class="px-6 py-4 font-mono text-center">Lutas Disputadas</th>
-									<th class="px-6 py-4 font-mono text-center">Vitórias</th>
-									<th class="px-6 py-4 font-mono text-right">Aproveitamento</th>
+									<th class="px-6 py-3.5">Judoca</th>
+									<th class="px-6 py-3.5">Faixa</th>
+									<th class="px-6 py-3.5">Classificação / Pódio</th>
+									<th class="px-6 py-3.5">Combates</th>
+									<th class="px-6 py-3.5">Vitórias</th>
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-zinc-900">
 								{#each data.resultados as res}
-									{@const aproveitamento = res.qtd_lutas > 0 ? Math.round((res.qtd_vitorias / res.qtd_lutas) * 100) : 0}
 									<tr class="hover:bg-zinc-900/30 transition-colors">
-										<td class="px-6 py-4 font-semibold text-white">
-											{res.nome_aluno}
-										</td>
-
-										<td class="px-6 py-4">
+										<td class="px-6 py-3.5 font-medium text-white">{res.nome_aluno}</td>
+										<td class="px-6 py-3.5">
 											<BadgeFaixa faixa={res.faixa_aluno} size="sm" />
 										</td>
-
-										<td class="px-6 py-4">
-											<span class="font-bold {res.classificacao_aluno.includes('Ouro') ? 'text-amber-400' : res.classificacao_aluno.includes('Prata') ? 'text-zinc-300' : res.classificacao_aluno.includes('Bronze') ? 'text-amber-600' : 'text-zinc-400'}">
-												{res.classificacao_aluno}
-											</span>
+										<td class="px-6 py-3.5">
+											{#if res.classificacao_aluno.includes('Ouro')}
+												<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-950/60 border border-amber-800 text-amber-300">
+													🥇 {res.classificacao_aluno}
+												</span>
+											{:else if res.classificacao_aluno.includes('Prata')}
+												<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800/80 border border-zinc-700 text-zinc-200">
+													🥈 {res.classificacao_aluno}
+												</span>
+											{:else if res.classificacao_aluno.includes('Bronze')}
+												<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-950/30 border border-amber-900 text-amber-500">
+													🥉 {res.classificacao_aluno}
+												</span>
+											{:else}
+												<span class="px-2 py-0.5 rounded text-xs text-zinc-400 font-mono">
+													{res.classificacao_aluno}
+												</span>
+											{/if}
 										</td>
-
-										<td class="px-6 py-4 font-mono text-center text-zinc-300">
-											{res.qtd_lutas}
-										</td>
-
-										<td class="px-6 py-4 font-mono text-center text-emerald-400 font-bold">
-											{res.qtd_vitorias}
-										</td>
-
-										<td class="px-6 py-4 font-mono text-right text-zinc-300">
-											{aproveitamento}%
-										</td>
+										<td class="px-6 py-3.5 font-mono">{res.qtd_lutas}</td>
+										<td class="px-6 py-3.5 font-mono text-emerald-400 font-bold">{res.qtd_vitorias}</td>
 									</tr>
 								{/each}
 							</tbody>
 						</table>
 					</div>
-				</div>
-			{:else}
-				<div class="p-8 rounded-xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
-					<Medal class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-					<h4 class="text-sm font-bold text-white font-display">Sem resultados lançados</h4>
-					<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
-						Após a realização dos combates, lance o desempenho dos atletas acima para alimentar o quadro de medalhas.
-					</p>
-				</div>
-			{/if}
+				{:else}
+					<div class="p-8 text-center text-xs text-zinc-500">
+						Nenhum resultado computado ainda para este campeonato.
+					</div>
+				{/if}
+			</div>
 		</div>
 	{/if}
 </div>
+
+<!-- ========================================================================= -->
+<!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DO CAMPEONATO -->
+<!-- ========================================================================= -->
+{#if modalExclusaoAberto}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="w-full max-w-md p-6 rounded-2xl bg-zinc-950 border border-red-950/80 shadow-2xl space-y-4">
+			<div class="flex items-center gap-3">
+				<div class="w-10 h-10 rounded-xl bg-red-950/60 border border-red-800 flex items-center justify-center text-red-400 shrink-0">
+					<Trash2 class="w-5 h-5" />
+				</div>
+				<div>
+					<h3 class="text-sm font-bold text-white font-display">Excluir Campeonato</h3>
+					<p class="text-xs text-zinc-400">Esta ação não poderá ser desfeita.</p>
+				</div>
+			</div>
+
+			<div class="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs text-zinc-300 space-y-1">
+				<p>
+					Você está prestes a excluir o campeonato:
+					<strong class="text-white block mt-0.5">{data.campeonato.nome}</strong>
+				</p>
+				<p class="text-[11px] text-zinc-400 pt-1">
+					Todas as inscrições e registros vinculados a este evento serão permanentemente removidos.
+				</p>
+			</div>
+
+			<div class="flex items-center justify-end gap-2.5 pt-2">
+				<button
+					type="button"
+					onclick={() => (modalExclusaoAberto = false)}
+					disabled={carregandoExclusao}
+					class="px-4 py-2 rounded-xl border border-zinc-800 text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+				>
+					Cancelar
+				</button>
+
+				<form
+					action="?/excluir"
+					method="POST"
+					use:enhance={() => {
+						carregandoExclusao = true;
+						return async ({ update }) => {
+							await update();
+							carregandoExclusao = false;
+						};
+					}}
+				>
+					<button
+						type="submit"
+						disabled={carregandoExclusao}
+						class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-lg shadow-red-600/20 transition-all disabled:opacity-50"
+					>
+						{#if carregandoExclusao}
+							<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+							<span>Excluindo...</span>
+						{:else}
+							<Trash2 class="w-3.5 h-3.5" />
+							<span>Sim, Excluir Campeonato</span>
+						{/if}
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+{/if}

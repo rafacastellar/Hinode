@@ -8,7 +8,8 @@
 		Award,
 		PlusCircle,
 		ArrowRight,
-		Medal
+		Medal,
+		Clock
 	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -46,13 +47,15 @@
 			</p>
 		</div>
 
-		<a
-			href="/dashboard/campeonatos/novo"
-			class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all shrink-0"
-		>
-			<PlusCircle class="w-4 h-4" />
-			<span>Cadastrar Campeonato</span>
-		</a>
+		{#if data.podeCriarCampeonato}
+			<a
+				href="/dashboard/campeonatos/novo"
+				class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all shrink-0"
+			>
+				<PlusCircle class="w-4 h-4" />
+				<span>Cadastrar Campeonato</span>
+			</a>
+		{/if}
 	</div>
 
 	<!-- CARDS DE MÉTRICAS -->
@@ -118,12 +121,37 @@
 							{camp.nome}
 						</h3>
 						{#if camp.edicao}
-							<span class="text-xs text-zinc-400 block mb-3">{camp.edicao}</span>
+							<span class="text-xs text-zinc-400 block mb-2">{camp.edicao}</span>
 						{/if}
 
-						<div class="flex items-center gap-2 text-xs text-zinc-400 mb-4">
+						<div class="flex items-center gap-2 text-xs text-zinc-400 mb-3">
 							<MapPin class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
 							<span>{camp.cidade} / {camp.uf}</span>
+						</div>
+
+						<!-- Limites de Graduação, Categoria, Idade e Taxa -->
+						<div class="flex flex-wrap gap-1.5 pt-2 border-t border-zinc-900/80 mb-4">
+							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300">
+								<span class="text-red-400 font-bold">Faixas:</span>
+								<span>{camp.faixa_inicio && camp.faixa_fim ? `${camp.faixa_inicio} até ${camp.faixa_fim}` : (camp.limite_graduacao || 'Todas as Faixas')}</span>
+							</span>
+							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300">
+								<span class="text-amber-400 font-bold">Categoria:</span>
+								<span>{camp.limite_grupo || 'Todos'}</span>
+							</span>
+							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-sky-300">
+								<span class="text-sky-400 font-bold">Idade:</span>
+								<span>{camp.idade_minima !== null && camp.idade_minima !== undefined && camp.idade_maxima !== null && camp.idade_maxima !== undefined ? `${camp.idade_minima} a ${camp.idade_maxima} anos` : camp.idade_minima !== null && camp.idade_minima !== undefined ? `A partir de ${camp.idade_minima} anos` : camp.idade_maxima !== null && camp.idade_maxima !== undefined ? `Até ${camp.idade_maxima} anos` : 'Livre'}</span>
+							</span>
+							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-emerald-400">
+								<span>{camp.valor_inscricao !== null && camp.valor_inscricao !== undefined && Number(camp.valor_inscricao) > 0 ? `R$ ${Number(camp.valor_inscricao).toFixed(2)}` : 'Gratuito'}</span>
+							</span>
+							{#if camp.data_inicio_inscricao || camp.data_fim_inscricao}
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-purple-300">
+									<Clock class="w-3 h-3 text-purple-400" />
+									<span>Inscrições: {camp.data_inicio_inscricao && camp.data_fim_inscricao ? `${camp.data_inicio_inscricao} a ${camp.data_fim_inscricao}` : camp.data_fim_inscricao ? `Até ${camp.data_fim_inscricao}` : `A partir de ${camp.data_inicio_inscricao}`}</span>
+								</span>
+							{/if}
 						</div>
 					</div>
 
