@@ -147,15 +147,17 @@
 					O atleta encontra-se atualmente na faixa inicial ({data.aluno.graduacao_atual}). As próximas
 					homologações aparecerão aqui nesta linha do tempo.
 				</p>
-				<div class="mt-4">
-					<a
-						href="/dashboard/graduacoes/nova"
-						class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
-					>
-						<Award class="w-3.5 h-3.5" />
-						<span>Homologar Exame para este Judoca</span>
-					</a>
-				</div>
+				{#if data.podeHomologar}
+					<div class="mt-4">
+						<a
+							href="/dashboard/graduacoes/nova"
+							class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
+						>
+							<Award class="w-3.5 h-3.5" />
+							<span>Homologar Exame para este Judoca</span>
+						</a>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>

@@ -13,7 +13,9 @@
 		ArrowRight,
 		Clock,
 		Flame,
-		CheckCircle2
+		CheckCircle2,
+		UserCog,
+		Settings
 	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -132,27 +134,31 @@
 				</div>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-					<a
-						href="/dashboard/alunos"
-						class="group p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 transition-all flex items-start gap-3.5"
-					>
-						<div
-							class="w-9 h-9 rounded-lg bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-zinc-300 group-hover:text-red-400 group-hover:border-red-900/60 shrink-0 transition-colors"
+					{#if data.podeVerAlunos}
+						<a
+							href="/dashboard/alunos"
+							class="group p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 transition-all flex items-start gap-3.5"
 						>
-							<UserPlus class="w-4 h-4" />
-						</div>
-						<div class="min-w-0 flex-1">
-							<div class="flex items-center justify-between">
-								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
-									Matricular Judoca
-								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 4</span>
+							<div
+								class="w-9 h-9 rounded-lg bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-zinc-300 group-hover:text-red-400 group-hover:border-red-900/60 shrink-0 transition-colors"
+							>
+								<UserPlus class="w-4 h-4" />
 							</div>
-							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-								Cadastro de alunos, cálculo de maioridade e responsável legal.
-							</p>
-						</div>
-					</a>
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
+										{data.podeCriarAlunos ? 'Matricular Judoca' : 'Alunos & Judocas'}
+									</span>
+									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 4</span>
+								</div>
+								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+									{data.podeCriarAlunos
+										? 'Cadastro de alunos, cálculo de maioridade e responsável legal.'
+										: 'Consulta ao prontuário e ficha técnica dos judocas.'}
+								</p>
+							</div>
+						</a>
+					{/if}
 
 					<a
 						href="/dashboard/turmas"
@@ -166,12 +172,14 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center justify-between">
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
-									Organizar Turmas
+									{data.podeGerenciarTurmas ? 'Organizar Turmas' : 'Turmas & Treinos'}
 								</span>
 								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 5</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-								Horários de tatame, dias da semana e alocação de senseis.
+								{data.podeGerenciarTurmas
+									? 'Horários de tatame, dias da semana e alocação de senseis.'
+									: 'Consulte a grade semanal de treinos e senseis responsáveis.'}
 							</p>
 						</div>
 					</a>
@@ -188,12 +196,14 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center justify-between">
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
-									Exame & Graduação
+									{data.podeHomologarGraduacoes ? 'Exame & Graduação' : 'Graduações & Faixas'}
 								</span>
 								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 6</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-								Troca de faixa atômica com histórico estritamente insert-only.
+								{data.podeHomologarGraduacoes
+									? 'Troca de faixa atômica com histórico estritamente insert-only.'
+									: 'Histórico cronológico de promoções de faixa e carências.'}
 							</p>
 						</div>
 					</a>
@@ -210,15 +220,65 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center justify-between">
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
-									Inscrição em Torneios
+									{data.podeGerenciarCampeonatos ? 'Gestão de Campeonatos' : 'Campeonatos & Inscrições'}
 								</span>
 								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 7</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-								Inscrições mistas, validação de lutas e registro de vitórias.
+								{data.podeGerenciarCampeonatos
+									? 'Inscrições mistas, validação de lutas e registro de vitórias.'
+									: 'Consulte os torneios oficiais e confirme sua participação.'}
 							</p>
 						</div>
 					</a>
+
+					{#if data.podeVerUsuarios}
+						<a
+							href="/dashboard/usuarios"
+							class="group p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 transition-all flex items-start gap-3.5"
+						>
+							<div
+								class="w-9 h-9 rounded-lg bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-zinc-300 group-hover:text-red-400 group-hover:border-red-900/60 shrink-0 transition-colors"
+							>
+								<UserCog class="w-4 h-4" />
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
+										Equipe & Usuários
+									</span>
+									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 9</span>
+								</div>
+								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+									Gestão de operadores e atribuição de perfis acumulativos.
+								</p>
+							</div>
+						</a>
+					{/if}
+
+					{#if data.podeConfigurarAcademia}
+						<a
+							href="/dashboard/configuracoes"
+							class="group p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 transition-all flex items-start gap-3.5"
+						>
+							<div
+								class="w-9 h-9 rounded-lg bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-zinc-300 group-hover:text-red-400 group-hover:border-red-900/60 shrink-0 transition-colors"
+							>
+								<Settings class="w-4 h-4" />
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
+										Configurações do Dojo
+									</span>
+									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 8</span>
+								</div>
+								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+									Dados da academia, telemetria e conformidade LGPD.
+								</p>
+							</div>
+						</a>
+					{/if}
 				</div>
 			</div>
 		</div>

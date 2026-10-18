@@ -1,6 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { buscarAlunoPorId } from '#lib/server/repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
 import { atualizarDadosAluno } from '#lib/server/servicos/aluno.service';
@@ -24,9 +24,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, { message: 'Judoca não encontrado neste dojo' });
 	}
 
+	const podeEditar = temPermissao(perfis, 'ALUNOS_EDITAR');
+	const podeGerenciarUsuario = temPermissao(perfis, 'USUARIOS_GERENCIAR');
+
 	return {
 		aluno,
-		professores
+		professores,
+		podeEditar,
+		podeGerenciarUsuario
 	};
 };
 

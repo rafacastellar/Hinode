@@ -252,13 +252,15 @@
 						</div>
 
 						<div class="flex items-center gap-2 self-end sm:self-auto">
-							<a
-								href="/dashboard/usuarios/{selecionado.id_usuario}"
-								class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors"
-							>
-								<Pencil class="w-3.5 h-3.5" />
-								<span>Editar cadastro</span>
-							</a>
+							{#if data.podeGerenciarUsuario}
+								<a
+									href="/dashboard/usuarios/{selecionado.id_usuario}"
+									class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors"
+								>
+									<Pencil class="w-3.5 h-3.5" />
+									<span>Editar cadastro</span>
+								</a>
+							{/if}
 							<button
 								type="button"
 								id="btn-trocar-usuario"
@@ -308,13 +310,19 @@
 								<Info class="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
 								<div>
 									<p>Nenhum usuário com perfil Aluno encontrado.</p>
-									<a
-										href="/dashboard/usuarios/novo"
-										class="inline-flex items-center gap-1 mt-1.5 text-red-400 hover:text-red-300 font-medium"
-									>
-										<UserPlus class="w-3.5 h-3.5" />
-										Cadastrar usuário com perfil Aluno
-									</a>
+									{#if data.podeGerenciarUsuario}
+										<a
+											href="/dashboard/usuarios/novo"
+											class="inline-flex items-center gap-1 mt-1.5 text-red-400 hover:text-red-300 font-medium"
+										>
+											<UserPlus class="w-3.5 h-3.5" />
+											Cadastrar usuário com perfil Aluno
+										</a>
+									{:else}
+										<p class="mt-1 text-[11px] text-zinc-500">
+											Solicite à administração o cadastro prévio do usuário no sistema.
+										</p>
+									{/if}
 								</div>
 							</div>
 						{:else}
@@ -438,13 +446,15 @@
 								</p>
 							</div>
 						</div>
-						<a
-							href="/dashboard/usuarios/{selecionado.id_usuario}"
-							class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors w-fit"
-						>
-							<Pencil class="w-3.5 h-3.5" />
-							<span>Gerenciar responsáveis</span>
-						</a>
+						{#if data.podeGerenciarUsuario}
+							<a
+								href="/dashboard/usuarios/{selecionado.id_usuario}"
+								class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 text-xs flex items-center gap-1.5 transition-colors w-fit"
+							>
+								<Pencil class="w-3.5 h-3.5" />
+								<span>Gerenciar responsáveis</span>
+							</a>
+						{/if}
 					</div>
 
 					{#if menorSemResponsavel}

@@ -7,7 +7,8 @@
 		Search,
 		Award,
 		HeartHandshake,
-		Pencil
+		Pencil,
+		Eye
 	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -49,13 +50,15 @@
 			</p>
 		</div>
 
-		<a
-			href="/dashboard/alunos/novo"
-			class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all shrink-0"
-		>
-			<UserPlus class="w-4 h-4" />
-			<span>Matricular Judoca</span>
-		</a>
+		{#if data.podeCriarAluno}
+			<a
+				href="/dashboard/alunos/novo"
+				class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all shrink-0"
+			>
+				<UserPlus class="w-4 h-4" />
+				<span>Matricular Judoca</span>
+			</a>
+		{/if}
 	</div>
 
 	<!-- ========================================================================= -->
@@ -247,10 +250,15 @@
 									<a
 										href="/dashboard/alunos/{aluno.id_usuario}"
 										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 hover:text-white transition-colors"
-										title="Visualizar e editar dados do judoca"
+										title={data.podeEditarAluno ? "Visualizar e editar dados do judoca" : "Visualizar dados do judoca"}
 									>
-										<Pencil class="w-3.5 h-3.5 text-zinc-400" />
-										<span>Editar</span>
+										{#if data.podeEditarAluno}
+											<Pencil class="w-3.5 h-3.5 text-zinc-400" />
+											<span>Editar</span>
+										{:else}
+											<Eye class="w-3.5 h-3.5 text-zinc-400" />
+											<span>Visualizar</span>
+										{/if}
 									</a>
 								</td>
 							</tr>
@@ -270,15 +278,17 @@
 					Comece matriculando o primeiro atleta da academia para dar início aos registros de treinos e graduações.
 				{/if}
 			</p>
-			<div class="mt-5">
-				<a
-					href="/dashboard/alunos/novo"
-					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
-				>
-					<UserPlus class="w-3.5 h-3.5" />
-					<span>Cadastrar Primeiro Judoca</span>
-				</a>
-			</div>
+			{#if data.podeCriarAluno}
+				<div class="mt-5">
+					<a
+						href="/dashboard/alunos/novo"
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
+					>
+						<UserPlus class="w-3.5 h-3.5" />
+						<span>Cadastrar Primeiro Judoca</span>
+					</a>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

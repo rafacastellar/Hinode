@@ -84,13 +84,15 @@
 				</button>
 			</div>
 
-			<a
-				href="/dashboard/turmas/nova"
-				class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
-			>
-				<CalendarPlus class="w-4 h-4" />
-				<span>Criar Nova Turma</span>
-			</a>
+			{#if data.podeGerenciar}
+				<a
+					href="/dashboard/turmas/nova"
+					class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
+				>
+					<CalendarPlus class="w-4 h-4" />
+					<span>Criar Nova Turma</span>
+				</a>
+			{/if}
 		</div>
 	</div>
 
@@ -213,7 +215,7 @@
 											href="/dashboard/turmas/{turma.id_treino}"
 											class="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white font-medium"
 										>
-											<span>Gerenciar</span>
+											<span>{data.podeGerenciar ? 'Gerenciar' : 'Ver Detalhes'}</span>
 											<ArrowRight class="w-3.5 h-3.5" />
 										</a>
 									</td>
@@ -231,15 +233,17 @@
 			<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
 				Organize os horários de tatame do seu dojo, defina os dias de treino e distribua os judocas por turmas.
 			</p>
-			<div class="mt-5">
-				<a
-					href="/dashboard/turmas/nova"
-					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
-				>
-					<CalendarPlus class="w-3.5 h-3.5" />
-					<span>Cadastrar Primeira Turma</span>
-				</a>
-			</div>
+			{#if data.podeGerenciar}
+				<div class="mt-5">
+					<a
+						href="/dashboard/turmas/nova"
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
+					>
+						<CalendarPlus class="w-3.5 h-3.5" />
+						<span>Cadastrar Primeira Turma</span>
+					</a>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

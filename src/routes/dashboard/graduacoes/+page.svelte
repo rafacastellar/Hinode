@@ -187,7 +187,7 @@
 								href="/dashboard/graduacoes/{evento.id_evento}"
 								class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs border border-zinc-800 transition-all group-hover:border-red-900/60 group-hover:bg-red-950/20"
 							>
-								<span>Gerenciar Exame</span>
+								<span>{data.podeHomologar ? 'Gerenciar Exame' : 'Consultar Exame'}</span>
 								<ArrowRight class="w-3.5 h-3.5 text-zinc-400 group-hover:text-red-400 transition-transform group-hover:translate-x-0.5" />
 							</a>
 						</div>

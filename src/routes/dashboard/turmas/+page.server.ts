@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { listarTurmasDoDojo } from '#lib/server/repositorios/turma.repo';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -10,6 +10,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const turmas = await listarTurmasDoDojo(idAcademia);
 
 	return {
-		turmas
+		turmas,
+		podeGerenciar: temPermissao(perfis, 'TURMAS_GERENCIAR')
 	};
 };
