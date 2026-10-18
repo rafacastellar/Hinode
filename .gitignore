@@ -5,8 +5,10 @@ implemente.md
 .project
 migrations/
 tests/
+scratch/
 plano-execucao-usuarios-judocas.md
-
+plano-graduacoes.md
+plano-execucao-eventos.md
 # Output
 .output
 .vercel

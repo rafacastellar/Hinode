@@ -171,7 +171,7 @@
 							href="/dashboard/campeonatos/{camp.id_evento}"
 							class="inline-flex items-center gap-1.5 text-xs font-semibold text-white hover:text-red-400 transition-colors"
 						>
-							<span>Gerenciar</span>
+							<span>{data.podeCriarCampeonato ? 'Gerenciar' : 'Detalhes & Inscrição'}</span>
 							<ArrowRight class="w-3.5 h-3.5" />
 						</a>
 					</div>
@@ -186,15 +186,17 @@
 				Cadastre as competições da federação, inscreva os judocas e professores do dojo e
 				registre as medalhas conquistadas.
 			</p>
-			<div class="mt-5">
-				<a
-					href="/dashboard/campeonatos/novo"
-					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
-				>
-					<PlusCircle class="w-3.5 h-3.5" />
-					<span>Cadastrar Primeiro Campeonato</span>
-				</a>
-			</div>
+			{#if data.podeCriarCampeonato}
+				<div class="mt-5">
+					<a
+						href="/dashboard/campeonatos/novo"
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors"
+					>
+						<PlusCircle class="w-3.5 h-3.5" />
+						<span>Cadastrar Primeiro Campeonato</span>
+					</a>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

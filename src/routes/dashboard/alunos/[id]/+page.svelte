@@ -121,6 +121,13 @@
 							{aluno.grupo_especial_aspirante}
 						</span>
 					{/if}
+					{#if !data.podeEditar}
+						<span
+							class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-950/60 border border-amber-800 text-amber-300"
+						>
+							Modo Consulta
+						</span>
+					{/if}
 				</div>
 				<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 					{aluno.nome}
@@ -132,14 +139,16 @@
 
 			<div class="flex items-center gap-3">
 				<BadgeFaixa faixa={aluno.graduacao_atual} size="lg" />
-				<a
-					href="/dashboard/usuarios/{aluno.id_usuario}"
-					class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition-colors"
-					title="Editar perfil pessoal, endereço e dados de responsável"
-				>
-					<ExternalLink class="w-3.5 h-3.5 text-zinc-400" />
-					<span>Perfil de Usuário</span>
-				</a>
+				{#if data.podeGerenciarUsuario}
+					<a
+						href="/dashboard/usuarios/{aluno.id_usuario}"
+						class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition-colors"
+						title="Editar perfil pessoal, endereço e dados de responsável"
+					>
+						<ExternalLink class="w-3.5 h-3.5 text-zinc-400" />
+						<span>Perfil de Usuário</span>
+					</a>
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -182,13 +191,15 @@
 					Dados Cadastrais & Responsabilidade
 				</h2>
 			</div>
-			<a
-				href="/dashboard/usuarios/{aluno.id_usuario}"
-				class="text-[11px] text-red-400 hover:text-red-300 font-medium inline-flex items-center gap-1 transition-colors"
-			>
-				<span>Editar cadastro completo / Endereço</span>
-				<ExternalLink class="w-3 h-3" />
-			</a>
+			{#if data.podeGerenciarUsuario}
+				<a
+					href="/dashboard/usuarios/{aluno.id_usuario}"
+					class="text-[11px] text-red-400 hover:text-red-300 font-medium inline-flex items-center gap-1 transition-colors"
+				>
+					<span>Editar cadastro completo / Endereço</span>
+					<ExternalLink class="w-3 h-3" />
+				</a>
+			{/if}
 		</div>
 
 		<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
@@ -262,6 +273,7 @@
 	<!-- FORMULÁRIO DE EDIÇÃO TÉCNICA E ESPORTIVA DO JUDOCA -->
 	<!-- ========================================================================= -->
 	<form method="POST" class="space-y-6">
+		<fieldset disabled={!data.podeEditar} class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-85">
 		<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
 			<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
 				<div
@@ -456,6 +468,7 @@
 				</div>
 			</div>
 		</div>
+		</fieldset>
 
 		<!-- ===================================================================== -->
 		<!-- BOTÕES DE AÇÃO -->
@@ -465,15 +478,17 @@
 				href="/dashboard/alunos"
 				class="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs sm:text-sm font-medium text-zinc-300 transition-colors"
 			>
-				Cancelar
+				{data.podeEditar ? 'Cancelar' : 'Voltar'}
 			</a>
-			<button
-				type="submit"
-				class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
-			>
-				<Save class="w-4 h-4" />
-				<span>Salvar Alterações do Judoca</span>
-			</button>
+			{#if data.podeEditar}
+				<button
+					type="submit"
+					class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
+				>
+					<Save class="w-4 h-4" />
+					<span>Salvar Alterações do Judoca</span>
+				</button>
+			{/if}
 		</div>
 	</form>
 </div>

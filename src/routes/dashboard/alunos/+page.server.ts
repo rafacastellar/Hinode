@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { listarAlunos } from '#lib/server/repositorios/aluno.repo';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -13,6 +13,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		alunos,
-		busca
+		busca,
+		podeCriarAluno: temPermissao(perfis, 'ALUNOS_CRIAR'),
+		podeEditarAluno: temPermissao(perfis, 'ALUNOS_EDITAR')
 	};
 };

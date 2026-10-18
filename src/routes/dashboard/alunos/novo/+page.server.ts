@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
 import { listarCandidatosMatriculaDoDojo } from '#lib/server/repositorios/matricula.repo';
 import { matricularUsuarioExistente } from '#lib/server/servicos/aluno.service';
@@ -16,9 +16,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listarCandidatosMatriculaDoDojo(idAcademia)
 	]);
 
+	const podeGerenciarUsuario = temPermissao(perfis, 'USUARIOS_GERENCIAR');
+
 	return {
 		professores,
-		candidatos
+		candidatos,
+		podeGerenciarUsuario
 	};
 };
 

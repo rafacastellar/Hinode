@@ -297,13 +297,20 @@ model Classificacao {
 }
 
 model Graduacao_Evento {
-  id_evento      Int                   @id
-  tipo_graduacao String?               @db.VarChar(100)
-  status         String?               @db.VarChar(50)
-  requisitos     String?               @db.Text
+  id_evento                           Int                   @id
+  tipo_graduacao                      String?               @default("Troca de Faixa") @db.VarChar(100)
+  status                              String?               @default("Agendado") @db.VarChar(50)
+  faixa_inicio                        String                @default("Branca") @db.VarChar(50)
+  faixa_fim                           String                @default("Marrom") @db.VarChar(50)
+  tempo_minimo_judo_meses             Int?                  @default(0)
+  tempo_minimo_ultima_graduacao_meses Int?                  @default(0)
+  taxa_graduacao                      Decimal?              @default(0.00) @db.Decimal(10, 2)
+  data_inicio_inscricao               DateTime?             @db.Date
+  data_fim_inscricao                  DateTime?             @db.Date
+  requisitos                          String?               @db.Text
 
-  evento         Evento                @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
-  historicos     Historico_Graduacao[]
+  evento                              Evento                @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+  historicos                          Historico_Graduacao[]
 }
 
 // =======================================================

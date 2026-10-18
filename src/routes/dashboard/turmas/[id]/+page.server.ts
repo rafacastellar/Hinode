@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { buscarTurmaPorId } from '#lib/server/repositorios/turma.repo';
 import { listarAlunos } from '#lib/server/repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
@@ -28,18 +28,26 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		throw error(404, 'Turma não encontrada no dojo');
 	}
 
-	// Busca todos os judocas do dojo para seleção rápida
-	const todosAlunos = await listarAlunos(idAcademia);
-	const idsJaMatriculados = new Set(turma.alunos_matriculados.map((a) => a.id_usuario));
-	const alunosDisponiveis = todosAlunos.filter((a) => !idsJaMatriculados.has(a.id_usuario));
+	const podeGerenciar = temPermissao(perfis, 'TURMAS_GERENCIAR');
+	const podeVerAlunos = temPermissao(perfis, 'ALUNOS_VER');
 
-	// Lista de todos os professores do dojo para alocação múltipla
-	const professoresDojo = await listarProfessoresDoDojo(idAcademia);
+	// Busca judocas para matrícula apenas se tiver privilégio de gestão
+	let alunosDisponiveis: typeof turma.alunos_matriculados = [];
+	let professoresDojo: Awaited<ReturnType<typeof listarProfessoresDoDojo>> = [];
+
+	if (podeGerenciar) {
+		const todosAlunos = await listarAlunos(idAcademia);
+		const idsJaMatriculados = new Set(turma.alunos_matriculados.map((a) => a.id_usuario));
+		alunosDisponiveis = todosAlunos.filter((a) => !idsJaMatriculados.has(a.id_usuario));
+		professoresDojo = await listarProfessoresDoDojo(idAcademia);
+	}
 
 	return {
 		turma,
 		alunosDisponiveis,
-		professoresDojo
+		professoresDojo,
+		podeGerenciar,
+		podeVerAlunos
 	};
 };
 

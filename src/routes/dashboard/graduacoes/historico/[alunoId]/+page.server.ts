@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { exigirPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { buscarAlunoPorId } from '#lib/server/repositorios/aluno.repo';
 import { buscarHistoricoDoAluno } from '#lib/server/repositorios/graduacao.repo';
 
@@ -24,6 +24,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	return {
 		aluno,
-		historico
+		historico,
+		podeHomologar: temPermissao(perfis, 'GRADUACOES_HOMOLOGAR')
 	};
 };

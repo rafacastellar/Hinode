@@ -47,6 +47,9 @@
 	let diasSelecionados = $state<string[]>([]);
 
 	$effect(() => {
+		if (!data.podeGerenciar && abaAtiva === 'editar') {
+			abaAtiva = 'alunos';
+		}
 		professoresSelecionados = data.turma.professores.map((p) => p.id_professor);
 		diasSelecionados = diasSemanaOpcoes.filter((dia) =>
 			data.turma.dia_semana.toLowerCase().includes(dia.toLowerCase().split('-')[0])
@@ -122,16 +125,18 @@
 						{data.turma.alunos_matriculados.length} atletas
 					</span>
 				</div>
-				<button
-					type="button"
-					onclick={() => (abaAtiva = abaAtiva === 'alunos' ? 'editar' : 'alunos')}
-					class="px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-colors flex items-center gap-1.5 {abaAtiva === 'editar'
-						? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.3)]'
-						: 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'}"
-				>
-					<Settings class="w-3.5 h-3.5" />
-					<span>{abaAtiva === 'editar' ? 'Ver Chamada' : 'Editar Turma'}</span>
-				</button>
+				{#if data.podeGerenciar}
+					<button
+						type="button"
+						onclick={() => (abaAtiva = abaAtiva === 'alunos' ? 'editar' : 'alunos')}
+						class="px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-colors flex items-center gap-1.5 {abaAtiva === 'editar'
+							? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.3)]'
+							: 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'}"
+					>
+						<Settings class="w-3.5 h-3.5" />
+						<span>{abaAtiva === 'editar' ? 'Ver Chamada' : 'Editar Turma'}</span>
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -168,16 +173,18 @@
 			</span>
 		</button>
 
-		<button
-			type="button"
-			onclick={() => (abaAtiva = 'editar')}
-			class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors {abaAtiva === 'editar'
-				? 'bg-zinc-900 text-white border border-zinc-800'
-				: 'text-zinc-400 hover:text-white'}"
-		>
-			<Settings class="w-4 h-4 text-red-500" />
-			<span>Editar Turma, Horários e Senseis</span>
-		</button>
+		{#if data.podeGerenciar}
+			<button
+				type="button"
+				onclick={() => (abaAtiva = 'editar')}
+				class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors {abaAtiva === 'editar'
+					? 'bg-zinc-900 text-white border border-zinc-800'
+					: 'text-zinc-400 hover:text-white'}"
+			>
+				<Settings class="w-4 h-4 text-red-500" />
+				<span>Editar Turma, Horários e Senseis</span>
+			</button>
+		{/if}
 	</div>
 
 	<!-- ALERTAS DE FEEDBACK GLOBAIS -->
@@ -208,7 +215,7 @@
 	<!-- CONTEÚDO DA ABA 1: JUDOCAS & MATRÍCULA -->
 	{#if abaAtiva === 'alunos'}
 		<!-- MATRICULAR NOVO ALUNO NA TURMA -->
-		{#if data.alunosDisponiveis.length > 0}
+		{#if data.podeGerenciar && data.alunosDisponiveis.length > 0}
 			<div class="p-5 sm:p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
 				<div class="flex items-center justify-between">
 					<div>
@@ -286,19 +293,25 @@
 									<th class="px-6 py-4">Graduação (Faixa)</th>
 									<th class="px-6 py-4">Idade</th>
 									<th class="px-6 py-4">Matrícula</th>
-									<th class="px-6 py-4 text-right">Ação</th>
+									{#if data.podeGerenciar}
+										<th class="px-6 py-4 text-right">Ação</th>
+									{/if}
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-zinc-900">
 								{#each data.turma.alunos_matriculados as aluno}
 									<tr class="hover:bg-zinc-900/30 transition-colors">
 										<td class="px-6 py-4 font-semibold text-white">
-											<a
-												href="/dashboard/alunos/{aluno.id_usuario}"
-												class="hover:text-red-400 hover:underline transition-colors"
-											>
-												{aluno.nome}
-											</a>
+											{#if data.podeVerAlunos}
+												<a
+													href="/dashboard/alunos/{aluno.id_usuario}"
+													class="hover:text-red-400 hover:underline transition-colors"
+												>
+													{aluno.nome}
+												</a>
+											{:else}
+												<span>{aluno.nome}</span>
+											{/if}
 										</td>
 										<td class="px-6 py-4">
 											<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
@@ -309,18 +322,20 @@
 										<td class="px-6 py-4 font-mono text-zinc-400">
 											{aluno.matricula || '-'}
 										</td>
-										<td class="px-6 py-4 text-right">
-											<form action="?/desmatricular" method="POST" use:enhance class="inline-block">
-												<input type="hidden" name="idAluno" value={aluno.id_usuario} />
-												<button
-													type="submit"
-													class="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-900 transition-colors"
-													title="Remover judoca desta turma"
-												>
-													<Trash2 class="w-4 h-4" />
-												</button>
-											</form>
-										</td>
+										{#if data.podeGerenciar}
+											<td class="px-6 py-4 text-right">
+												<form action="?/desmatricular" method="POST" use:enhance class="inline-block">
+													<input type="hidden" name="idAluno" value={aluno.id_usuario} />
+													<button
+														type="submit"
+														class="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-900 transition-colors"
+														title="Remover judoca desta turma"
+													>
+														<Trash2 class="w-4 h-4" />
+													</button>
+												</form>
+											</td>
+										{/if}
 									</tr>
 								{/each}
 							</tbody>
