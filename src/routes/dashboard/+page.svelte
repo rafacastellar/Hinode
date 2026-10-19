@@ -18,18 +18,38 @@
 		Settings
 	} from '@lucide/svelte';
 	import PainelJudoca from '#lib/components/dashboard/PainelJudoca.svelte';
+	import PainelProfessor from '#lib/components/dashboard/PainelProfessor.svelte';
+	import PainelResponsavel from '#lib/components/dashboard/PainelResponsavel.svelte';
+	import SeletorPerspectiva from '#lib/components/dashboard/SeletorPerspectiva.svelte';
+	import CardAniversariantes from '#lib/components/dashboard/CardAniversariantes.svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>
 
 <svelte:head>
-	<title>{data.ehAluno ? 'Meu Painel - Judô Hinodê' : 'Visão Geral do Dojo - Judô Hinodê'}</title>
+	<title>
+		{data.visaoAtiva === 'aluno'
+			? 'Meu Painel - Judô Hinodê'
+			: data.visaoAtiva === 'professor'
+				? 'Tatame do Sensei - Judô Hinodê'
+				: data.visaoAtiva === 'responsavel'
+					? 'Painel da Família - Judô Hinodê'
+					: 'Gestão do Dojo - Judô Hinodê'}
+	</title>
 </svelte:head>
 
-{#if data.ehAluno && data.painelJudoca}
-	<PainelJudoca painel={data.painelJudoca} nomeAcademia={data.nomeAcademia} />
-{:else}
-<div class="space-y-8">
+<div class="space-y-6">
+	<!-- 0. SELETOR DE PERSPECTIVA (APENAS PARA USUÁRIOS COM MÚLTIPLOS PAPÉIS) -->
+	<SeletorPerspectiva perfis={data.perfis} visaoAtiva={data.visaoAtiva} />
+
+	{#if data.visaoAtiva === 'aluno' && data.painelJudoca}
+		<PainelJudoca painel={data.painelJudoca} nomeAcademia={data.nomeAcademia} />
+	{:else if data.visaoAtiva === 'professor' && data.painelProfessor}
+		<PainelProfessor painel={data.painelProfessor} nomeAcademia={data.nomeAcademia} />
+	{:else if data.visaoAtiva === 'responsavel' && data.painelResponsavel}
+		<PainelResponsavel painel={data.painelResponsavel} nomeAcademia={data.nomeAcademia} />
+	{:else}
+		<div class="space-y-8">
 	<!-- ========================================================================= -->
 	<!-- 1. BANNER DE BOAS-VINDAS & CONTEXTO MULTI-TENANT -->
 	<!-- ========================================================================= -->
@@ -287,8 +307,13 @@
 			</div>
 		</div>
 
-		<!-- Coluna da Direita (1 slot): Próximos Eventos & Filosofia do Judô -->
+		<!-- Coluna da Direita (1 slot): Aniversariantes, Próximos Eventos & Filosofia do Judô -->
 		<div class="space-y-6">
+			<!-- Aniversariantes da Semana (Equipe do Dojo) -->
+			{#if data.aniversariantes}
+				<CardAniversariantes aniversariantes={data.aniversariantes} />
+			{/if}
+
 			<!-- Próximos Eventos -->
 			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900">
 				<div class="flex items-center justify-between mb-4">
@@ -382,3 +407,4 @@
 	</div>
 </div>
 {/if}
+</div>

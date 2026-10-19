@@ -49,6 +49,8 @@ const PERMISSOES_POR_PAPEL: Record<string, readonly Permissao[]> = {
 	professor: [
 		'DASHBOARD_VER',
 		'ALUNOS_VER',
+		'ALUNOS_CRIAR',
+		'ALUNOS_EDITAR',
 		'TURMAS_VER',
 		'TURMAS_GERENCIAR',
 		'GRADUACOES_VER',

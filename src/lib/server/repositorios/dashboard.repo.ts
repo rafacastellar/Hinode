@@ -110,6 +110,93 @@ export interface PainelJudocaDados {
 	pendencias: PendenciaJudoca[];
 }
 
+export interface AniversarianteItem {
+	id_usuario: number;
+	nome: string;
+	data_nascimento_br: string;
+	dia_mes: string;
+	idade_completando: number;
+	dias_restantes: number; // 0 = hoje, 1 = amanhã, etc.
+	perfis: string;
+	faixa?: string | null;
+}
+
+export interface TurmaProfessorItem {
+	id_treino: number;
+	descricao: string;
+	dia_semana: string;
+	horario_inicio: string;
+	horario_fim: string;
+	total_alunos: number;
+}
+
+export interface AlunoTutelaItem {
+	id_usuario: number;
+	nome: string;
+	matricula: string | null;
+	graduacao_atual: string;
+	peso: number | null;
+	categoria: string | null;
+	status_federacao: string | null;
+	tem_turma: boolean;
+}
+
+export interface PainelProfessorDados {
+	professor: {
+		id_usuario: number;
+		nome: string;
+		email: string;
+		telefone: string | null;
+		n_federacao: string | null;
+		grau_faixa: string | null;
+	};
+	turmas: TurmaProfessorItem[];
+	totalTurmas: number;
+	totalAlunosSobTutela: number;
+	totalAlunosTurmas: number;
+	alunosSobTutela: AlunoTutelaItem[];
+	pendenciasTecnicas: {
+		alunosSemPeso: AlunoTutelaItem[];
+		alunosSemTurma: AlunoTutelaItem[];
+		alunosFederacaoPendente: AlunoTutelaItem[];
+	};
+	aniversariantes: AniversarianteItem[];
+	proximosEventos: MetricasDojo['proximosEventos'];
+}
+
+export interface DependenteItemPainel {
+	aluno: {
+		id_usuario: number;
+		nome: string;
+		data_nascimento_br: string;
+		idade: number;
+		menor_idade: boolean;
+		grau_parentesco: string;
+		financeiro: boolean;
+		matricula: string | null;
+		graduacao_atual: string;
+		peso: number | null;
+		categoria: string | null;
+		nome_professor_responsavel: string;
+	};
+	painelJudoca: PainelJudocaDados;
+}
+
+export interface PainelResponsavelDados {
+	responsavel: {
+		id_usuario: number;
+		nome: string;
+		email: string;
+		telefone: string | null;
+	};
+	totalDependentes: number;
+	totalTurmasAtivas: number;
+	totalMedalhasFamilia: number;
+	totalPendenciasFamilia: number;
+	dependentes: DependenteItemPainel[];
+	proximosEventos: MetricasDojo['proximosEventos'];
+}
+
 function calcularDiferencaMeses(dataPassada: string | Date | null): number {
 	if (!dataPassada) return 0;
 	let d: Date;
@@ -653,4 +740,312 @@ export async function contarPendenciasAcaoAluno(
 
 	return totalCamp + semTurma + semPeso;
 }
+
+/**
+ * Consulta e formata os aniversariantes da academia nos próximos 7 dias.
+ * Apenas utiliza dados existentes da tabela Usuario (data_nascimento).
+ */
+export async function obterAniversariantesDaSemana(
+	idAcademia: number
+): Promise<AniversarianteItem[]> {
+	const pool = getDbPool();
+	const sql = `
+		SELECT 
+			u.id_usuario,
+			u.nome,
+			u.data_nascimento,
+			al.graduacao_atual,
+			GROUP_CONCAT(DISTINCT p.role SEPARATOR ', ') AS perfis
+		FROM Usuario u
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		LEFT JOIN Usuario_Academia_Perfil uap ON uap.id_usuario = u.id_usuario AND uap.id_academia = ua.id_academia
+		LEFT JOIN Perfil p ON p.id_perfil = uap.id_perfil
+		LEFT JOIN Aluno al ON al.id_usuario = u.id_usuario
+		WHERE ua.id_academia = ?
+		GROUP BY u.id_usuario, u.nome, u.data_nascimento, al.graduacao_atual
+	`;
+	const [rows] = await pool.execute<RowDataPacket[]>(sql, [idAcademia]);
+
+	const hoje = new Date();
+	hoje.setHours(0, 0, 0, 0);
+	const anoAtual = hoje.getFullYear();
+
+	const aniversariantes: AniversarianteItem[] = [];
+
+	for (const row of rows) {
+		if (!row.data_nascimento) continue;
+		const nasc = new Date(row.data_nascimento);
+		if (isNaN(nasc.getTime())) continue;
+
+		const mesNasc = nasc.getUTCMonth();
+		const diaNasc = nasc.getUTCDate();
+
+		// Data de aniversário no ano atual
+		let dataAniv = new Date(anoAtual, mesNasc, diaNasc);
+		dataAniv.setHours(0, 0, 0, 0);
+
+		// Se já passou este ano e estamos perto do fim do ano, checar ano que vem
+		if (dataAniv.getTime() < hoje.getTime()) {
+			dataAniv = new Date(anoAtual + 1, mesNasc, diaNasc);
+			dataAniv.setHours(0, 0, 0, 0);
+		}
+
+		const diffTime = dataAniv.getTime() - hoje.getTime();
+		const diffDias = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+		if (diffDias >= 0 && diffDias <= 7) {
+			const anoNasc = nasc.getUTCFullYear();
+			const idadeCompletando = dataAniv.getFullYear() - anoNasc;
+
+			const diaStr = String(diaNasc).padStart(2, '0');
+			const mesStr = String(mesNasc + 1).padStart(2, '0');
+
+			aniversariantes.push({
+				id_usuario: row.id_usuario,
+				nome: row.nome,
+				data_nascimento_br: `${diaStr}/${mesStr}/${anoNasc}`,
+				dia_mes: `${diaStr}/${mesStr}`,
+				idade_completando: idadeCompletando,
+				dias_restantes: diffDias,
+				perfis: row.perfis || 'Usuário',
+				faixa: row.graduacao_atual || null
+			});
+		}
+	}
+
+	aniversariantes.sort((a, b) => a.dias_restantes - b.dias_restantes);
+	return aniversariantes;
+}
+
+/**
+ * Monta os dados consolidados do painel do Sensei / Professor
+ * baseado 100% no banco de dados existente.
+ */
+export async function obterPainelProfessor(
+	idAcademia: number,
+	idUsuarioProfessor: number
+): Promise<PainelProfessorDados | null> {
+	const pool = getDbPool();
+
+	// 1. Dados cadastrais e marciais do professor
+	const sqlProf = `
+		SELECT 
+			u.id_usuario,
+			u.nome,
+			u.email,
+			u.telefone,
+			p.n_federacao,
+			p.grau_faixa
+		FROM Professor p
+		INNER JOIN Usuario u ON u.id_usuario = p.id_usuario
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		WHERE p.id_usuario = ? AND ua.id_academia = ?
+		LIMIT 1
+	`;
+	const [rowsProf] = await pool.execute<RowDataPacket[]>(sqlProf, [idUsuarioProfessor, idAcademia]);
+	if (rowsProf.length === 0) return null;
+
+	const prof = rowsProf[0];
+
+	// 2. Turmas ministradas pelo professor
+	const sqlTurmas = `
+		SELECT 
+			tt.id_treino,
+			tt.descricao,
+			tt.dia_semana,
+			TIME_FORMAT(tt.horario_inicio, '%H:%i') AS horario_inicio,
+			TIME_FORMAT(tt.horario_fim, '%H:%i') AS horario_fim,
+			(SELECT COUNT(*) FROM Aluno_Treino at WHERE at.id_treino = tt.id_treino) AS total_alunos
+		FROM Professor_Treino pt
+		INNER JOIN Treino_Turma tt ON tt.id_treino = pt.id_treino
+		WHERE pt.id_professor = ? AND tt.id_academia = ?
+		ORDER BY 
+			FIELD(tt.dia_semana, 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'),
+			tt.horario_inicio ASC
+	`;
+	const [rowsTurmas] = await pool.execute<RowDataPacket[]>(sqlTurmas, [idUsuarioProfessor, idAcademia]);
+	const turmas: TurmaProfessorItem[] = rowsTurmas.map((t) => ({
+		id_treino: t.id_treino,
+		descricao: t.descricao,
+		dia_semana: t.dia_semana,
+		horario_inicio: t.horario_inicio || '',
+		horario_fim: t.horario_fim || '',
+		total_alunos: Number(t.total_alunos || 0)
+	}));
+
+	// 3. Alunos sob tutela técnica direta do professor
+	const sqlAlunos = `
+		SELECT 
+			u.id_usuario,
+			u.nome,
+			a.matricula,
+			a.graduacao_atual,
+			a.peso,
+			a.categoria,
+			a.status_federacao,
+			EXISTS(SELECT 1 FROM Aluno_Treino at_sub WHERE at_sub.id_aluno = a.id_usuario) AS tem_turma
+		FROM Aluno a
+		INNER JOIN Usuario u ON u.id_usuario = a.id_usuario
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		WHERE a.id_professor_responsavel = ? AND ua.id_academia = ?
+		ORDER BY u.nome ASC
+	`;
+	const [rowsAlunos] = await pool.execute<RowDataPacket[]>(sqlAlunos, [idUsuarioProfessor, idAcademia]);
+	const alunosSobTutela: AlunoTutelaItem[] = rowsAlunos.map((a) => ({
+		id_usuario: a.id_usuario,
+		nome: a.nome,
+		matricula: a.matricula,
+		graduacao_atual: a.graduacao_atual,
+		peso: a.peso !== null ? Number(a.peso) : null,
+		categoria: a.categoria,
+		status_federacao: a.status_federacao,
+		tem_turma: Boolean(a.tem_turma)
+	}));
+
+	// 4. Filtrar pendências técnicas da tutela
+	const alunosSemPeso = alunosSobTutela.filter((a) => a.peso === null);
+	const alunosSemTurma = alunosSobTutela.filter((a) => !a.tem_turma);
+	const alunosFederacaoPendente = alunosSobTutela.filter((a) => a.status_federacao !== 'Ativo');
+
+	// 5. Total de alunos distintos nas turmas ministradas
+	const sqlTotalAlunosTurmas = `
+		SELECT COUNT(DISTINCT at.id_aluno) AS total
+		FROM Professor_Treino pt
+		INNER JOIN Aluno_Treino at ON at.id_treino = pt.id_treino
+		INNER JOIN Treino_Turma tt ON tt.id_treino = pt.id_treino
+		WHERE pt.id_professor = ? AND tt.id_academia = ?
+	`;
+	const [rowsTotalAlunosTurmas] = await pool.execute<RowDataPacket[]>(sqlTotalAlunosTurmas, [
+		idUsuarioProfessor,
+		idAcademia
+	]);
+	const totalAlunosTurmas = Number(rowsTotalAlunosTurmas[0]?.total || 0);
+
+	// 6. Aniversariantes da semana
+	const aniversariantes = await obterAniversariantesDaSemana(idAcademia);
+
+	// 7. Próximos eventos gerais
+	const metricasGerais = await obterMetricasDoDojo(idAcademia);
+
+	return {
+		professor: {
+			id_usuario: prof.id_usuario,
+			nome: prof.nome,
+			email: prof.email,
+			telefone: prof.telefone,
+			n_federacao: prof.n_federacao,
+			grau_faixa: prof.grau_faixa
+		},
+		turmas,
+		totalTurmas: turmas.length,
+		totalAlunosSobTutela: alunosSobTutela.length,
+		totalAlunosTurmas,
+		alunosSobTutela,
+		pendenciasTecnicas: {
+			alunosSemPeso,
+			alunosSemTurma,
+			alunosFederacaoPendente
+		},
+		aniversariantes,
+		proximosEventos: metricasGerais.proximosEventos
+	};
+}
+
+/**
+ * Consulta agregada exclusiva para o Painel do Responsável Legal.
+ * Traz todos os judocas tutelados pelo responsável e seus respectivos painéis individuais,
+ * consolidados com métricas familiares de turmas, medalhas e pendências.
+ */
+export async function obterPainelResponsavel(
+	idAcademia: number,
+	idUsuarioResponsavel: number
+): Promise<PainelResponsavelDados | null> {
+	const pool = getDbPool();
+
+	// 1. Dados do Responsável
+	const sqlResp = `
+		SELECT u.id_usuario, u.nome, u.email, u.telefone
+		FROM Usuario u
+		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+		WHERE u.id_usuario = ? AND ua.id_academia = ?
+	`;
+	const [linhasResp] = await pool.execute<RowDataPacket[]>(sqlResp, [
+		idUsuarioResponsavel,
+		idAcademia
+	]);
+	if (linhasResp.length === 0) return null;
+	const resp = linhasResp[0];
+
+	// 2. Judocas/Dependentes vinculados na academia
+	const sqlAlunos = `
+		SELECT 
+			ra.id_aluno,
+			u_aluno.nome,
+			DATE_FORMAT(u_aluno.data_nascimento, '%d/%m/%Y') AS data_nascimento_br,
+			TIMESTAMPDIFF(YEAR, u_aluno.data_nascimento, CURDATE()) AS idade,
+			COALESCE(ra.grau_parentesco, r.grau_parentesco, 'Responsável Legal') AS grau_parentesco,
+			COALESCE(ra.financeiro, 0) AS financeiro
+		FROM Responsavel_Aluno ra
+		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
+		INNER JOIN Usuario u_aluno ON ra.id_aluno = u_aluno.id_usuario
+		INNER JOIN Usuario_Academia ua ON u_aluno.id_usuario = ua.id_usuario
+		WHERE ra.id_responsavel = ? AND ua.id_academia = ?
+		ORDER BY u_aluno.nome ASC
+	`;
+	const [linhasAlunos] = await pool.execute<RowDataPacket[]>(sqlAlunos, [
+		idUsuarioResponsavel,
+		idAcademia
+	]);
+
+	const dependentes: DependenteItemPainel[] = [];
+	let totalTurmasAtivas = 0;
+	let totalMedalhasFamilia = 0;
+	let totalPendenciasFamilia = 0;
+
+	for (const linha of linhasAlunos) {
+		const idAluno = Number(linha.id_aluno);
+		const painelJudoca = await obterPainelJudoca(idAcademia, idAluno);
+		if (!painelJudoca) continue;
+
+		totalTurmasAtivas += painelJudoca.treinosInscritos.length;
+		totalMedalhasFamilia += painelJudoca.metricasJudoca.totalMedalhas;
+		totalPendenciasFamilia += painelJudoca.pendencias.length;
+
+		dependentes.push({
+			aluno: {
+				id_usuario: painelJudoca.judoca.id_usuario,
+				nome: painelJudoca.judoca.nome,
+				data_nascimento_br: String(linha.data_nascimento_br),
+				idade: Number(linha.idade),
+				menor_idade: Number(linha.idade) < 18,
+				grau_parentesco: String(linha.grau_parentesco),
+				financeiro: Boolean(linha.financeiro),
+				matricula: painelJudoca.judoca.matricula,
+				graduacao_atual: painelJudoca.judoca.graduacao_atual,
+				peso: painelJudoca.judoca.peso,
+				categoria: painelJudoca.judoca.categoria,
+				nome_professor_responsavel: painelJudoca.judoca.nome_professor_responsavel
+			},
+			painelJudoca
+		});
+	}
+
+	const metricasGerais = await obterMetricasDoDojo(idAcademia);
+
+	return {
+		responsavel: {
+			id_usuario: Number(resp.id_usuario),
+			nome: String(resp.nome),
+			email: String(resp.email),
+			telefone: resp.telefone ? String(resp.telefone) : null
+		},
+		totalDependentes: dependentes.length,
+		totalTurmasAtivas,
+		totalMedalhasFamilia,
+		totalPendenciasFamilia,
+		dependentes,
+		proximosEventos: metricasGerais.proximosEventos
+	};
+}
+
 
