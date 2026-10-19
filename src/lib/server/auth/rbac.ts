@@ -87,7 +87,7 @@ const PERMISSOES_POR_PAPEL: Record<string, readonly Permissao[]> = {
 /**
  * Normaliza o nome do papel removendo acentuação e convertendo para minúsculas.
  */
-function normalizarNomePapel(papel: string): string {
+export function normalizarNomePapel(papel: string): string {
 	return papel
 		.toLowerCase()
 		.normalize('NFD')
@@ -141,7 +141,8 @@ export type IconeMenu =
 	| 'award'
 	| 'trophy'
 	| 'settings'
-	| 'users-cog';
+	| 'users-cog'
+	| 'user';
 
 export interface ItemMenu {
 	titulo: string;
@@ -151,6 +152,7 @@ export interface ItemMenu {
 	permissao?: Permissao;
 	fase: number;
 	badge?: string;
+	badgeUrgente?: boolean;
 }
 
 /**
@@ -202,6 +204,13 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
 		badge: 'Fase 7'
 	},
 	{
+		titulo: 'Meu Perfil',
+		href: '/dashboard/perfil',
+		icone: 'user',
+		descricao: 'Meus dados cadastrais, contato e endereço',
+		fase: 10
+	},
+	{
 		titulo: 'Equipe & Usuários',
 		href: '/dashboard/usuarios',
 		icone: 'users-cog',
@@ -226,9 +235,46 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
  */
 export function obterMenuAutorizado(perfis: string[]): ItemMenu[] {
 	const permissoesAtivas = new Set(calcularPermissoes(perfis));
+	const ehGestorOuProfessor = perfis.some((p) => {
+		const norm = normalizarNomePapel(p);
+		return norm === 'admin' || norm === 'professor' || norm === 'recepcao';
+	});
+	const ehAluno = perfis.some((p) => normalizarNomePapel(p) === 'aluno');
 
 	return CATALOGO_MENU.filter((item) => {
 		if (!item.permissao) return true;
 		return permissoesAtivas.has(item.permissao);
+	}).map((item) => {
+		if (ehAluno && !ehGestorOuProfessor) {
+			if (item.href === '/dashboard') {
+				return {
+					...item,
+					titulo: 'Meu Painel',
+					descricao: 'Minha jornada, graduações e treinos'
+				};
+			}
+			if (item.href === '/dashboard/turmas') {
+				return {
+					...item,
+					titulo: 'Meus Treinos & Grade',
+					descricao: 'Horários do dojo e turmas inscritas'
+				};
+			}
+			if (item.href === '/dashboard/graduacoes') {
+				return {
+					...item,
+					titulo: 'Minhas Graduações',
+					descricao: 'Histórico de faixas e exames agendados'
+				};
+			}
+			if (item.href === '/dashboard/campeonatos') {
+				return {
+					...item,
+					titulo: 'Torneios & Inscrições',
+					descricao: 'Calendário de competições e inscrições'
+				};
+			}
+		}
+		return item;
 	});
 }

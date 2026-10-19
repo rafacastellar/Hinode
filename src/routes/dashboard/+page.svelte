@@ -17,14 +17,18 @@
 		UserCog,
 		Settings
 	} from '@lucide/svelte';
+	import PainelJudoca from '#lib/components/dashboard/PainelJudoca.svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>
 
 <svelte:head>
-	<title>Visão Geral do Dojo - Judô Hinodê</title>
+	<title>{data.ehAluno ? 'Meu Painel - Judô Hinodê' : 'Visão Geral do Dojo - Judô Hinodê'}</title>
 </svelte:head>
 
+{#if data.ehAluno && data.painelJudoca}
+	<PainelJudoca painel={data.painelJudoca} nomeAcademia={data.nomeAcademia} />
+{:else}
 <div class="space-y-8">
 	<!-- ========================================================================= -->
 	<!-- 1. BANNER DE BOAS-VINDAS & CONTEXTO MULTI-TENANT -->
@@ -377,3 +381,4 @@
 		</div>
 	</div>
 </div>
+{/if}

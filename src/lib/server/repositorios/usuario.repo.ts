@@ -1,5 +1,6 @@
 import type { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
-import { getDbPool } from '../db/pool';
+import { getDbPool, executarTransacao } from '../db/pool';
+import { verificarSenha, gerarHashSenha } from '../auth/criptografia';
 
 export interface UsuarioAutenticavel {
 	id_usuario: number;
@@ -65,6 +66,20 @@ export interface UsuarioDetalhadoDojo {
 		n_federacao: string | null;
 		grau_faixa: string | null;
 	} | null;
+	dados_aluno: {
+		matricula: string | null;
+		peso: number | null;
+		categoria: string | null;
+		n_federacao: string | null;
+		status_federacao: string | null;
+		data_inicio: string | null;
+		data_inicio_br: string | null;
+		data_primeira_graduacao: string | null;
+		data_primeira_graduacao_br: string | null;
+		graduacao_atual: string;
+		grupo_especial_aspirante: string | null;
+		nome_professor_responsavel: string;
+	} | null;
 	endereco: EnderecoUsuario | null;
 	responsavel_legal: {
 		id_responsavel: number;
@@ -90,6 +105,59 @@ export interface UsuarioDetalhadoDojo {
 		id_aluno: number;
 		nome: string;
 	}>;
+}
+
+export interface PerfilCompletoUsuario {
+	id_usuario: number;
+	nome: string;
+	cpf: string;
+	cpf_mascarado: string;
+	email: string;
+	data_nascimento: string;
+	data_nascimento_br: string;
+	genero: 'M' | 'F';
+	idade: number;
+	telefone: string | null;
+	perfis: PerfilItem[];
+	endereco: EnderecoUsuario | null;
+	dados_aluno: {
+		matricula: string | null;
+		peso: number | null;
+		categoria: string | null;
+		n_federacao: string | null;
+		status_federacao: string | null;
+		data_inicio: string | null;
+		data_inicio_br: string | null;
+		data_primeira_graduacao: string | null;
+		data_primeira_graduacao_br: string | null;
+		graduacao_atual: string;
+		grupo_especial_aspirante: string | null;
+		nome_professor_responsavel: string;
+	} | null;
+	dados_professor: {
+		n_federacao: string | null;
+		grau_faixa: string | null;
+	} | null;
+	dados_responsavel: {
+		grau_parentesco: string | null;
+		financeiro: boolean;
+		dependentes: Array<{ id_aluno: number; nome: string }>;
+	} | null;
+}
+
+export interface DadosEdicaoProprioPerfil {
+	email: string;
+	telefone?: string | null;
+	peso?: number | null;
+	endereco?: {
+		cep: string;
+		logradouro: string;
+		numero?: string | null;
+		complemento?: string | null;
+		bairro?: string | null;
+		cidade: string;
+		uf: string;
+	} | null;
 }
 
 /**
@@ -406,6 +474,53 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		nome: String(d.nome)
 	}));
 
+	// Busca dados de aluno (caso este usuário possua ficha de judoca)
+	let dadosAluno: PerfilCompletoUsuario['dados_aluno'] = null;
+	const [alunosLinhas] = await pool.query<RowDataPacket[]>(
+		`SELECT 
+			a.matricula,
+			a.peso,
+			a.categoria,
+			a.n_federacao,
+			a.status_federacao,
+			DATE_FORMAT(a.data_inicio, '%Y-%m-%d') AS data_inicio,
+			DATE_FORMAT(a.data_inicio, '%d/%m/%Y') AS data_inicio_br,
+			DATE_FORMAT(a.data_primeira_graduacao, '%Y-%m-%d') AS data_primeira_graduacao,
+			DATE_FORMAT(a.data_primeira_graduacao, '%d/%m/%Y') AS data_primeira_graduacao_br,
+			a.graduacao_atual,
+			a.grupo_especial_aspirante,
+			COALESCE(
+				CASE 
+					WHEN p.grau_faixa IS NOT NULL AND p.grau_faixa != '' THEN CONCAT(prof_u.nome, ' (', p.grau_faixa, ')')
+					ELSE prof_u.nome
+				END, 
+				'Não informado'
+			) AS nome_professor_responsavel
+		FROM Aluno a
+		LEFT JOIN Professor p ON a.id_professor_responsavel = p.id_usuario
+		LEFT JOIN Usuario prof_u ON p.id_usuario = prof_u.id_usuario
+		WHERE a.id_usuario = ?
+		LIMIT 1`,
+		[idUsuario]
+	);
+	if (alunosLinhas.length > 0) {
+		const al = alunosLinhas[0];
+		dadosAluno = {
+			matricula: al.matricula ? String(al.matricula) : null,
+			peso: al.peso !== null ? Number(al.peso) : null,
+			categoria: al.categoria ? String(al.categoria) : null,
+			n_federacao: al.n_federacao ? String(al.n_federacao) : null,
+			status_federacao: al.status_federacao ? String(al.status_federacao) : null,
+			data_inicio: al.data_inicio ? String(al.data_inicio) : null,
+			data_inicio_br: al.data_inicio_br ? String(al.data_inicio_br) : null,
+			data_primeira_graduacao: al.data_primeira_graduacao ? String(al.data_primeira_graduacao) : null,
+			data_primeira_graduacao_br: al.data_primeira_graduacao_br ? String(al.data_primeira_graduacao_br) : null,
+			graduacao_atual: String(al.graduacao_atual || 'Branca'),
+			grupo_especial_aspirante: al.grupo_especial_aspirante ? String(al.grupo_especial_aspirante) : null,
+			nome_professor_responsavel: String(al.nome_professor_responsavel)
+		};
+	}
+
 	return {
 		id_usuario: Number(u.id_usuario),
 		nome: String(u.nome),
@@ -425,6 +540,7 @@ export async function buscarUsuarioDetalhadoNoDojo(
 						grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
 				  }
 				: null,
+		dados_aluno: dadosAluno,
 		endereco,
 		responsavel_legal: responsavelLegal,
 		responsaveis_legais: responsaveisLegais,
@@ -803,3 +919,266 @@ export async function buscarUsuariosParaMatricula(
 		ja_aluno: Boolean(linha.ja_aluno)
 	}));
 }
+
+/**
+ * Busca o perfil completo e detalhado do usuário logado no contexto do Dojo (Tenant).
+ */
+export async function buscarPerfilCompletoParaUsuario(
+	idAcademia: number,
+	idUsuario: number
+): Promise<PerfilCompletoUsuario | null> {
+	const pool = getDbPool();
+
+	// 1. Busca dados base do usuário garantindo vínculo com a academia logada
+	const [usuarios] = await pool.query<RowDataPacket[]>(
+		`SELECT 
+			u.id_usuario,
+			u.nome,
+			u.cpf,
+			u.email,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			DATE_FORMAT(u.data_nascimento, '%d/%m/%Y') AS data_nascimento_br,
+			u.genero,
+			TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) AS idade,
+			u.telefone
+		FROM Usuario u
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		WHERE ua.id_academia = ? AND u.id_usuario = ?
+		LIMIT 1`,
+		[idAcademia, idUsuario]
+	);
+
+	if (usuarios.length === 0) return null;
+	const u = usuarios[0];
+
+	// 2. Perfis vinculados a esta academia
+	const [perfisLinhas] = await pool.query<RowDataPacket[]>(
+		`SELECT p.id_perfil, p.role
+		FROM Usuario_Academia_Perfil uap
+		INNER JOIN Perfil p ON p.id_perfil = uap.id_perfil
+		WHERE uap.id_academia = ? AND uap.id_usuario = ?
+		ORDER BY p.id_perfil ASC`,
+		[idAcademia, idUsuario]
+	);
+	const perfis = perfisLinhas.map((p) => ({
+		id_perfil: Number(p.id_perfil),
+		role: String(p.role)
+	}));
+
+	// 3. Endereço residencial do usuário
+	const [enderecos] = await pool.query<RowDataPacket[]>(
+		`SELECT logradouro, numero, complemento, bairro, cidade, uf, cep
+		FROM Endereco_Usuario
+		WHERE id_usuario = ?
+		LIMIT 1`,
+		[idUsuario]
+	);
+	const endereco: EnderecoUsuario | null =
+		enderecos.length > 0
+			? {
+					logradouro: String(enderecos[0].logradouro),
+					numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
+					complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
+					bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
+					cidade: String(enderecos[0].cidade),
+					uf: String(enderecos[0].uf),
+					cep: String(enderecos[0].cep)
+			  }
+			: null;
+
+	// 4. Dados de Aluno (se aplicável)
+	let dadosAluno: PerfilCompletoUsuario['dados_aluno'] = null;
+	const [alunosLinhas] = await pool.query<RowDataPacket[]>(
+		`SELECT 
+			a.matricula,
+			a.peso,
+			a.categoria,
+			a.n_federacao,
+			a.status_federacao,
+			DATE_FORMAT(a.data_inicio, '%Y-%m-%d') AS data_inicio,
+			DATE_FORMAT(a.data_inicio, '%d/%m/%Y') AS data_inicio_br,
+			DATE_FORMAT(a.data_primeira_graduacao, '%Y-%m-%d') AS data_primeira_graduacao,
+			DATE_FORMAT(a.data_primeira_graduacao, '%d/%m/%Y') AS data_primeira_graduacao_br,
+			a.graduacao_atual,
+			a.grupo_especial_aspirante,
+			COALESCE(
+				CASE 
+					WHEN p.grau_faixa IS NOT NULL AND p.grau_faixa != '' THEN CONCAT(prof_u.nome, ' (', p.grau_faixa, ')')
+					ELSE prof_u.nome
+				END, 
+				'Não informado'
+			) AS nome_professor_responsavel
+		FROM Aluno a
+		LEFT JOIN Professor p ON a.id_professor_responsavel = p.id_usuario
+		LEFT JOIN Usuario prof_u ON p.id_usuario = prof_u.id_usuario
+		WHERE a.id_usuario = ?
+		LIMIT 1`,
+		[idUsuario]
+	);
+	if (alunosLinhas.length > 0) {
+		const al = alunosLinhas[0];
+		dadosAluno = {
+			matricula: al.matricula ? String(al.matricula) : null,
+			peso: al.peso !== null ? Number(al.peso) : null,
+			categoria: al.categoria ? String(al.categoria) : null,
+			n_federacao: al.n_federacao ? String(al.n_federacao) : null,
+			status_federacao: al.status_federacao ? String(al.status_federacao) : null,
+			data_inicio: al.data_inicio ? String(al.data_inicio) : null,
+			data_inicio_br: al.data_inicio_br ? String(al.data_inicio_br) : null,
+			data_primeira_graduacao: al.data_primeira_graduacao ? String(al.data_primeira_graduacao) : null,
+			data_primeira_graduacao_br: al.data_primeira_graduacao_br ? String(al.data_primeira_graduacao_br) : null,
+			graduacao_atual: String(al.graduacao_atual || 'Branca'),
+			grupo_especial_aspirante: al.grupo_especial_aspirante ? String(al.grupo_especial_aspirante) : null,
+			nome_professor_responsavel: String(al.nome_professor_responsavel)
+		};
+	}
+
+	// 5. Dados de Professor (se aplicável)
+	let dadosProfessor: PerfilCompletoUsuario['dados_professor'] = null;
+	const [profLinhas] = await pool.query<RowDataPacket[]>(
+		`SELECT n_federacao, grau_faixa FROM Professor WHERE id_usuario = ? LIMIT 1`,
+		[idUsuario]
+	);
+	if (profLinhas.length > 0) {
+		dadosProfessor = {
+			n_federacao: profLinhas[0].n_federacao ? String(profLinhas[0].n_federacao) : null,
+			grau_faixa: profLinhas[0].grau_faixa ? String(profLinhas[0].grau_faixa) : null
+		};
+	}
+
+	// 6. Dados de Responsável (se aplicável)
+	let dadosResponsavel: PerfilCompletoUsuario['dados_responsavel'] = null;
+	const [respLinhas] = await pool.query<RowDataPacket[]>(
+		`SELECT grau_parentesco, financeiro FROM Responsavel WHERE id_usuario = ? LIMIT 1`,
+		[idUsuario]
+	);
+	if (respLinhas.length > 0) {
+		const [depsLinhas] = await pool.query<RowDataPacket[]>(
+			`SELECT ra.id_aluno, al_u.nome
+			FROM Responsavel_Aluno ra
+			INNER JOIN Usuario al_u ON ra.id_aluno = al_u.id_usuario
+			WHERE ra.id_responsavel = ?
+			ORDER BY al_u.nome ASC`,
+			[idUsuario]
+		);
+		dadosResponsavel = {
+			grau_parentesco: respLinhas[0].grau_parentesco ? String(respLinhas[0].grau_parentesco) : null,
+			financeiro: Boolean(respLinhas[0].financeiro),
+			dependentes: depsLinhas.map((d) => ({
+				id_aluno: Number(d.id_aluno),
+				nome: String(d.nome)
+			}))
+		};
+	}
+
+	return {
+		id_usuario: Number(u.id_usuario),
+		nome: String(u.nome),
+		cpf: String(u.cpf),
+		cpf_mascarado: mascararCpf(String(u.cpf)),
+		email: String(u.email),
+		data_nascimento: String(u.data_nascimento),
+		data_nascimento_br: String(u.data_nascimento_br),
+		genero: (u.genero || 'M') as 'M' | 'F',
+		idade: Number(u.idade),
+		telefone: u.telefone ? String(u.telefone) : null,
+		perfis,
+		endereco,
+		dados_aluno: dadosAluno,
+		dados_professor: dadosProfessor,
+		dados_responsavel: dadosResponsavel
+	};
+}
+
+/**
+ * Atualiza os dados editáveis pelo próprio usuário em transação ACID segura.
+ */
+export async function atualizarDadosProprioPerfilTx(
+	idAcademia: number,
+	idUsuario: number,
+	dados: DadosEdicaoProprioPerfil
+): Promise<void> {
+	return await executarTransacao(async (conn) => {
+		// 1. Valida se o usuário pertence à academia logada
+		const [vinculo] = await conn.execute<RowDataPacket[]>(
+			`SELECT 1 FROM Usuario_Academia WHERE id_usuario = ? AND id_academia = ? LIMIT 1`,
+			[idUsuario, idAcademia]
+		);
+		if (vinculo.length === 0) {
+			throw new Error('Usuário não vinculado a esta academia.');
+		}
+
+		// 2. Valida unicidade de e-mail (caso tenha sido alterado)
+		const emailNormalizado = dados.email.toLowerCase().trim();
+		const [emailExistente] = await conn.execute<RowDataPacket[]>(
+			`SELECT id_usuario FROM Usuario WHERE email = ? AND id_usuario != ? LIMIT 1`,
+			[emailNormalizado, idUsuario]
+		);
+		if (emailExistente.length > 0) {
+			throw new Error('Este e-mail já está sendo utilizado por outro usuário no sistema.');
+		}
+
+		// 3. Atualiza dados de contato em Usuario
+		await conn.execute(
+			`UPDATE Usuario SET email = ?, telefone = ? WHERE id_usuario = ?`,
+			[emailNormalizado, dados.telefone?.trim() || null, idUsuario]
+		);
+
+		// 4. Salva endereço se informado
+		if (dados.endereco) {
+			await salvarEnderecoUsuarioTx(conn, idUsuario, dados.endereco);
+		}
+
+		// 5. Se o usuário for Aluno, atualiza o peso
+		if (dados.peso !== undefined) {
+			const [eAluno] = await conn.execute<RowDataPacket[]>(
+				`SELECT 1 FROM Aluno WHERE id_usuario = ? LIMIT 1`,
+				[idUsuario]
+			);
+			if (eAluno.length > 0) {
+				await conn.execute(
+					`UPDATE Aluno SET peso = ? WHERE id_usuario = ?`,
+					[dados.peso, idUsuario]
+				);
+			}
+		}
+	});
+}
+
+/**
+ * Altera a senha de acesso do usuário validando previamente a senha antiga.
+ */
+export async function alterarPropriaSenhaUsuario(
+	idUsuario: number,
+	senhaAtual: string,
+	novaSenha: string
+): Promise<void> {
+	const pool = getDbPool();
+
+	// 1. Busca hash da senha atual
+	const [linhas] = await pool.execute<RowDataPacket[]>(
+		`SELECT senha_hash FROM Usuario WHERE id_usuario = ? LIMIT 1`,
+		[idUsuario]
+	);
+	if (linhas.length === 0) {
+		throw new Error('Usuário não encontrado.');
+	}
+
+	const hashAtual = String(linhas[0].senha_hash);
+
+	// 2. Compara a senha antiga informada
+	const senhaCorreta = await verificarSenha(senhaAtual, hashAtual);
+	if (!senhaCorreta) {
+		throw new Error('A senha atual informada está incorreta.');
+	}
+
+	// 3. Gera novo hash seguro com bcrypt (custo 12)
+	const novoHash = await gerarHashSenha(novaSenha);
+
+	// 4. Atualiza a credencial no banco
+	await pool.execute(
+		`UPDATE Usuario SET senha_hash = ? WHERE id_usuario = ?`,
+		[novoHash, idUsuario]
+	);
+}
+
