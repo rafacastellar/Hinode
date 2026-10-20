@@ -15,7 +15,8 @@
 		X,
 		Building2,
 		ShieldCheck,
-		ChevronRight
+		ChevronRight,
+		HeartHandshake
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 
@@ -31,7 +32,8 @@
 		trophy: Trophy,
 		settings: Settings,
 		'users-cog': UserCog,
-		user: User
+		user: User,
+		'heart-handshake': HeartHandshake
 	};
 
 	const ehApenasAluno = $derived(

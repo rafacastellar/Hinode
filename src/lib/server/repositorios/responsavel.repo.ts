@@ -2,7 +2,10 @@ import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/prom
 import { getDbPool } from '../db/pool';
 import { gerarHashSenha } from '../auth/criptografia';
 import { mascararCpf } from './usuario.repo';
-import { calcularIdadeServidor } from './aluno.repo';
+import { calcularIdadeServidor, buscarAlunoPorId } from './aluno.repo';
+import { buscarHistoricoDoAluno, type HistoricoAlunoItem } from './graduacao.repo';
+import { obterProximaFaixa } from '../servicos/regras-graduacao';
+import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
 
 export interface ResponsavelAluno {
 	id_usuario: number;
@@ -329,4 +332,321 @@ export async function listarAlunosDoResponsavel(
 		};
 	});
 }
+
+/**
+ * Conta quantos judocas/dependentes estão vinculados ao responsável na academia.
+ * Utilizado para controle de visibilidade da aba 'Perfil do Responsável'.
+ */
+export async function contarAlunosDoResponsavel(
+	idAcademia: number,
+	idResponsavel: number
+): Promise<number> {
+	const pool = getDbPool();
+	const sql = `
+		SELECT COUNT(DISTINCT ra.id_aluno) AS total
+		FROM Responsavel_Aluno ra
+		INNER JOIN Aluno a ON ra.id_aluno = a.id_usuario
+		INNER JOIN Usuario_Academia ua ON a.id_usuario = ua.id_usuario
+		WHERE ua.id_academia = ? AND ra.id_responsavel = ?
+	`;
+	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia, idResponsavel]);
+	return Number(linhas[0]?.total || 0);
+}
+
+export interface AlunoDoResponsavelDetalhado {
+	id_usuario: number;
+	nome: string;
+	cpf: string;
+	cpf_mascarado: string;
+	email: string | null;
+	telefone: string | null;
+	data_nascimento: string;
+	data_nascimento_br: string;
+	idade: number;
+	menor_idade: boolean;
+	genero: 'M' | 'F';
+	meu_grau_parentesco: string;
+	sou_financeiro: boolean;
+	responsaveis: Array<{
+		id_responsavel: number;
+		nome: string;
+		grau_parentesco: string;
+		financeiro: boolean;
+	}>;
+	endereco: {
+		logradouro: string;
+		numero: string | null;
+		complemento: string | null;
+		bairro: string | null;
+		cidade: string;
+		uf: string;
+		cep: string;
+	} | null;
+	matricula: string | null;
+	graduacao_atual: string;
+	proxima_faixa: string;
+	peso: number | null;
+	categoria: string | null;
+	divisao: string | null;
+	n_federacao: string | null;
+	status_federacao: string | null;
+	data_inicio: string | null;
+	data_inicio_br: string | null;
+	data_primeira_graduacao: string | null;
+	data_primeira_graduacao_br: string | null;
+	id_professor_responsavel: number;
+	nome_professor_responsavel: string;
+	treinosInscritos: Array<{
+		id_treino: number;
+		descricao: string;
+		dia_semana: string;
+		horario_inicio: string;
+		horario_fim: string;
+		professores: string;
+	}>;
+	graduacoes: HistoricoAlunoItem[];
+}
+
+/**
+ * Busca a ficha cadastral e técnica completa de todos os judocas vinculados
+ * ao responsável na academia especificada.
+ */
+export async function buscarPerfilCompletoAlunosDoResponsavel(
+	idAcademia: number,
+	idResponsavel: number
+): Promise<AlunoDoResponsavelDetalhado[]> {
+	const pool = getDbPool();
+
+	const sqlVinculos = `
+		SELECT 
+			ra.id_aluno,
+			COALESCE(ra.grau_parentesco, r.grau_parentesco, 'Responsável Legal') AS meu_grau_parentesco,
+			COALESCE(ra.financeiro, r.financeiro, 0) AS sou_financeiro
+		FROM Responsavel_Aluno ra
+		INNER JOIN Aluno a ON ra.id_aluno = a.id_usuario
+		INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
+		INNER JOIN Usuario_Academia ua ON a.id_usuario = ua.id_usuario
+		LEFT JOIN Responsavel r ON ra.id_responsavel = r.id_usuario
+		WHERE ua.id_academia = ? AND ra.id_responsavel = ?
+		ORDER BY u.nome ASC
+	`;
+	const [vinculos] = await pool.query<RowDataPacket[]>(sqlVinculos, [idAcademia, idResponsavel]);
+	if (vinculos.length === 0) return [];
+
+	const resultados: AlunoDoResponsavelDetalhado[] = [];
+
+	for (const v of vinculos) {
+		const idAluno = Number(v.id_aluno);
+		const alunoDetalhes = await buscarAlunoPorId(idAcademia, idAluno);
+		if (!alunoDetalhes) continue;
+
+		// 1. Endereço do aluno
+		const [enderecos] = await pool.query<RowDataPacket[]>(
+			`SELECT logradouro, numero, complemento, bairro, cidade, uf, cep 
+			 FROM Endereco_Usuario 
+			 WHERE id_usuario = ? LIMIT 1`,
+			[idAluno]
+		);
+		const endereco =
+			enderecos.length > 0
+				? {
+						logradouro: String(enderecos[0].logradouro),
+						numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
+						complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
+						bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
+						cidade: String(enderecos[0].cidade),
+						uf: String(enderecos[0].uf),
+						cep: String(enderecos[0].cep)
+				  }
+				: null;
+
+		// 2. Turmas em que o aluno está inscrito
+		const sqlTreinos = `
+			SELECT 
+				tt.id_treino,
+				COALESCE(tt.descricao, 'Treino de Judô') AS descricao,
+				COALESCE(tt.dia_semana, 'Segunda-feira') AS dia_semana,
+				TIME_FORMAT(tt.horario_inicio, '%H:%i') AS horario_inicio,
+				TIME_FORMAT(tt.horario_fim, '%H:%i') AS horario_fim,
+				COALESCE(GROUP_CONCAT(DISTINCT u_prof.nome ORDER BY u_prof.nome SEPARATOR ', '), 'Sensei do Dojo') AS professores
+			FROM Treino_Turma tt
+			INNER JOIN Aluno_Treino at ON tt.id_treino = at.id_treino
+			LEFT JOIN Professor_Treino pt ON tt.id_treino = pt.id_treino
+			LEFT JOIN Professor p ON pt.id_professor = p.id_usuario
+			LEFT JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
+			WHERE tt.id_academia = ? AND at.id_aluno = ?
+			GROUP BY tt.id_treino
+			ORDER BY FIELD(tt.dia_semana, 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'), tt.horario_inicio ASC
+		`;
+		const [linhasTreinos] = await pool.execute<RowDataPacket[]>(sqlTreinos, [idAcademia, idAluno]);
+		const treinosInscritos = linhasTreinos.map((t) => ({
+			id_treino: Number(t.id_treino),
+			descricao: String(t.descricao),
+			dia_semana: String(t.dia_semana),
+			horario_inicio: String(t.horario_inicio || ''),
+			horario_fim: String(t.horario_fim || ''),
+			professores: String(t.professores)
+		}));
+
+		// 3. Trilha cronológica de graduações homologadas
+		const graduacoes = await buscarHistoricoDoAluno(idAcademia, idAluno);
+
+		// 4. Próxima faixa de progressão no Judô
+		const proximaFaixa = obterProximaFaixa(alunoDetalhes.graduacao_atual);
+
+		// 5. Formatação das datas em padrão brasileiro
+		const partesNasc = alunoDetalhes.data_nascimento.split('-');
+		const dataNascBr =
+			partesNasc.length === 3
+				? `${partesNasc[2]}/${partesNasc[1]}/${partesNasc[0]}`
+				: alunoDetalhes.data_nascimento;
+
+		let dataInicioBr: string | null = null;
+		if (alunoDetalhes.data_inicio) {
+			const p = alunoDetalhes.data_inicio.split('-');
+			dataInicioBr = p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : alunoDetalhes.data_inicio;
+		}
+
+		let dataPrimeiraGraduacaoBr: string | null = null;
+		if (alunoDetalhes.data_primeira_graduacao) {
+			const p = alunoDetalhes.data_primeira_graduacao.split('-');
+			dataPrimeiraGraduacaoBr =
+				p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : alunoDetalhes.data_primeira_graduacao;
+		}
+
+		resultados.push({
+			id_usuario: alunoDetalhes.id_usuario,
+			nome: alunoDetalhes.nome,
+			cpf: alunoDetalhes.cpf,
+			cpf_mascarado: mascararCpf(alunoDetalhes.cpf),
+			email: alunoDetalhes.email || null,
+			telefone: alunoDetalhes.telefone || null,
+			data_nascimento: alunoDetalhes.data_nascimento,
+			data_nascimento_br: dataNascBr,
+			idade: alunoDetalhes.idade,
+			menor_idade: alunoDetalhes.menor_idade,
+			genero: alunoDetalhes.genero,
+			meu_grau_parentesco: String(v.meu_grau_parentesco),
+			sou_financeiro: Boolean(v.sou_financeiro),
+			responsaveis: alunoDetalhes.responsaveis || [],
+			endereco,
+			matricula: alunoDetalhes.matricula,
+			graduacao_atual: alunoDetalhes.graduacao_atual,
+			proxima_faixa: proximaFaixa,
+			peso: alunoDetalhes.peso,
+			categoria: alunoDetalhes.categoria,
+			divisao: alunoDetalhes.grupo_especial_aspirante,
+			n_federacao: alunoDetalhes.n_federacao,
+			status_federacao: alunoDetalhes.status_federacao,
+			data_inicio: alunoDetalhes.data_inicio,
+			data_inicio_br: dataInicioBr,
+			data_primeira_graduacao: alunoDetalhes.data_primeira_graduacao,
+			data_primeira_graduacao_br: dataPrimeiraGraduacaoBr,
+			id_professor_responsavel: alunoDetalhes.id_professor_responsavel,
+			nome_professor_responsavel: alunoDetalhes.nome_professor_responsavel,
+			treinosInscritos,
+			graduacoes
+		});
+	}
+
+	return resultados;
+}
+
+/**
+ * Atualiza o peso de um aluno tutelado diretamente pelo responsável legal,
+ * recalculando automaticamente a categoria e divisão oficial de Judô (CBJ/FPJ).
+ */
+export async function atualizarPesoAlunoDoResponsavel(
+	idAcademia: number,
+	idResponsavel: number,
+	idAluno: number,
+	novoPeso: number
+): Promise<{ sucesso: boolean; mensagem: string; novaCategoria?: string }> {
+	const pool = getDbPool();
+
+	// Validação de segurança: o aluno deve ser tutelado pelo responsável logado nesta academia
+	const [check] = await pool.query<RowDataPacket[]>(
+		`SELECT ra.id_aluno, u.nome, u.genero, DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento, a.graduacao_atual
+		 FROM Responsavel_Aluno ra
+		 INNER JOIN Aluno a ON ra.id_aluno = a.id_usuario
+		 INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
+		 INNER JOIN Usuario_Academia ua ON a.id_usuario = ua.id_usuario
+		 WHERE ua.id_academia = ? AND ra.id_responsavel = ? AND ra.id_aluno = ?
+		 LIMIT 1`,
+		[idAcademia, idResponsavel, idAluno]
+	);
+
+	if (check.length === 0) {
+		throw new Error('Acesso negado: você não possui tutela legal sobre este judoca no dojo atual.');
+	}
+
+	const row = check[0];
+	let novaCategoria: string | null = null;
+	let novaDivisao: string | null = null;
+
+	if (row.data_nascimento) {
+		const classif = obterClassificacaoJudo({
+			dataNascimento: String(row.data_nascimento),
+			genero: (row.genero === 'F' ? 'F' : 'M') as 'M' | 'F',
+			peso: novoPeso,
+			graduacao: String(row.graduacao_atual || 'Branca')
+		});
+		novaCategoria = classif.categoriaCompleta;
+		novaDivisao = classif.divisao;
+	}
+
+	await pool.execute(
+		`UPDATE Aluno 
+		 SET peso = ?, 
+		     categoria = COALESCE(?, categoria), 
+		     grupo_especial_aspirante = COALESCE(?, grupo_especial_aspirante)
+		 WHERE id_usuario = ?`,
+		[novoPeso, novaCategoria, novaDivisao, idAluno]
+	);
+
+	return {
+		sucesso: true,
+		mensagem: `Peso de ${row.nome} atualizado para ${novoPeso.toFixed(2)} kg!${novaCategoria ? ` Categoria recalculada: ${novaCategoria}.` : ''}`,
+		novaCategoria: novaCategoria || undefined
+	};
+}
+
+/**
+ * Atualiza canais de contato direto do aluno tutelado (telefone/WhatsApp ou e-mail).
+ */
+export async function atualizarContatoAlunoDoResponsavel(
+	idAcademia: number,
+	idResponsavel: number,
+	idAluno: number,
+	dados: { telefone?: string | null; email?: string | null }
+): Promise<{ sucesso: boolean; mensagem: string }> {
+	const pool = getDbPool();
+
+	const [check] = await pool.query<RowDataPacket[]>(
+		`SELECT ra.id_aluno, u.nome
+		 FROM Responsavel_Aluno ra
+		 INNER JOIN Usuario_Academia ua ON ra.id_aluno = ua.id_usuario
+		 INNER JOIN Usuario u ON ra.id_aluno = u.id_usuario
+		 WHERE ua.id_academia = ? AND ra.id_responsavel = ? AND ra.id_aluno = ?
+		 LIMIT 1`,
+		[idAcademia, idResponsavel, idAluno]
+	);
+
+	if (check.length === 0) {
+		throw new Error('Acesso negado: você não possui tutela legal sobre este judoca no dojo atual.');
+	}
+
+	await pool.execute(
+		`UPDATE Usuario 
+		 SET telefone = ?, email = COALESCE(NULLIF(?, ''), email)
+		 WHERE id_usuario = ?`,
+		[dados.telefone || null, dados.email || null, idAluno]
+	);
+
+	return {
+		sucesso: true,
+		mensagem: `Contatos de ${check[0].nome} atualizados com sucesso.`
+	};
+}
+
 

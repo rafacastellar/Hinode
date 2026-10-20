@@ -144,7 +144,8 @@ export type IconeMenu =
 	| 'trophy'
 	| 'settings'
 	| 'users-cog'
-	| 'user';
+	| 'user'
+	| 'heart-handshake';
 
 export interface ItemMenu {
 	titulo: string;
@@ -155,6 +156,10 @@ export interface ItemMenu {
 	fase: number;
 	badge?: string;
 	badgeUrgente?: boolean;
+}
+
+export interface ContextoMenu {
+	totalDependentes?: number;
 }
 
 /**
@@ -213,6 +218,13 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
 		fase: 10
 	},
 	{
+		titulo: 'Perfil do Responsável',
+		href: '/dashboard/responsavel',
+		icone: 'heart-handshake',
+		descricao: 'Dados cadastrais e técnicos dos judocas sob sua tutela',
+		fase: 10
+	},
+	{
 		titulo: 'Equipe & Usuários',
 		href: '/dashboard/usuarios',
 		icone: 'users-cog',
@@ -235,7 +247,7 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
 /**
  * Retorna os itens de navegação autorizados para o conjunto de papéis do usuário logado.
  */
-export function obterMenuAutorizado(perfis: string[]): ItemMenu[] {
+export function obterMenuAutorizado(perfis: string[], contexto?: ContextoMenu): ItemMenu[] {
 	const permissoesAtivas = new Set(calcularPermissoes(perfis));
 	const ehGestorOuProfessor = perfis.some((p) => {
 		const norm = normalizarNomePapel(p);
@@ -244,6 +256,10 @@ export function obterMenuAutorizado(perfis: string[]): ItemMenu[] {
 	const ehAluno = perfis.some((p) => normalizarNomePapel(p) === 'aluno');
 
 	return CATALOGO_MENU.filter((item) => {
+		if (item.href === '/dashboard/responsavel') {
+			// Visível exclusivamente para quem tem pelo menos um judoca para se responsabilizar
+			return Boolean(contexto?.totalDependentes && contexto.totalDependentes > 0);
+		}
 		if (!item.permissao) return true;
 		return permissoesAtivas.has(item.permissao);
 	}).map((item) => {

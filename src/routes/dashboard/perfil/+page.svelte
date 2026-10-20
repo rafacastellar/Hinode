@@ -821,14 +821,39 @@
 					/>
 				</div>
 				{#if data.perfil.dados_responsavel.dependentes && data.perfil.dados_responsavel.dependentes.length > 0}
-					<div class="sm:col-span-2 space-y-1">
-						<span class="text-xs font-semibold text-zinc-400 block">Alunos Dependentes Vinculados</span>
-						<div class="flex items-center gap-2 flex-wrap pt-1">
+					<div class="sm:col-span-2 space-y-3 pt-2">
+						<div class="flex items-center justify-between">
+							<span class="text-xs font-semibold text-zinc-300 block">Alunos Tutelados Vinculados</span>
+							<span class="text-[10px] font-mono text-zinc-500">
+								{data.perfil.dados_responsavel.dependentes.length} atleta(s)
+							</span>
+						</div>
+						<div class="flex items-center gap-2 flex-wrap">
 							{#each data.perfil.dados_responsavel.dependentes as dep}
-								<span class="px-3 py-1.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-medium">
-									🥋 {dep.nome}
+								<span class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white font-medium flex items-center gap-2">
+									<span>🥋</span>
+									<span>{dep.nome}</span>
 								</span>
 							{/each}
+						</div>
+
+						<!-- Link de redirecionamento para a nova aba dedicada 'Perfil do Responsável' -->
+						<div class="mt-2 p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+							<div class="space-y-0.5">
+								<p class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+									<span>Nova aba dedicada: Perfil do Responsável</span>
+								</p>
+								<p class="text-[11px] text-zinc-400">
+									Para manter o seu perfil limpo e organizado, a ficha técnica, turmas e pesagens oficiais dos seus dependentes estão em sua própria aba lateral.
+								</p>
+							</div>
+							<a
+								href="/dashboard/responsavel"
+								class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-all shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
+							>
+								<span>Ver Perfil dos Alunos</span>
+								<span>→</span>
+							</a>
 						</div>
 					</div>
 				{/if}
