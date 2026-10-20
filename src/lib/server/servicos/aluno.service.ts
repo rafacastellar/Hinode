@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
-import { executarTransacao } from '../db/pool';
+import { executarTransacao, getDbPool } from '../db/pool';
 import { gerarHashSenha } from '../auth/criptografia';
+import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
 import {
 	calcularIdadeServidor,
 	inserirAlunoEmTransacao,
@@ -267,7 +268,7 @@ export async function matricularUsuarioExistente(
 	return await executarTransacao(async (conn) => {
 		// 1. Usuário deve pertencer ao dojo com o perfil 'Aluno'
 		const [usuarios] = await conn.execute<RowDataPacket[]>(
-			`SELECT u.id_usuario, u.nome, DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento
+			`SELECT u.id_usuario, u.nome, u.genero, DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento
 			 FROM Usuario u
 			 INNER JOIN Usuario_Academia_Perfil uap ON uap.id_usuario = u.id_usuario
 			 INNER JOIN Perfil p ON p.id_perfil = uap.id_perfil
@@ -306,7 +307,26 @@ export async function matricularUsuarioExistente(
 			}
 		}
 
-		// 4. Grava dados técnicos
+		// 4. Se a categoria ou divisão não tiverem sido fornecidas, calcula com o motor oficial de Judô CBJ/FPJ
+		let categoriaFinal = dados.categoria;
+		let grupoFinal = dados.grupoEspecialAspirante;
+
+		if (!categoriaFinal || !grupoFinal) {
+			const classif = obterClassificacaoJudo({
+				dataNascimento: String(usuario.data_nascimento),
+				genero: (usuario.genero === 'F' ? 'F' : 'M') as 'M' | 'F',
+				peso: dados.peso,
+				graduacao: dados.graduacaoAtual
+			});
+			if (!categoriaFinal && classif.categoriaCompleta) {
+				categoriaFinal = classif.categoriaCompleta;
+			}
+			if (!grupoFinal && classif.divisao) {
+				grupoFinal = classif.divisao;
+			}
+		}
+
+		// 5. Grava dados técnicos
 		await conn.execute(
 			`INSERT INTO Aluno (
 				id_usuario, matricula, peso, categoria, n_federacao, status_federacao,
@@ -317,13 +337,13 @@ export async function matricularUsuarioExistente(
 				dados.idUsuario,
 				dados.matricula || null,
 				dados.peso || null,
-				dados.categoria || null,
+				categoriaFinal || null,
 				dados.nFederacao || null,
 				dados.statusFederacao || null,
 				dados.dataInicio || null,
 				dados.dataPrimeiraGraduacao || null,
 				dados.graduacaoAtual,
-				dados.grupoEspecialAspirante || null,
+				grupoFinal || null,
 				dados.idProfessorResponsavel
 			]
 		);
@@ -363,6 +383,25 @@ export async function atualizarDadosAluno(
 		});
 	}
 
+	// Se a categoria ou grupo competitivo não foi informada ou veio vazia, calcula com base no motor
+	if (!dados.categoria || !dados.grupoEspecialAspirante) {
+		const pool = getDbPool();
+		const [u] = await pool.execute<RowDataPacket[]>(
+			`SELECT genero, DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento FROM Usuario WHERE id_usuario = ? LIMIT 1`,
+			[idAluno]
+		);
+		if (u.length > 0 && u[0].data_nascimento) {
+			const classif = obterClassificacaoJudo({
+				dataNascimento: String(u[0].data_nascimento),
+				genero: (u[0].genero === 'F' ? 'F' : 'M') as 'M' | 'F',
+				peso: dados.peso,
+				graduacao: dados.graduacaoAtual
+			});
+			if (!dados.categoria) dados.categoria = classif.categoriaCompleta;
+			if (!dados.grupoEspecialAspirante) dados.grupoEspecialAspirante = classif.divisao;
+		}
+	}
+
 	return await executarTransacao(async (conn) => {
 		await atualizarAlunoEmTransacao(conn, idAcademia, idAluno, dados);
 		return {
@@ -370,4 +409,58 @@ export async function atualizarDadosAluno(
 			mensagem: 'Dados técnicos e esportivos do judoca atualizados com sucesso.'
 		};
 	});
+}
+
+/**
+ * Recalcula e atualiza em lote as categorias de peso e divisões oficiais de todos os alunos do dojo
+ * com base na data de nascimento, gênero, peso atual e graduação (Regulamento CBJ/FPJ).
+ */
+export async function recalcularCategoriasDojo(
+	idAcademia: number
+): Promise<{ totalAtualizados: number; totalAlunos: number }> {
+	const pool = getDbPool();
+	const [alunos] = await pool.query<RowDataPacket[]>(
+		`SELECT 
+			a.id_usuario,
+			u.nome,
+			u.genero,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			a.peso,
+			a.graduacao_atual,
+			a.categoria,
+			a.grupo_especial_aspirante
+		 FROM Aluno a
+		 INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
+		 INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+		 WHERE ua.id_academia = ?`,
+		[idAcademia]
+	);
+
+	let totalAtualizados = 0;
+
+	for (const aluno of alunos) {
+		if (!aluno.data_nascimento) continue;
+		const classif = obterClassificacaoJudo({
+			dataNascimento: String(aluno.data_nascimento),
+			genero: aluno.genero === 'F' ? 'F' : 'M',
+			peso: aluno.peso !== null ? Number(aluno.peso) : null,
+			graduacao: aluno.graduacao_atual
+		});
+
+		// Atualiza se mudou ou se não estava preenchido
+		if (aluno.categoria !== classif.categoriaCompleta || aluno.grupo_especial_aspirante !== classif.divisao) {
+			await pool.execute(
+				`UPDATE Aluno 
+				 SET categoria = ?, grupo_especial_aspirante = ? 
+				 WHERE id_usuario = ?`,
+				[classif.categoriaCompleta, classif.divisao, aluno.id_usuario]
+			);
+			totalAtualizados++;
+		}
+	}
+
+	return {
+		totalAtualizados,
+		totalAlunos: alunos.length
+	};
 }
