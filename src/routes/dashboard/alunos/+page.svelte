@@ -11,21 +11,64 @@
 		Pencil,
 		Eye,
 		Zap,
-		CheckCircle2
+		CheckCircle2,
+		ChevronDown,
+		ArrowUpDown,
+		Filter,
+		LayoutList,
+		AlignJustify,
+		ArrowUp,
+		ArrowDown,
+		SlidersHorizontal
 	} from '@lucide/svelte';
+	import {
+		ordenarAtletas,
+		type CampoOrdenacaoAtleta,
+		type DirecaoOrdenacao
+	} from '#lib/dominio/ordenacao-atletas';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let termoBusca = $state('');
 	let recalculando = $state(false);
 
+	// Estados de controle: minimização (accordion), ordenação e densidade
+	let listaExpandida = $state(true);
+	let modoDensidade = $state<'detalhada' | 'compacta'>('detalhada');
+	let campoOrdenacao = $state<CampoOrdenacaoAtleta>('nome');
+	let direcaoOrdenacao = $state<DirecaoOrdenacao>('asc');
+	let filtroChip = $state<'TODOS' | 'MENORES' | 'ADULTOS' | 'ASPIRANTES' | 'ESPECIAIS'>('TODOS');
+
 	$effect(() => {
 		termoBusca = data.busca || '';
 	});
 
+	function alternarDirecao() {
+		direcaoOrdenacao = direcaoOrdenacao === 'asc' ? 'desc' : 'asc';
+	}
+
 	// Métricas rápidas calculadas da lista
 	const totalAlunos = $derived(data.alunos.length);
 	const totalMenores = $derived(data.alunos.filter((a) => a.menor_idade).length);
+	const totalAdultos = $derived(data.alunos.filter((a) => !a.menor_idade).length);
+
+	// Filtragem por chips rápidos
+	const alunosFiltradosPorChip = $derived(
+		data.alunos.filter((aluno) => {
+			if (filtroChip === 'MENORES') return aluno.menor_idade;
+			if (filtroChip === 'ADULTOS') return !aluno.menor_idade;
+			if (filtroChip === 'ASPIRANTES')
+				return (aluno.grupo_especial_aspirante || '').toLowerCase().includes('aspirante');
+			if (filtroChip === 'ESPECIAIS')
+				return (aluno.grupo_especial_aspirante || '').toLowerCase().includes('especial');
+			return true;
+		})
+	);
+
+	// Lista final ordenada
+	const alunosOrdenados = $derived(
+		ordenarAtletas(alunosFiltradosPorChip, campoOrdenacao, direcaoOrdenacao)
+	);
 </script>
 
 <svelte:head>
@@ -179,151 +222,372 @@
 	</div>
 
 	<!-- ========================================================================= -->
-	<!-- LISTAGEM DE ALUNOS -->
+	<!-- LISTAGEM DE ALUNOS COM MINIMIZAÇÃO (ACCORDION) E ORDENAÇÃO               -->
 	<!-- ========================================================================= -->
 	{#if data.alunos.length > 0}
-		<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
-			<div class="overflow-x-auto">
-				<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
-					<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
-						<tr>
-							<th class="px-6 py-4">Judoca / Atleta</th>
-							<th class="px-6 py-4">Graduação (Faixa)</th>
-							<th class="px-6 py-4">Idade / Responsabilidade</th>
-							<th class="px-6 py-4">Categoria & Divisão (CBJ)</th>
-							<th class="px-6 py-4">Sensei Responsável</th>
-							<th class="px-6 py-4">Matrícula</th>
-							<th class="px-6 py-4 text-right">Ações</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-zinc-900">
-						{#each data.alunos as aluno}
-							<tr class="hover:bg-zinc-900/30 transition-colors group">
-								<!-- Nome & CPF -->
-								<td class="px-6 py-4">
-									<a
-										href="/dashboard/alunos/{aluno.id_usuario}"
-										class="font-semibold text-white group-hover:text-red-400 transition-colors block"
-									>
-										{aluno.nome}
-									</a>
-									<div class="text-[11px] font-mono text-zinc-500 mt-0.5">
-										CPF: {aluno.cpf.slice(0, 3)}.***.***-{aluno.cpf.slice(-2)}
-									</div>
-								</td>
+		<section class="rounded-3xl bg-zinc-950 border border-zinc-900 overflow-hidden shadow-sm">
+		<!-- Header Colapsável com Resumo (Padrão idêntico aos Logs do Dojo) -->
+		<div
+			class="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-zinc-900/40 transition-colors"
+			onclick={() => (listaExpandida = !listaExpandida)}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Enter' && (listaExpandida = !listaExpandida)}
+			aria-expanded={listaExpandida}
+		>
+			<div class="flex items-center gap-3">
+				<div
+					class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-red-500 shrink-0"
+				>
+					<Users class="w-5 h-5" />
+				</div>
+				<div>
+					<div class="flex items-center gap-2 flex-wrap">
+						<h2 class="text-base font-bold text-white font-display">
+							Quadro Geral de Judocas
+						</h2>
+						<span
+							class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 font-semibold"
+						>
+							{alunosOrdenados.length} {alunosOrdenados.length === 1 ? 'atleta' : 'atletas'}
+						</span>
+						{#if totalMenores > 0}
+							<span
+								class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/40 border border-amber-800/60 text-amber-300"
+							>
+								{totalMenores} menores
+							</span>
+						{/if}
+					</div>
+					<p class="text-[11px] text-zinc-400 mt-0.5">
+						Matrículas ativas, histórico de graduação, faixas e categorias competitivas CBJ/FPJ.
+					</p>
+				</div>
+			</div>
 
-								<!-- Faixa Atual -->
-								<td class="px-6 py-4">
-									<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
-								</td>
-
-								<!-- Idade & Menoridade -->
-								<td class="px-6 py-4">
-									<div class="flex items-center gap-2">
-										<span class="text-zinc-200 font-mono">{aluno.idade} anos</span>
-										{#if aluno.menor_idade}
-											<span
-												class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-950/40 border border-amber-800/60 text-amber-300"
-												title="Menor de 18 anos"
-											>
-												Menor
-											</span>
-										{:else}
-											<span
-												class="px-2 py-0.5 rounded text-[10px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800"
-											>
-												Maior
-											</span>
-										{/if}
-									</div>
-									{#if aluno.nome_responsavel}
-										<div class="text-[11px] text-zinc-400 mt-1 flex items-center gap-1">
-											<HeartHandshake class="w-3 h-3 text-amber-400 shrink-0" />
-											<span
-												class="truncate max-w-[220px]"
-												title="{aluno.nome_responsavel}{aluno.parentesco_responsavel ? ` (${aluno.parentesco_responsavel})` : ''}"
-											>
-												{aluno.nome_responsavel}
-												{#if aluno.parentesco_responsavel}
-													<span class="text-zinc-500 font-mono">({aluno.parentesco_responsavel})</span>
-												{/if}
-											</span>
-										</div>
-									{/if}
-								</td>
-
-								<!-- Categoria & Divisão -->
-								<td class="px-6 py-4">
-									<div class="flex flex-col gap-1">
-										<div class="flex items-center gap-1.5 flex-wrap">
-											{#if aluno.categoria}
-												<span
-													class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-950/40 text-amber-300 border border-amber-800/50"
-													title="Categoria Oficial de Peso / Idade"
-												>
-													{aluno.categoria}
-												</span>
-											{/if}
-											{#if aluno.grupo_especial_aspirante}
-												<span
-													class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-950/50 text-purple-300 border border-purple-800/60"
-												>
-													{aluno.grupo_especial_aspirante}
-												</span>
-											{/if}
-										</div>
-										<div class="flex items-center gap-1.5 flex-wrap text-[11px] text-zinc-500 font-mono">
-											{#if aluno.peso}
-												<span>{aluno.peso} kg</span>
-											{/if}
-											{#if aluno.status_federacao}
-												<span>• FPJ: {aluno.status_federacao}</span>
-											{/if}
-										</div>
-										{#if !aluno.categoria && !aluno.grupo_especial_aspirante && !aluno.status_federacao}
-											<span class="text-zinc-600 text-xs">-</span>
-										{/if}
-									</div>
-								</td>
-
-								<!-- Sensei Técnico -->
-								<td class="px-6 py-4">
-									<span class="text-zinc-200 font-medium">
-										{aluno.nome_professor_responsavel}
-									</span>
-								</td>
-
-								<!-- Matrícula -->
-								<td class="px-6 py-4 font-mono text-zinc-400">
-									{aluno.matricula || '-'}
-								</td>
-
-								<!-- Ações -->
-								<td class="px-6 py-4 text-right">
-									<a
-										href="/dashboard/alunos/{aluno.id_usuario}"
-										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 hover:text-white transition-colors"
-										title={data.podeEditarAluno ? "Visualizar e editar dados do judoca" : "Visualizar dados do judoca"}
-									>
-										{#if data.podeEditarAluno}
-											<Pencil class="w-3.5 h-3.5 text-zinc-400" />
-											<span>Editar</span>
-										{:else}
-											<Eye class="w-3.5 h-3.5 text-zinc-400" />
-											<span>Visualizar</span>
-										{/if}
-									</a>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+			<div class="flex items-center gap-3 self-end sm:self-auto shrink-0">
+				<span
+					class="text-xs font-mono text-zinc-400 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800"
+				>
+					{listaExpandida ? 'Recolher Lista ▲' : 'Expandir Lista ▼'}
+				</span>
+				<div
+					class="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 transition-transform duration-200 {listaExpandida
+						? 'rotate-180'
+						: ''}"
+				>
+					<ChevronDown class="w-4 h-4" />
+				</div>
 			</div>
 		</div>
+
+		<!-- Conteúdo Expandido (Quando listaExpandida = true) -->
+		{#if listaExpandida}
+			<div class="border-t border-zinc-900 p-5 sm:p-6 space-y-4 animate-in slide-in-from-top-2 duration-200 bg-zinc-950/80">
+				<!-- Barra de Ferramentas: Filtros em Chips + Ordenação + Alternador de Densidade -->
+				<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-zinc-900">
+					<!-- 1. Chips de Filtro Rápido -->
+					<div class="flex items-center gap-2 flex-wrap text-xs">
+						<span
+							class="text-[10px] font-mono uppercase text-zinc-500 font-bold flex items-center gap-1 mr-1"
+						>
+							<Filter class="w-3 h-3" />
+							<span>Filtro:</span>
+						</span>
+						<button
+							type="button"
+							onclick={() => (filtroChip = 'TODOS')}
+							class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChip ===
+							'TODOS'
+								? 'bg-red-950/50 border-red-800/80 text-white font-bold'
+								: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+						>
+							Todos ({data.alunos.length})
+						</button>
+						<button
+							type="button"
+							onclick={() => (filtroChip = 'MENORES')}
+							class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChip ===
+							'MENORES'
+								? 'bg-amber-950/50 border-amber-800/80 text-amber-200 font-bold'
+								: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+						>
+							Menores de 18 ({totalMenores})
+						</button>
+						<button
+							type="button"
+							onclick={() => (filtroChip = 'ADULTOS')}
+							class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChip ===
+							'ADULTOS'
+								? 'bg-sky-950/50 border-sky-800/80 text-sky-200 font-bold'
+								: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+						>
+							Adultos ({totalAdultos})
+						</button>
+						<button
+							type="button"
+							onclick={() => (filtroChip = 'ASPIRANTES')}
+							class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChip ===
+							'ASPIRANTES'
+								? 'bg-purple-950/50 border-purple-800/80 text-purple-200 font-bold'
+								: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+						>
+							Aspirantes
+						</button>
+						<button
+							type="button"
+							onclick={() => (filtroChip = 'ESPECIAIS')}
+							class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChip ===
+							'ESPECIAIS'
+								? 'bg-purple-950/50 border-purple-800/80 text-purple-200 font-bold'
+								: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+						>
+							Especiais
+						</button>
+					</div>
+
+					<!-- 2. Controles de Ordenação e Densidade -->
+					<div class="flex items-center gap-3 flex-wrap self-end lg:self-auto">
+						<!-- Seletor de Ordenação -->
+						<div class="flex items-center gap-2 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800">
+							<span class="text-[10px] font-mono uppercase text-zinc-400 flex items-center gap-1 pl-1">
+								<ArrowUpDown class="w-3 h-3 text-red-500" />
+								<span>Ordenar:</span>
+							</span>
+							<select
+								bind:value={campoOrdenacao}
+								class="bg-zinc-950 border border-zinc-800 text-white text-xs font-mono rounded-lg px-2.5 py-1 focus:outline-none focus:border-red-600"
+							>
+								<option value="nome">Nome (A-Z)</option>
+								<option value="graduacao">Graduação (Faixa)</option>
+								<option value="idade">Idade</option>
+								<option value="categoria">Categoria CBJ</option>
+							</select>
+
+							<!-- Alternador de Direção Asc/Desc -->
+							<button
+								type="button"
+								onclick={alternarDirecao}
+								class="p-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+								title={direcaoOrdenacao === 'asc' ? 'Ordem Crescente (clique para inverter)' : 'Ordem Decrescente (clique para inverter)'}
+							>
+								{#if direcaoOrdenacao === 'asc'}
+									<ArrowUp class="w-3.5 h-3.5 text-red-400" />
+								{:else}
+									<ArrowDown class="w-3.5 h-3.5 text-amber-400" />
+								{/if}
+							</button>
+						</div>
+
+						<!-- Alternador de Densidade (Detalhada vs Compacta) -->
+						<div class="p-1 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center">
+							<button
+								type="button"
+								onclick={() => (modoDensidade = 'detalhada')}
+								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {modoDensidade ===
+								'detalhada'
+									? 'bg-zinc-800 text-white font-bold shadow-sm'
+									: 'text-zinc-500 hover:text-zinc-300'}"
+								title="Visualização Detalhada em Tabela Completa"
+							>
+								<LayoutList class="w-3.5 h-3.5" />
+								<span>Detalhada</span>
+							</button>
+							<button
+								type="button"
+								onclick={() => (modoDensidade = 'compacta')}
+								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {modoDensidade ===
+								'compacta'
+									? 'bg-zinc-800 text-white font-bold shadow-sm'
+									: 'text-zinc-500 hover:text-zinc-300'}"
+								title="Visualização Compacta / Minimizada com Rolagem Interna"
+							>
+								<AlignJustify class="w-3.5 h-3.5" />
+								<span>Compacta</span>
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Tabela de Alunos (Detalhada ou Compacta) -->
+				{#if alunosOrdenados.length > 0}
+					<div
+						class="overflow-hidden rounded-2xl border border-zinc-900 {modoDensidade === 'compacta'
+							? 'max-h-[520px] overflow-y-auto'
+							: ''}"
+					>
+						<div class="overflow-x-auto">
+							<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
+								<thead
+									class="bg-zinc-900/80 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-800 sticky top-0 backdrop-blur-sm z-10"
+								>
+									<tr>
+										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+											Judoca / Atleta
+										</th>
+										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+											Graduação (Faixa)
+										</th>
+										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+											Idade / Tutela
+										</th>
+										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+											Categoria & Divisão (CBJ)
+										</th>
+										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+											Sensei
+										</th>
+										{#if modoDensidade === 'detalhada'}
+											<th class="px-6 py-4">Matrícula</th>
+										{/if}
+										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'} text-right">
+											Ações
+										</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-zinc-900">
+									{#each alunosOrdenados as aluno}
+										<tr class="hover:bg-zinc-900/30 transition-colors group">
+											<!-- Nome & CPF -->
+											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+												<a
+													href="/dashboard/alunos/{aluno.id_usuario}"
+													class="font-semibold text-white group-hover:text-red-400 transition-colors block {modoDensidade === 'compacta' ? 'text-xs' : ''}"
+												>
+													{aluno.nome}
+												</a>
+												<div class="text-[10px] font-mono text-zinc-500 mt-0.5">
+													CPF: {aluno.cpf.slice(0, 3)}.***.***-{aluno.cpf.slice(-2)}
+													{#if modoDensidade === 'compacta' && aluno.matricula}
+														<span class="text-zinc-600 ml-1.5">• Mat: {aluno.matricula}</span>
+													{/if}
+												</div>
+											</td>
+
+											<!-- Faixa Atual -->
+											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+												<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+											</td>
+
+											<!-- Idade & Menoridade -->
+											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+												<div class="flex items-center gap-1.5">
+													<span class="text-zinc-200 font-mono text-xs">{aluno.idade} anos</span>
+													{#if aluno.menor_idade}
+														<span
+															class="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-950/40 border border-amber-800/60 text-amber-300"
+															title="Menor de 18 anos"
+														>
+															Menor
+														</span>
+													{:else}
+														<span
+															class="px-1.5 py-0.5 rounded text-[9px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800"
+														>
+															Maior
+														</span>
+													{/if}
+												</div>
+												{#if aluno.nome_responsavel && modoDensidade === 'detalhada'}
+													<div class="text-[11px] text-zinc-400 mt-1 flex items-center gap-1">
+														<HeartHandshake class="w-3 h-3 text-amber-400 shrink-0" />
+														<span
+															class="truncate max-w-[220px]"
+															title="{aluno.nome_responsavel}{aluno.parentesco_responsavel ? ` (${aluno.parentesco_responsavel})` : ''}"
+														>
+															{aluno.nome_responsavel}
+															{#if aluno.parentesco_responsavel}
+																<span class="text-zinc-500 font-mono">({aluno.parentesco_responsavel})</span>
+															{/if}
+														</span>
+													</div>
+												{/if}
+											</td>
+
+											<!-- Categoria & Divisão -->
+											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+												<div class="flex flex-col gap-1">
+													<div class="flex items-center gap-1.5 flex-wrap">
+														{#if aluno.categoria}
+															<span
+																class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-950/40 text-amber-300 border border-amber-800/50"
+																title="Categoria Oficial de Peso / Idade"
+															>
+																{aluno.categoria}
+															</span>
+														{/if}
+														{#if aluno.grupo_especial_aspirante}
+															<span
+																class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-950/50 text-purple-300 border border-purple-800/60"
+															>
+																{aluno.grupo_especial_aspirante}
+															</span>
+														{/if}
+													</div>
+													{#if modoDensidade === 'detalhada'}
+														<div class="flex items-center gap-1.5 flex-wrap text-[11px] text-zinc-500 font-mono">
+															{#if aluno.peso}
+																<span>{aluno.peso} kg</span>
+															{/if}
+															{#if aluno.status_federacao}
+																<span>• FPJ: {aluno.status_federacao}</span>
+															{/if}
+														</div>
+													{/if}
+													{#if !aluno.categoria && !aluno.grupo_especial_aspirante && !aluno.status_federacao}
+														<span class="text-zinc-600 text-xs">-</span>
+													{/if}
+												</div>
+											</td>
+
+											<!-- Sensei Técnico -->
+											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2 text-xs' : 'px-6 py-4'} text-zinc-300">
+												{aluno.nome_professor_responsavel}
+											</td>
+
+											<!-- Matrícula (quando detalhada) -->
+											{#if modoDensidade === 'detalhada'}
+												<td class="px-6 py-4 font-mono text-zinc-400">
+													{aluno.matricula || '-'}
+												</td>
+											{/if}
+
+											<!-- Ações -->
+											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} text-right">
+												<a
+													href="/dashboard/alunos/{aluno.id_usuario}"
+													class="inline-flex items-center gap-1.5 {modoDensidade === 'compacta' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 hover:text-white transition-colors"
+													title={data.podeEditarAluno
+														? 'Visualizar e editar dados do judoca'
+														: 'Visualizar dados do judoca'}
+												>
+													{#if data.podeEditarAluno}
+														<Pencil class="w-3.5 h-3.5 text-zinc-400" />
+														<span>Editar</span>
+													{:else}
+														<Eye class="w-3.5 h-3.5 text-zinc-400" />
+														<span>Ver</span>
+													{/if}
+												</a>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{:else}
+					<div class="p-8 text-center text-xs text-zinc-500 font-mono">
+						Nenhum atleta encontrado para o filtro selecionado.
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</section>
 	{:else}
 		<div class="p-12 rounded-2xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
 			<Users class="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-			<h3 class="text-base font-bold text-white font-display">Nenhum judoca encontrado</h3>
+			<h3 class="text-base font-bold text-white font-display">Nenhum judoca cadastrado</h3>
 			<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
 				{#if data.busca}
 					Nenhum resultado corresponde aos termos da pesquisa "{data.busca}".

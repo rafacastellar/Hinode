@@ -14,8 +14,21 @@
 		CheckCircle2,
 		Settings,
 		AlertTriangle,
-		X
+		X,
+		ChevronDown,
+		ArrowUpDown,
+		ArrowUp,
+		ArrowDown,
+		LayoutList,
+		AlignJustify,
+		Search,
+		Filter
 	} from '@lucide/svelte';
+	import {
+		ordenarAtletas,
+		type CampoOrdenacaoAtleta,
+		type DirecaoOrdenacao
+	} from '#lib/dominio/ordenacao-atletas';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -29,6 +42,18 @@
 	let modalExcluirAberto = $state(false);
 	let alunoSelecionado = $state<number | ''>('');
 	let filtroBuscaAluno = $state('');
+
+	// Estados de controle da chamada: minimização (accordion), ordenação e densidade
+	let listaChamadaExpandida = $state(true);
+	let densidadeChamada = $state<'detalhada' | 'compacta'>('detalhada');
+	let campoOrdenacaoChamada = $state<CampoOrdenacaoAtleta>('graduacao');
+	let direcaoOrdenacaoChamada = $state<DirecaoOrdenacao>('desc');
+	let filtroBuscaChamada = $state('');
+	let filtroIdadeChamada = $state<'TODOS' | 'MENORES' | 'ADULTOS'>('TODOS');
+
+	function alternarDirecaoChamada() {
+		direcaoOrdenacaoChamada = direcaoOrdenacaoChamada === 'asc' ? 'desc' : 'asc';
+	}
 
 	const diasSemanaOpcoes = [
 		'Segunda-feira',
@@ -80,6 +105,27 @@
 					a.nome.toLowerCase().includes(filtroBuscaAluno.toLowerCase()) ||
 					(a.matricula && a.matricula.toLowerCase().includes(filtroBuscaAluno.toLowerCase()))
 				)
+	);
+
+	// Filtragem e ordenação reativa dos judocas matriculados na turma
+	const alunosChamadaFiltrados = $derived(
+		data.turma.alunos_matriculados.filter((aluno) => {
+			if (filtroIdadeChamada === 'MENORES' && !aluno.menor_idade) return false;
+			if (filtroIdadeChamada === 'ADULTOS' && aluno.menor_idade) return false;
+			if (filtroBuscaChamada.trim() !== '') {
+				const termo = filtroBuscaChamada.toLowerCase();
+				const matchNome = aluno.nome.toLowerCase().includes(termo);
+				const matchMatricula = aluno.matricula ? aluno.matricula.toLowerCase().includes(termo) : false;
+				const matchFaixa = aluno.graduacao_atual.toLowerCase().includes(termo);
+				const matchCategoria = aluno.categoria ? aluno.categoria.toLowerCase().includes(termo) : false;
+				if (!matchNome && !matchMatricula && !matchFaixa && !matchCategoria) return false;
+			}
+			return true;
+		})
+	);
+
+	const alunosChamadaOrdenados = $derived(
+		ordenarAtletas(alunosChamadaFiltrados, campoOrdenacaoChamada, direcaoOrdenacaoChamada)
 	);
 </script>
 
@@ -275,83 +321,326 @@
 			</div>
 		{/if}
 
-		<!-- LISTA DE CHAMADA / ATLETAS MATRICULADOS -->
-		<div class="space-y-4">
-			<div class="flex items-center justify-between">
-				<h2 class="text-xs font-mono uppercase tracking-wider text-zinc-400">
-					Lista de Judocas Matriculados ({data.turma.alunos_matriculados.length})
-				</h2>
-			</div>
-
-			{#if data.turma.alunos_matriculados.length > 0}
-				<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
-					<div class="overflow-x-auto">
-						<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
-							<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
-								<tr>
-									<th class="px-6 py-4">Judoca</th>
-									<th class="px-6 py-4">Graduação (Faixa)</th>
-									<th class="px-6 py-4">Idade</th>
-									<th class="px-6 py-4">Matrícula</th>
-									{#if data.podeGerenciar}
-										<th class="px-6 py-4 text-right">Ação</th>
-									{/if}
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-zinc-900">
-								{#each data.turma.alunos_matriculados as aluno}
-									<tr class="hover:bg-zinc-900/30 transition-colors">
-										<td class="px-6 py-4 font-semibold text-white">
-											{#if data.podeVerAlunos}
-												<a
-													href="/dashboard/alunos/{aluno.id_usuario}"
-													class="hover:text-red-400 hover:underline transition-colors"
-												>
-													{aluno.nome}
-												</a>
-											{:else}
-												<span>{aluno.nome}</span>
-											{/if}
-										</td>
-										<td class="px-6 py-4">
-											<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
-										</td>
-										<td class="px-6 py-4 font-mono text-zinc-300">
-											{aluno.idade} anos
-										</td>
-										<td class="px-6 py-4 font-mono text-zinc-400">
-											{aluno.matricula || '-'}
-										</td>
-										{#if data.podeGerenciar}
-											<td class="px-6 py-4 text-right">
-												<form action="?/desmatricular" method="POST" use:enhance class="inline-block">
-													<input type="hidden" name="idAluno" value={aluno.id_usuario} />
-													<button
-														type="submit"
-														class="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-900 transition-colors"
-														title="Remover judoca desta turma"
-													>
-														<Trash2 class="w-4 h-4" />
-													</button>
-												</form>
-											</td>
-										{/if}
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+		<!-- ========================================================================= -->
+		<!-- LISTA DE CHAMADA COM MINIMIZAÇÃO (ACCORDION), FILTROS E ORDENAÇÃO         -->
+		<!-- ========================================================================= -->
+		<section class="rounded-3xl bg-zinc-950 border border-zinc-900 overflow-hidden shadow-sm">
+			<!-- Header Colapsável com Resumo (Padrão idêntico aos Logs do Dojo) -->
+			<div
+				class="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-zinc-900/40 transition-colors"
+				onclick={() => (listaChamadaExpandida = !listaChamadaExpandida)}
+				role="button"
+				tabindex="0"
+				onkeydown={(e) => e.key === 'Enter' && (listaChamadaExpandida = !listaChamadaExpandida)}
+				aria-expanded={listaChamadaExpandida}
+			>
+				<div class="flex items-center gap-3">
+					<div
+						class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-red-500 shrink-0"
+					>
+						<Users class="w-5 h-5" />
+					</div>
+					<div>
+						<div class="flex items-center gap-2 flex-wrap">
+							<h2 class="text-base font-bold text-white font-display">
+								Lista de Chamada & Judocas Matriculados
+							</h2>
+							<span
+								class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 font-semibold"
+							>
+								{alunosChamadaOrdenados.length} {alunosChamadaOrdenados.length === 1 ? 'atleta' : 'atletas'}
+							</span>
+							{#if data.turma.alunos_matriculados.filter((a) => a.menor_idade).length > 0}
+								<span
+									class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/40 border border-amber-800/60 text-amber-300"
+								>
+									{data.turma.alunos_matriculados.filter((a) => a.menor_idade).length} menores
+								</span>
+							{/if}
+						</div>
+						<p class="text-[11px] text-zinc-400 mt-0.5">
+							Alocação técnica de tatame, graduações ativas e categorias oficiais para o treino.
+						</p>
 					</div>
 				</div>
-			{:else}
-				<div class="p-10 rounded-2xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
-					<Users class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-					<h4 class="text-sm font-bold text-white font-display">Nenhum judoca matriculado nesta turma</h4>
-					<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
-						Utilize o seletor acima para matricular atletas do dojo neste treino.
-					</p>
+
+				<div class="flex items-center gap-3 self-end sm:self-auto shrink-0">
+					<span
+						class="text-xs font-mono text-zinc-400 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800"
+					>
+						{listaChamadaExpandida ? 'Recolher Chamada ▲' : 'Expandir Chamada ▼'}
+					</span>
+					<div
+						class="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 transition-transform duration-200 {listaChamadaExpandida
+							? 'rotate-180'
+							: ''}"
+					>
+						<ChevronDown class="w-4 h-4" />
+					</div>
+				</div>
+			</div>
+
+			<!-- Conteúdo Expandido (Quando listaChamadaExpandida = true) -->
+			{#if listaChamadaExpandida}
+				<div class="border-t border-zinc-900 p-5 sm:p-6 space-y-4 animate-in slide-in-from-top-2 duration-200 bg-zinc-950/80">
+					{#if data.turma.alunos_matriculados.length > 0}
+						<!-- Barra de Ferramentas: Filtros + Busca + Ordenação + Densidade -->
+						<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-zinc-900">
+							<!-- 1. Chips de Filtro & Busca Inline -->
+							<div class="flex items-center gap-2 flex-wrap text-xs flex-1">
+								<span
+									class="text-[10px] font-mono uppercase text-zinc-500 font-bold flex items-center gap-1 mr-1"
+								>
+									<Filter class="w-3 h-3" />
+									<span>Filtro:</span>
+								</span>
+								<button
+									type="button"
+									onclick={() => (filtroIdadeChamada = 'TODOS')}
+									class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroIdadeChamada ===
+									'TODOS'
+										? 'bg-red-950/50 border-red-800/80 text-white font-bold'
+										: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+								>
+									Todos ({data.turma.alunos_matriculados.length})
+								</button>
+								<button
+									type="button"
+									onclick={() => (filtroIdadeChamada = 'MENORES')}
+									class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroIdadeChamada ===
+									'MENORES'
+										? 'bg-amber-950/50 border-amber-800/80 text-amber-200 font-bold'
+										: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+								>
+									Menores de 18
+								</button>
+								<button
+									type="button"
+									onclick={() => (filtroIdadeChamada = 'ADULTOS')}
+									class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroIdadeChamada ===
+									'ADULTOS'
+										? 'bg-sky-950/50 border-sky-800/80 text-sky-200 font-bold'
+										: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+								>
+									Adultos
+								</button>
+
+								<!-- Busca Rápida Inline -->
+								<div class="relative ml-auto sm:ml-2 min-w-[200px]">
+									<Search class="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+									<input
+										type="text"
+										bind:value={filtroBuscaChamada}
+										placeholder="Filtrar judoca nesta turma..."
+										class="w-full pl-8 pr-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 font-mono"
+									/>
+									{#if filtroBuscaChamada}
+										<button
+											type="button"
+											onclick={() => (filtroBuscaChamada = '')}
+											class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs"
+										>
+											×
+										</button>
+									{/if}
+								</div>
+							</div>
+
+							<!-- 2. Controles de Ordenação e Densidade -->
+							<div class="flex items-center gap-3 flex-wrap self-end lg:self-auto">
+								<!-- Seletor de Ordenação -->
+								<div class="flex items-center gap-2 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800">
+									<span class="text-[10px] font-mono uppercase text-zinc-400 flex items-center gap-1 pl-1">
+										<ArrowUpDown class="w-3 h-3 text-red-500" />
+										<span>Ordenar:</span>
+									</span>
+									<select
+										bind:value={campoOrdenacaoChamada}
+										class="bg-zinc-950 border border-zinc-800 text-white text-xs font-mono rounded-lg px-2.5 py-1 focus:outline-none focus:border-red-600"
+									>
+										<option value="graduacao">Graduação (Faixa)</option>
+										<option value="idade">Idade</option>
+										<option value="categoria">Categoria CBJ</option>
+										<option value="nome">Nome (A-Z)</option>
+									</select>
+
+									<!-- Alternador de Direção Asc/Desc -->
+									<button
+										type="button"
+										onclick={alternarDirecaoChamada}
+										class="p-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+										title={direcaoOrdenacaoChamada === 'asc' ? 'Ordem Crescente (clique para inverter)' : 'Ordem Decrescente (clique para inverter)'}
+									>
+										{#if direcaoOrdenacaoChamada === 'asc'}
+											<ArrowUp class="w-3.5 h-3.5 text-red-400" />
+										{:else}
+											<ArrowDown class="w-3.5 h-3.5 text-amber-400" />
+										{/if}
+									</button>
+								</div>
+
+								<!-- Alternador de Densidade (Detalhada vs Compacta) -->
+								<div class="p-1 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center">
+									<button
+										type="button"
+										onclick={() => (densidadeChamada = 'detalhada')}
+										class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {densidadeChamada ===
+										'detalhada'
+											? 'bg-zinc-800 text-white font-bold shadow-sm'
+											: 'text-zinc-500 hover:text-zinc-300'}"
+										title="Visualização Detalhada em Tabela"
+									>
+										<LayoutList class="w-3.5 h-3.5" />
+										<span>Detalhada</span>
+									</button>
+									<button
+										type="button"
+										onclick={() => (densidadeChamada = 'compacta')}
+										class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {densidadeChamada ===
+										'compacta'
+											? 'bg-zinc-800 text-white font-bold shadow-sm'
+											: 'text-zinc-500 hover:text-zinc-300'}"
+										title="Visualização Compacta / Minimizada com Rolagem Interna"
+									>
+										<AlignJustify class="w-3.5 h-3.5" />
+										<span>Compacta</span>
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<!-- Tabela de Chamada (Detalhada ou Compacta) -->
+						{#if alunosChamadaOrdenados.length > 0}
+							<div
+								class="overflow-hidden rounded-2xl border border-zinc-900 {densidadeChamada === 'compacta'
+									? 'max-h-96 overflow-y-auto'
+									: ''}"
+							>
+								<div class="overflow-x-auto">
+									<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
+										<thead
+											class="bg-zinc-900/80 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-800 sticky top-0 backdrop-blur-sm z-10"
+										>
+											<tr>
+												<th class="{densidadeChamada === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+													Judoca
+												</th>
+												<th class="{densidadeChamada === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+													Graduação (Faixa)
+												</th>
+												<th class="{densidadeChamada === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+													Idade
+												</th>
+												<th class="{densidadeChamada === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+													Categoria CBJ
+												</th>
+												{#if densidadeChamada === 'detalhada'}
+													<th class="px-6 py-4">Matrícula</th>
+												{/if}
+												{#if data.podeGerenciar}
+													<th class="{densidadeChamada === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'} text-right">
+														Ação
+													</th>
+												{/if}
+											</tr>
+										</thead>
+										<tbody class="divide-y divide-zinc-900">
+											{#each alunosChamadaOrdenados as aluno}
+												<tr class="hover:bg-zinc-900/30 transition-colors">
+													<!-- Judoca -->
+													<td class="{densidadeChamada === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} font-semibold text-white">
+														{#if data.podeVerAlunos}
+															<a
+																href="/dashboard/alunos/{aluno.id_usuario}"
+																class="hover:text-red-400 hover:underline transition-colors block {densidadeChamada === 'compacta' ? 'text-xs' : ''}"
+															>
+																{aluno.nome}
+															</a>
+														{:else}
+															<span class="{densidadeChamada === 'compacta' ? 'text-xs' : ''}">{aluno.nome}</span>
+														{/if}
+														{#if densidadeChamada === 'compacta' && aluno.matricula}
+															<span class="text-[10px] font-mono text-zinc-500">Mat: {aluno.matricula}</span>
+														{/if}
+													</td>
+
+													<!-- Faixa -->
+													<td class="{densidadeChamada === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+														<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+													</td>
+
+													<!-- Idade -->
+													<td class="{densidadeChamada === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+														<div class="flex items-center gap-1.5 font-mono text-zinc-300">
+															<span class="text-xs">{aluno.idade} anos</span>
+															{#if aluno.menor_idade}
+																<span
+																	class="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-950/40 border border-amber-800/60 text-amber-300"
+																>
+																	Menor
+																</span>
+															{/if}
+														</div>
+													</td>
+
+													<!-- Categoria CBJ -->
+													<td class="{densidadeChamada === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+														{#if aluno.categoria}
+															<span
+																class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-950/40 text-amber-300 border border-amber-800/50"
+															>
+																{aluno.categoria}
+															</span>
+														{:else}
+															<span class="text-zinc-600 font-mono text-[11px]">-</span>
+														{/if}
+													</td>
+
+													<!-- Matrícula -->
+													{#if densidadeChamada === 'detalhada'}
+														<td class="px-6 py-4 font-mono text-zinc-400">
+															{aluno.matricula || '-'}
+														</td>
+													{/if}
+
+													<!-- Ação de Remover -->
+													{#if data.podeGerenciar}
+														<td class="{densidadeChamada === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} text-right">
+															<form action="?/desmatricular" method="POST" use:enhance class="inline-block">
+																<input type="hidden" name="idAluno" value={aluno.id_usuario} />
+																<button
+																	type="submit"
+																	class="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-900 transition-colors"
+																	title="Remover judoca desta turma"
+																>
+																	<Trash2 class="w-4 h-4" />
+																</button>
+															</form>
+														</td>
+													{/if}
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+							</div>
+						{:else}
+							<div class="p-8 text-center text-xs text-zinc-500 font-mono">
+								Nenhum judoca encontrado com os filtros aplicados.
+							</div>
+						{/if}
+					{:else}
+						<div class="p-8 rounded-2xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
+							<Users class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+							<h4 class="text-sm font-bold text-white font-display">Nenhum judoca matriculado nesta turma</h4>
+							<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+								Utilize o seletor acima para matricular atletas do dojo neste treino.
+							</p>
+						</div>
+					{/if}
 				</div>
 			{/if}
-		</div>
+		</section>
 	{/if}
 
 	<!-- CONTEÚDO DA ABA 2: EDITAR TURMA, HORÁRIOS & SENSEIS -->

@@ -24,9 +24,21 @@
 		DollarSign,
 		Sparkles,
 		Save,
-		X
+		X,
+		ChevronDown,
+		ArrowUpDown,
+		ArrowUp,
+		ArrowDown,
+		LayoutList,
+		AlignJustify,
+		Search
 	} from '@lucide/svelte';
 	import { SUGESTOES_CLASSIFICACAO_ACADEMIA } from '#lib/dominio/campeonato';
+	import {
+		ordenarAtletas,
+		type CampoOrdenacaoAtleta,
+		type DirecaoOrdenacao
+	} from '#lib/dominio/ordenacao-atletas';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -91,6 +103,44 @@
 
 	const inscricoesPendentes = $derived(
 		data.inscricoes.filter((i) => i.status_inscricao === 'Pendente')
+	);
+
+	// Estados de controle: minimização (accordion), ordenação e densidade da lista oficial
+	let listaOficialExpandida = $state(true);
+	let densidadeOficial = $state<'detalhada' | 'compacta'>('detalhada');
+	let campoOrdenacaoOficial = $state<CampoOrdenacaoAtleta>('graduacao');
+	let direcaoOrdenacaoOficial = $state<DirecaoOrdenacao>('desc');
+	let filtroChipOficial = $state<'TODOS' | 'ALUNOS' | 'PROFESSORES' | 'MENORES' | 'ADULTOS'>('TODOS');
+	let buscaOficial = $state('');
+
+	function alternarDirecaoOficial() {
+		direcaoOrdenacaoOficial = direcaoOrdenacaoOficial === 'asc' ? 'desc' : 'asc';
+	}
+
+	// Estado de minimização das inscrições pendentes
+	let listaPendentesExpandida = $state(true);
+
+	// Filtragem e ordenação reativa dos participantes oficiais confirmados
+	const participantesOficiaisFiltrados = $derived(
+		participantesConfirmados.filter((inscr) => {
+			if (filtroChipOficial === 'ALUNOS' && inscr.tipo_participante !== 'aluno') return false;
+			if (filtroChipOficial === 'PROFESSORES' && inscr.tipo_participante !== 'professor') return false;
+			if (filtroChipOficial === 'MENORES' && !inscr.menor_idade) return false;
+			if (filtroChipOficial === 'ADULTOS' && inscr.menor_idade) return false;
+			if (buscaOficial.trim() !== '') {
+				const termo = buscaOficial.toLowerCase();
+				const matchNome = inscr.nome_participante.toLowerCase().includes(termo);
+				const matchFaixa = inscr.faixa_participante.toLowerCase().includes(termo);
+				const matchGrupo = (inscr.grupo_participante || '').toLowerCase().includes(termo);
+				const matchCat = (inscr.categoria_participante || '').toLowerCase().includes(termo);
+				if (!matchNome && !matchFaixa && !matchGrupo && !matchCat) return false;
+			}
+			return true;
+		})
+	);
+
+	const participantesOficiaisOrdenados = $derived(
+		ordenarAtletas(participantesOficiaisFiltrados, campoOrdenacaoOficial, direcaoOrdenacaoOficial)
 	);
 
 	// Alunos disponíveis para inscrição (ainda não inscritos neste torneio)
@@ -662,270 +712,535 @@
 				</div>
 			{/if}
 
-			<!-- 2. LISTA OFICIAL DE PARTICIPANTES DO CAMPEONATO (CONFIRMADOS) -->
-			<div class="space-y-3">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<ShieldCheck class="w-4 h-4 text-emerald-400" />
-						<h2 class="text-sm font-bold text-white font-display">
-							Lista Oficial de Participantes do Campeonato
-						</h2>
-						<span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-800 text-emerald-300">
-							{participantesConfirmados.length} confirmados
-						</span>
+			<!-- 2. LISTA OFICIAL DE PARTICIPANTES DO CAMPEONATO (CONFIRMADOS COM ACCORDION E ORDENAÇÃO) -->
+			<section class="rounded-3xl bg-zinc-950 border border-zinc-900 overflow-hidden shadow-sm">
+				<!-- Header Colapsável com Resumo -->
+				<div
+					class="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-zinc-900/40 transition-colors"
+					onclick={() => (listaOficialExpandida = !listaOficialExpandida)}
+					role="button"
+					tabindex="0"
+					onkeydown={(e) => e.key === 'Enter' && (listaOficialExpandida = !listaOficialExpandida)}
+					aria-expanded={listaOficialExpandida}
+				>
+					<div class="flex items-center gap-3">
+						<div
+							class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shrink-0"
+						>
+							<ShieldCheck class="w-5 h-5" />
+						</div>
+						<div>
+							<div class="flex items-center gap-2 flex-wrap">
+								<h2 class="text-base font-bold text-white font-display">
+									Lista Oficial de Participantes do Campeonato
+								</h2>
+								<span
+									class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-800 text-emerald-300"
+								>
+									{participantesOficiaisOrdenados.length} {participantesOficiaisOrdenados.length === 1 ? 'competidor' : 'competidores'}
+								</span>
+							</div>
+							<p class="text-[11px] text-zinc-400 mt-0.5">
+								Atletas e professores aptos para a pesagem oficial e chaveamento de lutas.
+							</p>
+						</div>
 					</div>
-					<span class="text-[11px] text-zinc-500 font-mono">
-						Atletas com confirmação validada
-					</span>
+
+					<div class="flex items-center gap-3 self-end sm:self-auto shrink-0">
+						<span
+							class="text-xs font-mono text-zinc-400 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800"
+						>
+							{listaOficialExpandida ? 'Recolher Participantes ▲' : 'Expandir Participantes ▼'}
+						</span>
+						<div
+							class="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 transition-transform duration-200 {listaOficialExpandida
+								? 'rotate-180'
+								: ''}"
+						>
+							<ChevronDown class="w-4 h-4" />
+						</div>
+					</div>
 				</div>
 
-				{#if participantesConfirmados.length > 0}
-					<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
-						<div class="overflow-x-auto">
-							<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
-								<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
-									<tr>
-										<th class="px-6 py-4">Judoca Competidor</th>
-										<th class="px-6 py-4">Graduação / Faixa</th>
-										<th class="px-6 py-4">Categoria / Idade</th>
-										<th class="px-6 py-4">Taxa</th>
-										<th class="px-6 py-4">Confirmações Validadas</th>
-										{#if data.ehProfessorOuAdmin}
-											<th class="px-6 py-4 text-right">Ação do Professor</th>
+				<!-- Conteúdo Expandido da Lista Oficial -->
+				{#if listaOficialExpandida}
+					<div class="border-t border-zinc-900 p-5 sm:p-6 space-y-4 animate-in slide-in-from-top-2 duration-200 bg-zinc-950/80">
+						{#if participantesConfirmados.length > 0}
+							<!-- Barra de Ferramentas: Filtros + Busca + Ordenação + Densidade -->
+							<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-zinc-900">
+								<!-- 1. Chips de Filtro & Busca Inline -->
+								<div class="flex items-center gap-2 flex-wrap text-xs flex-1">
+									<span
+										class="text-[10px] font-mono uppercase text-zinc-500 font-bold flex items-center gap-1 mr-1"
+									>
+										<Filter class="w-3 h-3" />
+										<span>Filtro:</span>
+									</span>
+									<button
+										type="button"
+										onclick={() => (filtroChipOficial = 'TODOS')}
+										class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChipOficial ===
+										'TODOS'
+											? 'bg-red-950/50 border-red-800/80 text-white font-bold'
+											: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+									>
+										Todos ({participantesConfirmados.length})
+									</button>
+									<button
+										type="button"
+										onclick={() => (filtroChipOficial = 'ALUNOS')}
+										class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChipOficial ===
+										'ALUNOS'
+											? 'bg-red-950/50 border-red-800/80 text-white font-bold'
+											: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+									>
+										Alunos
+									</button>
+									<button
+										type="button"
+										onclick={() => (filtroChipOficial = 'PROFESSORES')}
+										class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChipOficial ===
+										'PROFESSORES'
+											? 'bg-purple-950/50 border-purple-800/80 text-purple-200 font-bold'
+											: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+									>
+										Senseis
+									</button>
+									<button
+										type="button"
+										onclick={() => (filtroChipOficial = 'MENORES')}
+										class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChipOficial ===
+										'MENORES'
+											? 'bg-amber-950/50 border-amber-800/80 text-amber-200 font-bold'
+											: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+									>
+										Menores
+									</button>
+									<button
+										type="button"
+										onclick={() => (filtroChipOficial = 'ADULTOS')}
+										class="px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all {filtroChipOficial ===
+										'ADULTOS'
+											? 'bg-sky-950/50 border-sky-800/80 text-sky-200 font-bold'
+											: 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'}"
+									>
+										Adultos
+									</button>
+
+									<!-- Busca Rápida Inline -->
+									<div class="relative ml-auto sm:ml-2 min-w-[200px]">
+										<Search class="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+										<input
+											type="text"
+											bind:value={buscaOficial}
+											placeholder="Filtrar competidor..."
+											class="w-full pl-8 pr-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 font-mono"
+										/>
+										{#if buscaOficial}
+											<button
+												type="button"
+												onclick={() => (buscaOficial = '')}
+												class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs"
+											>
+												×
+											</button>
 										{/if}
-									</tr>
-								</thead>
-								<tbody class="divide-y divide-zinc-900">
-									{#each participantesConfirmados as inscr}
-										<tr class="hover:bg-zinc-900/30 transition-colors">
-											<td class="px-6 py-4">
-												<div class="font-semibold text-white">
-													{inscr.nome_participante}
-												</div>
-												<span class="text-[10px] font-mono text-zinc-500 uppercase">
-													{inscr.tipo_participante === 'aluno' ? 'Judoca Oficial' : 'Professor Competidor'}
-												</span>
-											</td>
+									</div>
+								</div>
 
-											<td class="px-6 py-4">
-												<BadgeFaixa faixa={inscr.faixa_participante} size="sm" />
-											</td>
+								<!-- 2. Controles de Ordenação e Densidade -->
+								<div class="flex items-center gap-3 flex-wrap self-end lg:self-auto">
+									<!-- Seletor de Ordenação -->
+									<div class="flex items-center gap-2 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800">
+										<span class="text-[10px] font-mono uppercase text-zinc-400 flex items-center gap-1 pl-1">
+											<ArrowUpDown class="w-3 h-3 text-red-500" />
+											<span>Ordenar:</span>
+										</span>
+										<select
+											bind:value={campoOrdenacaoOficial}
+											class="bg-zinc-950 border border-zinc-800 text-white text-xs font-mono rounded-lg px-2.5 py-1 focus:outline-none focus:border-red-600"
+										>
+											<option value="graduacao">Graduação (Faixa)</option>
+											<option value="idade">Idade</option>
+											<option value="categoria">Categoria CBJ</option>
+											<option value="nome">Nome (A-Z)</option>
+										</select>
 
-											<td class="px-6 py-4">
-												<div class="text-xs text-zinc-300 font-medium">
-													{inscr.grupo_participante || 'Aspirante'}
-												</div>
-												<span class="text-[11px] font-mono text-zinc-500">
-													{inscr.idade} anos • {inscr.menor_idade ? 'Menor' : 'Maior'}
-												</span>
-											</td>
-
-											<td class="px-6 py-4 font-mono text-xs text-emerald-400">
-												{inscr.valor !== null && Number(inscr.valor) > 0 ? `R$ ${Number(inscr.valor).toFixed(2)}` : 'Isento'}
-											</td>
-
-											<td class="px-6 py-4">
-												<div class="space-y-1">
-													<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
-														<CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
-														<span>Atleta confirmou {inscr.data_confirmacao_atleta ? `(${inscr.data_confirmacao_atleta})` : ''}</span>
-													</div>
-													{#if inscr.menor_idade}
-														<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 block">
-															<CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
-															<span>Responsável ({inscr.nome_responsavel || 'Legal'}) autorizou</span>
-														</div>
-													{:else}
-														<div class="text-[10px] font-mono text-zinc-500">
-															Dispensado: Maior de 18 anos
-														</div>
-													{/if}
-												</div>
-											</td>
-
-											{#if data.ehProfessorOuAdmin}
-												<td class="px-6 py-4 text-right">
-													<form
-														action="?/removerAtleta"
-														method="POST"
-														use:enhance={() => {
-															carregandoAcao = true;
-															return async ({ update }) => {
-																await update();
-																carregandoAcao = false;
-															};
-														}}
-														class="inline-block"
-													>
-														<input type="hidden" name="idInscricao" value={inscr.id_inscricao} />
-														<button
-															type="submit"
-															disabled={carregandoAcao}
-															title="Remover atleta da lista do campeonato"
-															class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-[11px] text-zinc-400 hover:text-red-300 transition-colors"
-														>
-															<Trash2 class="w-3.5 h-3.5 text-zinc-500 hover:text-red-400" />
-															<span>Remover da Lista</span>
-														</button>
-													</form>
-												</td>
+										<!-- Alternador de Direção Asc/Desc -->
+										<button
+											type="button"
+											onclick={alternarDirecaoOficial}
+											class="p-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+											title={direcaoOrdenacaoOficial === 'asc' ? 'Ordem Crescente (clique para inverter)' : 'Ordem Decrescente (clique para inverter)'}
+										>
+											{#if direcaoOrdenacaoOficial === 'asc'}
+												<ArrowUp class="w-3.5 h-3.5 text-red-400" />
+											{:else}
+												<ArrowDown class="w-3.5 h-3.5 text-amber-400" />
 											{/if}
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-					</div>
-				{:else}
-					<div class="p-8 rounded-2xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
-						<Users class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-						<h4 class="text-sm font-bold text-white font-display">Nenhum competidor confirmado ainda</h4>
-						<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
-							Atletas adicionados pelo professor ou auto-inscritos aparecerão aqui assim que confirmarem (e o responsável autorizar, caso seja menor).
-						</p>
+										</button>
+									</div>
+
+									<!-- Alternador de Densidade (Detalhada vs Compacta) -->
+									<div class="p-1 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center">
+										<button
+											type="button"
+											onclick={() => (densidadeOficial = 'detalhada')}
+											class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {densidadeOficial ===
+											'detalhada'
+												? 'bg-zinc-800 text-white font-bold shadow-sm'
+												: 'text-zinc-500 hover:text-zinc-300'}"
+											title="Visualização Detalhada em Tabela"
+										>
+											<LayoutList class="w-3.5 h-3.5" />
+											<span>Detalhada</span>
+										</button>
+										<button
+											type="button"
+											onclick={() => (densidadeOficial = 'compacta')}
+											class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {densidadeOficial ===
+											'compacta'
+												? 'bg-zinc-800 text-white font-bold shadow-sm'
+												: 'text-zinc-500 hover:text-zinc-300'}"
+											title="Visualização Compacta / Minimizada com Rolagem Interna"
+										>
+											<AlignJustify class="w-3.5 h-3.5" />
+											<span>Compacta</span>
+										</button>
+									</div>
+								</div>
+							</div>
+
+							<!-- Tabela Oficial de Participantes -->
+							{#if participantesOficiaisOrdenados.length > 0}
+								<div
+									class="overflow-hidden rounded-2xl border border-zinc-900 {densidadeOficial === 'compacta'
+										? 'max-h-96 overflow-y-auto'
+										: ''}"
+								>
+									<div class="overflow-x-auto">
+										<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
+											<thead
+												class="bg-zinc-900/80 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-800 sticky top-0 backdrop-blur-sm z-10"
+											>
+												<tr>
+													<th class="{densidadeOficial === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+														Judoca Competidor
+													</th>
+													<th class="{densidadeOficial === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+														Graduação / Faixa
+													</th>
+													<th class="{densidadeOficial === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+														Categoria & Idade
+													</th>
+													<th class="{densidadeOficial === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+														Taxa
+													</th>
+													<th class="{densidadeOficial === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
+														Confirmações Validadas
+													</th>
+													{#if data.ehProfessorOuAdmin}
+														<th class="{densidadeOficial === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'} text-right">
+															Ação
+														</th>
+													{/if}
+												</tr>
+											</thead>
+											<tbody class="divide-y divide-zinc-900">
+												{#each participantesOficiaisOrdenados as inscr}
+													<tr class="hover:bg-zinc-900/30 transition-colors">
+														<!-- Competidor -->
+														<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+															<div class="font-semibold text-white {densidadeOficial === 'compacta' ? 'text-xs' : ''}">
+																{inscr.nome_participante}
+															</div>
+															<span class="text-[10px] font-mono text-zinc-500 uppercase">
+																{inscr.tipo_participante === 'aluno' ? 'Judoca Oficial' : 'Sensei Competidor'}
+															</span>
+														</td>
+
+														<!-- Faixa -->
+														<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+															<BadgeFaixa faixa={inscr.faixa_participante} size="sm" />
+														</td>
+
+														<!-- Categoria & Idade -->
+														<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+															<div class="flex items-center gap-1.5 flex-wrap">
+																{#if inscr.categoria_participante}
+																	<span
+																		class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-950/40 text-amber-300 border border-amber-800/50"
+																	>
+																		{inscr.categoria_participante}
+																	</span>
+																{:else if inscr.grupo_participante}
+																	<span class="text-xs text-zinc-300 font-medium">
+																		{inscr.grupo_participante}
+																	</span>
+																{/if}
+															</div>
+															<span class="text-[11px] font-mono text-zinc-500 block mt-0.5">
+																{inscr.idade} anos • {inscr.menor_idade ? 'Menor' : 'Maior'}
+																{#if inscr.peso_participante}
+																	<span> • {inscr.peso_participante}kg</span>
+																{/if}
+															</span>
+														</td>
+
+														<!-- Taxa -->
+														<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} font-mono text-xs text-emerald-400">
+															{inscr.valor !== null && Number(inscr.valor) > 0 ? `R$ ${Number(inscr.valor).toFixed(2)}` : 'Isento'}
+														</td>
+
+														<!-- Validações -->
+														<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
+															<div class="space-y-1">
+																<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
+																	<CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
+																	<span>Atleta confirmou {inscr.data_confirmacao_atleta ? `(${inscr.data_confirmacao_atleta})` : ''}</span>
+																</div>
+																{#if inscr.menor_idade}
+																	<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 block">
+																		<CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
+																		<span>Responsável ({inscr.nome_responsavel || 'Legal'}) autorizou</span>
+																	</div>
+																{:else if densidadeOficial === 'detalhada'}
+																	<div class="text-[10px] font-mono text-zinc-500">
+																		Dispensado: Maior de 18 anos
+																	</div>
+																{/if}
+															</div>
+														</td>
+
+														<!-- Ações -->
+														{#if data.ehProfessorOuAdmin}
+															<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} text-right">
+																<form
+																	action="?/removerAtleta"
+																	method="POST"
+																	use:enhance={() => {
+																		carregandoAcao = true;
+																		return async ({ update }) => {
+																			await update();
+																			carregandoAcao = false;
+																		};
+																	}}
+																	class="inline-block"
+																>
+																	<input type="hidden" name="idInscricao" value={inscr.id_inscricao} />
+																	<button
+																		type="submit"
+																		disabled={carregandoAcao}
+																		title="Remover atleta da lista do campeonato"
+																		class="inline-flex items-center gap-1 {densidadeOficial === 'compacta' ? 'px-2 py-1 text-[10px]' : 'px-2.5 py-1.5 text-[11px]'} rounded-lg bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-zinc-400 hover:text-red-300 transition-colors"
+																	>
+																		<Trash2 class="w-3.5 h-3.5 text-zinc-500 hover:text-red-400" />
+																		<span>Remover</span>
+																	</button>
+																</form>
+															</td>
+														{/if}
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+									</div>
+								</div>
+							{:else}
+								<div class="p-8 text-center text-xs text-zinc-500 font-mono">
+									Nenhum competidor oficial encontrado para o filtro selecionado.
+								</div>
+							{/if}
+						{:else}
+							<div class="p-8 rounded-2xl bg-zinc-950 border border-dashed border-zinc-800 text-center">
+								<Users class="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+								<h4 class="text-sm font-bold text-white font-display">Nenhum competidor confirmado ainda</h4>
+								<p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+									Atletas adicionados pelo professor ou auto-inscritos aparecerão aqui assim que confirmarem (e o responsável autorizar, caso seja menor).
+								</p>
+							</div>
+						{/if}
 					</div>
 				{/if}
-			</div>
+			</section>
 
-			<!-- 3. INSCRIÇÕES PENDENTES DE CONFIRMAÇÃO (AGUARDANDO ATLETA / RESPONSÁVEL) -->
+			<!-- 3. INSCRIÇÕES PENDENTES DE CONFIRMAÇÃO (COM ACCORDION / MINIMIZÁVEL) -->
 			{#if inscricoesPendentes.length > 0}
-				<div class="space-y-3 pt-4 border-t border-zinc-900">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<Clock class="w-4 h-4 text-amber-400" />
-							<h2 class="text-sm font-bold text-white font-display">
-								Inscrições Pendentes de Confirmação
-							</h2>
-							<span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 border border-amber-800 text-amber-300">
-								{inscricoesPendentes.length} aguardando
-							</span>
+				<section class="rounded-3xl bg-zinc-950 border border-zinc-900 overflow-hidden shadow-sm">
+					<!-- Header Colapsável de Pendências -->
+					<div
+						class="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-zinc-900/40 transition-colors"
+						onclick={() => (listaPendentesExpandida = !listaPendentesExpandida)}
+						role="button"
+						tabindex="0"
+						onkeydown={(e) => e.key === 'Enter' && (listaPendentesExpandida = !listaPendentesExpandida)}
+						aria-expanded={listaPendentesExpandida}
+					>
+						<div class="flex items-center gap-3">
+							<div
+								class="w-10 h-10 rounded-xl bg-amber-950/40 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0"
+							>
+								<Clock class="w-5 h-5" />
+							</div>
+							<div>
+								<div class="flex items-center gap-2 flex-wrap">
+									<h2 class="text-base font-bold text-white font-display">
+										Inscrições Pendentes de Confirmação
+									</h2>
+									<span
+										class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 border border-amber-800 text-amber-300"
+									>
+										{inscricoesPendentes.length} aguardando
+									</span>
+								</div>
+								<p class="text-[11px] text-zinc-400 mt-0.5">
+									Ingressam automaticamente na lista oficial assim que as autorizações forem validadas.
+								</p>
+							</div>
 						</div>
-						<span class="text-[11px] text-zinc-500 font-mono">
-							Ingressam na lista oficial após as confirmações
-						</span>
+
+						<div class="flex items-center gap-3 self-end sm:self-auto shrink-0">
+							<span
+								class="text-xs font-mono text-zinc-400 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800"
+							>
+								{listaPendentesExpandida ? 'Recolher Pendentes ▲' : 'Expandir Pendentes ▼'}
+							</span>
+							<div
+								class="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 transition-transform duration-200 {listaPendentesExpandida
+									? 'rotate-180'
+									: ''}"
+							>
+								<ChevronDown class="w-4 h-4" />
+							</div>
+						</div>
 					</div>
 
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						{#each inscricoesPendentes as pend}
-							{@const souOAtleta = Boolean(data.usuarioLogadoId && data.usuarioLogadoId === pend.id_participante)}
-							{@const souOResponsavel = Boolean(data.usuarioLogadoId && (pend.ids_responsaveis?.includes(data.usuarioLogadoId) || data.usuarioLogadoId === pend.id_responsavel))}
+					<!-- Conteúdo Expandido das Inscrições Pendentes -->
+					{#if listaPendentesExpandida}
+						<div class="border-t border-zinc-900 p-5 sm:p-6 space-y-4 animate-in slide-in-from-top-2 duration-200 bg-zinc-950/80">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{#each inscricoesPendentes as pend}
+									{@const souOAtleta = Boolean(data.usuarioLogadoId && data.usuarioLogadoId === pend.id_participante)}
+									{@const souOResponsavel = Boolean(data.usuarioLogadoId && (pend.ids_responsaveis?.includes(data.usuarioLogadoId) || data.usuarioLogadoId === pend.id_responsavel))}
 
-							<div class="p-5 rounded-2xl bg-zinc-950 border border-zinc-900 hover:border-zinc-800 transition-all flex flex-col justify-between space-y-4">
-								<div>
-									<!-- Topo do Card -->
-									<div class="flex items-start justify-between gap-3 mb-2">
+									<div class="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-zinc-700 transition-all flex flex-col justify-between space-y-4">
 										<div>
-											<h4 class="text-sm font-bold text-white font-display">
-												{pend.nome_participante}
-											</h4>
-											<div class="flex items-center gap-2 mt-1">
-												<BadgeFaixa faixa={pend.faixa_participante} size="sm" />
-												<span class="text-[11px] font-mono text-zinc-400">
-													{pend.grupo_participante || 'Aspirante'} • {pend.idade} anos
-												</span>
+											<!-- Topo do Card -->
+											<div class="flex items-start justify-between gap-3 mb-2">
+												<div>
+													<h4 class="text-sm font-bold text-white font-display">
+														{pend.nome_participante}
+													</h4>
+													<div class="flex items-center gap-2 mt-1">
+														<BadgeFaixa faixa={pend.faixa_participante} size="sm" />
+														<span class="text-[11px] font-mono text-zinc-400">
+															{pend.categoria_participante || pend.grupo_participante || 'Aspirante'} • {pend.idade} anos
+														</span>
+													</div>
+												</div>
+
+												{#if pend.menor_idade}
+													<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-950/60 border border-amber-800/80 text-amber-300 shrink-0">
+														Menor de Idade
+													</span>
+												{:else}
+													<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
+														Maior de Idade
+													</span>
+												{/if}
+											</div>
+
+											<!-- Status de Cada Confirmação Exigida -->
+											<div class="space-y-2 mt-3 pt-3 border-t border-zinc-900/80 text-xs font-mono">
+												<!-- 1. Atleta -->
+												<div class="flex items-center justify-between gap-2">
+													<span class="text-zinc-500 text-[11px]">1. Confirmação do Atleta:</span>
+													{#if pend.confirmado_atleta}
+														<span class="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
+															<CheckCircle2 class="w-3 h-3" />
+															<span>Confirmado</span>
+														</span>
+													{:else}
+														<span class="inline-flex items-center gap-1 text-amber-400 text-[11px]">
+															<Clock class="w-3 h-3" />
+															<span>Pendente</span>
+														</span>
+													{/if}
+												</div>
+
+												<!-- 2. Responsável -->
+												<div class="flex items-center justify-between gap-2">
+													<span class="text-zinc-500 text-[11px]">2. Autorização do Responsável:</span>
+													{#if !pend.menor_idade}
+														<span class="text-zinc-500 text-[11px]">Dispensado (18+ anos)</span>
+													{:else if pend.confirmado_responsavel}
+														<span class="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
+															<CheckCircle2 class="w-3 h-3" />
+															<span>Autorizado ({pend.nome_responsavel || 'Legal'})</span>
+														</span>
+													{:else}
+														<span class="inline-flex items-center gap-1 text-amber-400 text-[11px]">
+															<Clock class="w-3 h-3" />
+															<span>Aguardando {pend.nome_responsavel ? `(${pend.nome_responsavel})` : 'autorização'}</span>
+														</span>
+													{/if}
+												</div>
 											</div>
 										</div>
 
-										{#if pend.menor_idade}
-											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-950/60 border border-amber-800/80 text-amber-300 shrink-0">
-												Menor de Idade
-											</span>
-										{:else}
-											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
-												Maior de Idade
-											</span>
-										{/if}
-									</div>
+										<!-- Ações de Confirmação & Remoção -->
+										<div class="pt-3 border-t border-zinc-900 flex flex-wrap items-center justify-between gap-2">
+											<div class="flex flex-wrap items-center gap-2">
+												<!-- Botão de Confirmação pelo Atleta -->
+												{#if !pend.confirmado_atleta && (souOAtleta || data.ehProfessorOuAdmin)}
+													<form action="?/confirmarAtleta" method="POST" use:enhance class="inline-block">
+														<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
+														<button
+															type="submit"
+															class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800 text-xs font-semibold text-emerald-300 transition-colors"
+														>
+															<UserCheck class="w-3.5 h-3.5" />
+															<span>{souOAtleta ? 'Confirmar Minha Vaga' : 'Confirmar pelo Atleta'}</span>
+														</button>
+													</form>
+												{/if}
 
-									<!-- Status de Cada Confirmação Exigida -->
-									<div class="space-y-2 mt-3 pt-3 border-t border-zinc-900/80 text-xs font-mono">
-										<!-- 1. Atleta -->
-										<div class="flex items-center justify-between gap-2">
-											<span class="text-zinc-500 text-[11px]">1. Confirmação do Atleta:</span>
-											{#if pend.confirmado_atleta}
-												<span class="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
-													<CheckCircle2 class="w-3 h-3" />
-													<span>Confirmado</span>
-												</span>
-											{:else}
-												<span class="inline-flex items-center gap-1 text-amber-400 text-[11px]">
-													<Clock class="w-3 h-3" />
-													<span>Pendente</span>
-												</span>
+												<!-- Botão de Autorização pelo Responsável (se menor) -->
+												{#if pend.menor_idade && !pend.confirmado_responsavel && (souOResponsavel || data.ehProfessorOuAdmin)}
+													<form action="?/confirmarResponsavel" method="POST" use:enhance class="inline-block">
+														<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
+														<button
+															type="submit"
+															class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/80 border border-sky-800 text-xs font-semibold text-sky-300 transition-colors"
+														>
+															<ShieldCheck class="w-3.5 h-3.5" />
+															<span>{souOResponsavel ? 'Autorizar como Responsável' : 'Autorizar pelo Responsável'}</span>
+														</button>
+													</form>
+												{/if}
+											</div>
+
+											<!-- Professor pode remover atletas da lista -->
+											{#if data.ehProfessorOuAdmin}
+												<form action="?/removerAtleta" method="POST" use:enhance class="inline-block">
+													<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
+													<button
+														type="submit"
+														title="Remover atleta da lista do campeonato"
+														class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-[11px] text-zinc-400 hover:text-red-300 transition-colors"
+													>
+														<Trash2 class="w-3 h-3" />
+														<span>Remover</span>
+													</button>
+												</form>
 											{/if}
 										</div>
-
-										<!-- 2. Responsável -->
-										<div class="flex items-center justify-between gap-2">
-											<span class="text-zinc-500 text-[11px]">2. Autorização do Responsável:</span>
-											{#if !pend.menor_idade}
-												<span class="text-zinc-500 text-[11px]">Dispensado (18+ anos)</span>
-											{:else if pend.confirmado_responsavel}
-												<span class="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
-													<CheckCircle2 class="w-3 h-3" />
-													<span>Autorizado ({pend.nome_responsavel || 'Legal'})</span>
-												</span>
-											{:else}
-												<span class="inline-flex items-center gap-1 text-amber-400 text-[11px]">
-													<Clock class="w-3 h-3" />
-													<span>Aguardando {pend.nome_responsavel ? `(${pend.nome_responsavel})` : 'autorização'}</span>
-												</span>
-											{/if}
-										</div>
 									</div>
-								</div>
-
-								<!-- Ações de Confirmação & Remoção -->
-								<div class="pt-3 border-t border-zinc-900 flex flex-wrap items-center justify-between gap-2">
-									<div class="flex flex-wrap items-center gap-2">
-										<!-- Botão de Confirmação pelo Atleta -->
-										{#if !pend.confirmado_atleta && (souOAtleta || data.ehProfessorOuAdmin)}
-											<form action="?/confirmarAtleta" method="POST" use:enhance class="inline-block">
-												<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
-												<button
-													type="submit"
-													class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800 text-xs font-semibold text-emerald-300 transition-colors"
-												>
-													<UserCheck class="w-3.5 h-3.5" />
-													<span>{souOAtleta ? 'Confirmar Minha Vaga' : 'Confirmar pelo Atleta'}</span>
-												</button>
-											</form>
-										{/if}
-
-										<!-- Botão de Autorização pelo Responsável (se menor) -->
-										{#if pend.menor_idade && !pend.confirmado_responsavel && (souOResponsavel || data.ehProfessorOuAdmin)}
-											<form action="?/confirmarResponsavel" method="POST" use:enhance class="inline-block">
-												<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
-												<button
-													type="submit"
-													class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/80 border border-sky-800 text-xs font-semibold text-sky-300 transition-colors"
-												>
-													<ShieldCheck class="w-3.5 h-3.5" />
-													<span>{souOResponsavel ? 'Autorizar como Responsável' : 'Autorizar pelo Responsável'}</span>
-												</button>
-											</form>
-										{/if}
-									</div>
-
-									<!-- Professor pode remover atletas da lista -->
-									{#if data.ehProfessorOuAdmin}
-										<form action="?/removerAtleta" method="POST" use:enhance class="inline-block">
-											<input type="hidden" name="idInscricao" value={pend.id_inscricao} />
-											<button
-												type="submit"
-												title="Remover atleta da lista do campeonato"
-												class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-[11px] text-zinc-400 hover:text-red-300 transition-colors"
-											>
-												<Trash2 class="w-3 h-3" />
-												<span>Remover</span>
-											</button>
-										</form>
-									{/if}
-								</div>
+								{/each}
 							</div>
-						{/each}
-					</div>
-				</div>
+						</div>
+					{/if}
+				</section>
 			{/if}
 		</div>
 	{/if}

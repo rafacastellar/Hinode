@@ -78,6 +78,8 @@ export interface InscricaoItem {
 	data_confirmacao_responsavel: string | null;
 	status_inscricao: 'Pendente' | 'Confirmada' | 'Cancelada';
 	valor: number | null;
+	categoria_participante?: string | null;
+	peso_participante?: number | null;
 }
 
 export interface ClassificacaoItem {
@@ -458,6 +460,8 @@ export async function listarInscricoesDoCampeonato(
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			COALESCE(a.graduacao_atual, p.grau_faixa, 'Faixa Preta') AS faixa_participante,
 			a.grupo_especial_aspirante AS grupo_participante,
+			a.categoria AS categoria_participante,
+			a.peso AS peso_participante,
 			COALESCE(ie.confirmado_atleta, 0) AS confirmado_atleta,
 			COALESCE(ie.confirmado_responsavel, 0) AS confirmado_responsavel,
 			DATE_FORMAT(ie.data_confirmacao_atleta, '%d/%m/%Y %H:%i') AS data_confirmacao_atleta,
@@ -486,6 +490,8 @@ export async function listarInscricoesDoCampeonato(
 			a.graduacao_atual,
 			p.grau_faixa,
 			a.grupo_especial_aspirante,
+			a.categoria,
+			a.peso,
 			ie.confirmado_atleta,
 			ie.confirmado_responsavel,
 			ie.data_confirmacao_atleta,
@@ -535,7 +541,9 @@ export async function listarInscricoesDoCampeonato(
 			data_confirmacao_atleta: linha.data_confirmacao_atleta ? String(linha.data_confirmacao_atleta) : null,
 			data_confirmacao_responsavel: linha.data_confirmacao_responsavel ? String(linha.data_confirmacao_responsavel) : null,
 			status_inscricao: linha.status_inscricao as 'Pendente' | 'Confirmada' | 'Cancelada',
-			valor: linha.valor !== null ? Number(linha.valor) : null
+			valor: linha.valor !== null ? Number(linha.valor) : null,
+			categoria_participante: linha.categoria_participante ? String(linha.categoria_participante) : null,
+			peso_participante: linha.peso_participante !== null && linha.peso_participante !== undefined ? Number(linha.peso_participante) : null
 		};
 	});
 }
