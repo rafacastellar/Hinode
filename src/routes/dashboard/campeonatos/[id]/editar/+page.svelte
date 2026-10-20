@@ -14,7 +14,7 @@
 		Search,
 		Loader2
 	} from '@lucide/svelte';
-	import { FAIXAS_JUDO_LISTA } from '#lib/dominio/campeonato';
+	import { FAIXAS_JUDO_LISTA, SUGESTOES_CLASSIFICACAO_ACADEMIA } from '#lib/dominio/campeonato';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -242,6 +242,30 @@
 					</div>
 					<span class="text-[10px] text-zinc-500 mt-1 block">
 						Valor padrão cobrado de cada judoca. Deixe 0.00 se for isento/gratuito.
+					</span>
+				</div>
+
+				<!-- Colocação Geral da Academia (Livre) -->
+				<div class="sm:col-span-2">
+					<label for="classificacaoAcademia" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Colocação Geral da Hinodê no Torneio (Opcional - Campo Livre)
+					</label>
+					<input
+						type="text"
+						id="classificacaoAcademia"
+						name="classificacaoAcademia"
+						list="sugestoesClassificacaoEdit"
+						value={(form?.valores?.classificacaoAcademia as string) ?? (data.campeonato.classificacao_academia || '')}
+						placeholder="Ex: Campeã Geral, Vice-campeã, 3º Lugar Geral, 10ª Colocada, Vigésima..."
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					/>
+					<datalist id="sugestoesClassificacaoEdit">
+						{#each SUGESTOES_CLASSIFICACAO_ACADEMIA as sugestao}
+							<option value={sugestao}></option>
+						{/each}
+					</datalist>
+					<span class="text-[11px] text-zinc-500 mt-1 block">
+						Campo livre: registre ou atualize livremente a colocação da equipe neste campeonato.
 					</span>
 				</div>
 

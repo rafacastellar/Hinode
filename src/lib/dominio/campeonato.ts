@@ -105,3 +105,116 @@ export function formatarIdadeLimite(
 	}
 	return `${idadeMinima} a ${idadeMaxima} anos`;
 }
+
+/**
+ * Sugestões comuns de colocação geral da academia em campeonatos.
+ * O campo é livre (texto aberto), mas estas sugestões facilitam o preenchimento.
+ */
+export const SUGESTOES_CLASSIFICACAO_ACADEMIA = [
+	'1º Lugar Geral / Campeã Geral',
+	'2º Lugar Geral / Vice-Campeã Geral',
+	'3º Lugar Geral',
+	'4º Lugar Geral',
+	'5º Lugar Geral',
+	'Top 10 Geral',
+	'10ª Colocada Geral',
+	'20ª Colocada Geral',
+	'Troféu Eficiência',
+	'Melhor Equipe de Base',
+	'Participação'
+] as const;
+
+/**
+ * Agrupamentos ordinais semânticos para lidar com volatilidade de preenchimento (ex: 'decima' <-> '10', 'campeã' <-> '1').
+ */
+const CLUSTERS_ORDINAIS: Array<{ numero: number; termos: string[] }> = [
+	{ numero: 1, termos: ['1', 'primeir', 'campe', 'ouro', 'titulo', 'vencedor'] },
+	{ numero: 2, termos: ['2', 'segund', 'vice', 'prata'] },
+	{ numero: 3, termos: ['3', 'terceir', 'bronze'] },
+	{ numero: 4, termos: ['4', 'quart'] },
+	{ numero: 5, termos: ['5', 'quint'] },
+	{ numero: 6, termos: ['6', 'sext'] },
+	{ numero: 7, termos: ['7', 'setim'] },
+	{ numero: 8, termos: ['8', 'oitav'] },
+	{ numero: 9, termos: ['9', 'non'] },
+	{ numero: 10, termos: ['10', 'decim'] },
+	{ numero: 11, termos: ['11', 'decim primeir'] },
+	{ numero: 12, termos: ['12', 'decim segund'] },
+	{ numero: 13, termos: ['13', 'decim terceir'] },
+	{ numero: 14, termos: ['14', 'decim quart'] },
+	{ numero: 15, termos: ['15', 'decim quint'] },
+	{ numero: 20, termos: ['20', 'vigesim'] },
+	{ numero: 30, termos: ['30', 'trigesim'] },
+	{ numero: 40, termos: ['40', 'quadragesim'] },
+	{ numero: 50, termos: ['50', 'quinquagesim'] }
+];
+
+/**
+ * Normaliza qualquer texto para comparação insensível a caixa, acentos e caracteres ordinais.
+ */
+export function normalizarTexto(txt: string | null | undefined): string {
+	if (!txt) return '';
+	return txt
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[ºª°]/g, '')
+		.trim();
+}
+
+/**
+ * Avalia se uma classificação livre gravada pelo sensei (ex: 'Campeã Geral', '2º Lugar', '10ª Colocada', 'Vigésima')
+ * corresponde a um termo de busca digitado pelo usuário (ex: 'decima', '10', 'campeã', 'segundo', 'vigesima').
+ */
+export function correspondeClassificacaoAcademia(
+	classificacao: string | null | undefined,
+	termoBusca: string
+): boolean {
+	if (!classificacao || !termoBusca) return false;
+
+	const normClassif = normalizarTexto(classificacao);
+	const normBusca = normalizarTexto(termoBusca);
+
+	if (!normClassif || !normBusca) return false;
+
+	// 1. Busca textual direta (substring)
+	if (normClassif.includes(normBusca)) return true;
+
+	// 2. Busca por palavras individuais
+	const palavrasBusca = normBusca.split(/\s+/).filter(Boolean);
+	if (palavrasBusca.length > 1 && palavrasBusca.every((p) => normClassif.includes(p))) {
+		return true;
+	}
+
+	// 3. Busca semântica por números e ordinais equivalentes
+	for (const cluster of CLUSTERS_ORDINAIS) {
+		const buscaBateComCluster = cluster.termos.some((t) => normBusca.includes(t) || normBusca === t);
+		if (buscaBateComCluster) {
+			const classifBateComCluster = cluster.termos.some(
+				(t) => normClassif.includes(t) || normClassif.split(/\s+/).includes(t)
+			);
+			if (classifBateComCluster) return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Identifica se a colocação da academia é de pódio geral ou campeã (1º, 2º ou 3º lugar geral).
+ */
+export function ehPodioOuCampeao(classificacao: string | null | undefined): boolean {
+	if (!classificacao) return false;
+	const norm = normalizarTexto(classificacao);
+	return (
+		norm.includes('campe') ||
+		norm.includes('1') ||
+		norm.includes('ouro') ||
+		norm.includes('vice') ||
+		norm.includes('2') ||
+		norm.includes('prata') ||
+		norm.includes('3') ||
+		norm.includes('bronze')
+	);
+}
+

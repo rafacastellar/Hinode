@@ -17,7 +17,10 @@ import {
 	removerAtletaDoCampeonato,
 	excluirCampeonatoDoDojo,
 	mudarStatusInscricao,
-	registrarResultadoCampeonato
+	registrarResultadoCampeonato,
+	salvarClassificacaoDojo,
+	editarResultadoCampeonato,
+	removerResultadoCampeonato
 } from '#lib/server/servicos/campeonato.service';
 import {
 	validarElegibilidadeCompleta,
@@ -26,7 +29,13 @@ import {
 	validarPeriodoInscricao,
 	formatarPeriodoInscricao
 } from '#lib/server/servicos/regras-campeonato';
-import { inscricaoSchema, resultadoSchema } from '#lib/server/validacao/campeonato.schema';
+import {
+	inscricaoSchema,
+	resultadoSchema,
+	salvarClassificacaoAcademiaSchema,
+	editarResultadoSchema,
+	excluirResultadoSchema
+} from '#lib/server/validacao/campeonato.schema';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const perfis = locals.perfis || [];
@@ -408,5 +417,113 @@ export const actions: Actions = {
 		}
 
 		return { sucessoResultado: true };
+	},
+
+	salvarClassificacaoDojo: async ({ request, params, locals }) => {
+		const perfis = locals.perfis || [];
+		if (
+			!temPermissao(perfis, 'CAMPEONATOS_RESULTADOS') &&
+			!temPermissao(perfis, 'CAMPEONATOS_GERENCIAR')
+		) {
+			throw error(403, 'Acesso negado: sem permissão para atualizar classificação da academia');
+		}
+
+		const idAcademia = locals.idAcademia!;
+		const idEvento = Number(params.id);
+		const formData = await request.formData();
+
+		const validacao = salvarClassificacaoAcademiaSchema.safeParse({
+			idEvento,
+			classificacaoAcademia: formData.get('classificacaoAcademia')
+		});
+
+		if (!validacao.success) {
+			const msg = validacao.error.issues?.[0]?.message || 'Classificação da academia inválida';
+			return fail(400, { erroClassificacaoDojo: msg });
+		}
+
+		try {
+			await salvarClassificacaoDojo(
+				idAcademia,
+				idEvento,
+				validacao.data.classificacaoAcademia
+			);
+			return {
+				sucessoClassificacaoDojo: validacao.data.classificacaoAcademia
+					? `Colocação geral da academia registrada: ${validacao.data.classificacaoAcademia}`
+					: 'Colocação geral da academia removida.'
+			};
+		} catch (err: any) {
+			const msg = err.body?.message || err.message || 'Falha ao salvar classificação da academia';
+			return fail(400, { erroClassificacaoDojo: msg });
+		}
+	},
+
+	editarResultado: async ({ request, locals }) => {
+		const perfis = locals.perfis || [];
+		if (
+			!temPermissao(perfis, 'CAMPEONATOS_RESULTADOS') &&
+			!temPermissao(perfis, 'CAMPEONATOS_GERENCIAR')
+		) {
+			throw error(403, 'Acesso negado: sem permissão para alterar resultados');
+		}
+
+		const idAcademia = locals.idAcademia!;
+		const formData = await request.formData();
+
+		const validacao = editarResultadoSchema.safeParse({
+			idClassificacao: formData.get('idClassificacao'),
+			classificacaoAluno: formData.get('classificacaoAluno'),
+			qtdLutas: formData.get('qtdLutas'),
+			qtdVitorias: formData.get('qtdVitorias')
+		});
+
+		if (!validacao.success) {
+			const primeiroErro =
+				validacao.error.issues?.[0]?.message || 'Dados de resultado inválidos';
+			return fail(400, { erroResultado: primeiroErro });
+		}
+
+		try {
+			await editarResultadoCampeonato(idAcademia, validacao.data);
+			return { sucessoEdicaoResultado: 'Resultado do atleta atualizado com sucesso!' };
+		} catch (err: any) {
+			const msg = err.body?.message || err.message || 'Falha ao atualizar resultado do atleta';
+			return fail(400, { erroResultado: msg });
+		}
+	},
+
+	excluirResultado: async ({ request, locals }) => {
+		const perfis = locals.perfis || [];
+		if (
+			!temPermissao(perfis, 'CAMPEONATOS_RESULTADOS') &&
+			!temPermissao(perfis, 'CAMPEONATOS_GERENCIAR')
+		) {
+			throw error(403, 'Acesso negado: sem permissão para excluir resultados');
+		}
+
+		const idAcademia = locals.idAcademia!;
+		const formData = await request.formData();
+
+		const validacao = excluirResultadoSchema.safeParse({
+			idClassificacao: formData.get('idClassificacao')
+		});
+
+		if (!validacao.success) {
+			const msg =
+				validacao.error.issues?.[0]?.message || 'Identificador de resultado inválido';
+			return fail(400, { erroResultado: msg });
+		}
+
+		try {
+			await removerResultadoCampeonato(idAcademia, validacao.data.idClassificacao);
+			return {
+				sucessoExclusaoResultado:
+					'Resultado do atleta removido com sucesso do quadro de medalhas.'
+			};
+		} catch (err: any) {
+			const msg = err.body?.message || err.message || 'Falha ao excluir resultado do atleta';
+			return fail(400, { erroResultado: msg });
+		}
 	}
 };

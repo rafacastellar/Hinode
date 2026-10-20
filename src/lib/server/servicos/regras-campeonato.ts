@@ -9,7 +9,11 @@ export {
 	FAIXAS_JUDO_ORDEM,
 	obterIndiceFaixa,
 	formatarIntervaloFaixas,
-	formatarIdadeLimite
+	formatarIdadeLimite,
+	SUGESTOES_CLASSIFICACAO_ACADEMIA,
+	correspondeClassificacaoAcademia,
+	ehPodioOuCampeao,
+	normalizarTexto
 } from '../../dominio/campeonato';
 import {
 	obterIndiceFaixa,

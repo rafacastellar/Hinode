@@ -139,6 +139,25 @@ export interface AlunoTutelaItem {
 	categoria: string | null;
 	status_federacao: string | null;
 	tem_turma: boolean;
+	nome_professor_responsavel?: string | null;
+}
+
+export interface PendenciaCampeonatoAutorizacao {
+	id_inscricao: number;
+	id_evento: number;
+	nome_campeonato: string;
+	data_campeonato: string | null;
+	id_aluno: number;
+	nome_aluno: string;
+	graduacao_atual: string;
+	nome_professor_responsavel?: string | null;
+}
+
+export interface PendenciasTecnicasDojo {
+	alunosSemPeso: AlunoTutelaItem[];
+	alunosSemTurma: AlunoTutelaItem[];
+	alunosFederacaoPendente: AlunoTutelaItem[];
+	campeonatosPendentesAutorizacao: PendenciaCampeonatoAutorizacao[];
 }
 
 export interface PainelProfessorDados {
@@ -155,11 +174,7 @@ export interface PainelProfessorDados {
 	totalAlunosSobTutela: number;
 	totalAlunosTurmas: number;
 	alunosSobTutela: AlunoTutelaItem[];
-	pendenciasTecnicas: {
-		alunosSemPeso: AlunoTutelaItem[];
-		alunosSemTurma: AlunoTutelaItem[];
-		alunosFederacaoPendente: AlunoTutelaItem[];
-	};
+	pendenciasTecnicas: PendenciasTecnicasDojo;
 	aniversariantes: AniversarianteItem[];
 	proximosEventos: MetricasDojo['proximosEventos'];
 }
@@ -194,6 +209,7 @@ export interface PainelResponsavelDados {
 	totalMedalhasFamilia: number;
 	totalPendenciasFamilia: number;
 	dependentes: DependenteItemPainel[];
+	pendenciasTecnicas: PendenciasTecnicasDojo;
 	proximosEventos: MetricasDojo['proximosEventos'];
 }
 
@@ -564,6 +580,43 @@ export async function obterPainelJudoca(
 		});
 	}
 
+	// A2) Campeonatos com inscrição aguardando autorização do responsável legal (quando menor)
+	const sqlCampResp = `
+		SELECT 
+			ie.id_inscricao,
+			ie.id_evento,
+			e.nome AS nome_campeonato,
+			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_evento
+		FROM Inscricao_Evento ie
+		INNER JOIN Campeonato c ON ie.id_evento = c.id_evento
+		INNER JOIN Evento e ON c.id_evento = e.id_evento
+		INNER JOIN Usuario u ON ie.id_aluno = u.id_usuario
+		WHERE e.id_academia = ? 
+		  AND ie.id_aluno = ? 
+		  AND COALESCE(ie.confirmado_responsavel, 0) = 0
+		  AND ie.status_inscricao != 'Cancelada'
+		  AND e.data_inicio >= CURDATE()
+		  AND TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) < 18
+		ORDER BY e.data_inicio ASC
+	`;
+	const [linhasCampResp] = await pool.execute<RowDataPacket[]>(sqlCampResp, [idAcademia, idUsuario]);
+	for (const cr of linhasCampResp) {
+		pendencias.push({
+			id: `camp-resp-${cr.id_inscricao}`,
+			tipo: 'confirmacao_campeonato',
+			gravidade: 'alta',
+			dependeDoAluno: true,
+			prazo: cr.data_evento,
+			idInscricao: Number(cr.id_inscricao),
+			idEvento: Number(cr.id_evento),
+			titulo: `Autorização de Campeonato: ${cr.nome_campeonato}`,
+			descricao: `Inscrição no torneio de ${cr.data_evento} aguarda autorização expressa do responsável legal para inclusão na chave de lutas.`,
+			textoBotao: 'Autorizar Participação',
+			href: `/dashboard/campeonatos/${cr.id_evento}`,
+			badge: 'Autorização Familiar'
+		});
+	}
+
 	// B) Exames de Graduação abertos onde o judoca é elegível e ainda não se inscreveu
 	const sqlExamesAbertos = `
 		SELECT 
@@ -902,10 +955,8 @@ export async function obterPainelProfessor(
 		tem_turma: Boolean(a.tem_turma)
 	}));
 
-	// 4. Filtrar pendências técnicas da tutela
-	const alunosSemPeso = alunosSobTutela.filter((a) => a.peso === null);
-	const alunosSemTurma = alunosSobTutela.filter((a) => !a.tem_turma);
-	const alunosFederacaoPendente = alunosSobTutela.filter((a) => a.status_federacao !== 'Ativo');
+	// 4. Pendências técnicas da tutela
+	const pendenciasTecnicas = await obterPendenciasTecnicasDojo(idAcademia, idUsuarioProfessor);
 
 	// 5. Total de alunos distintos nas turmas ministradas
 	const sqlTotalAlunosTurmas = `
@@ -941,13 +992,136 @@ export async function obterPainelProfessor(
 		totalAlunosSobTutela: alunosSobTutela.length,
 		totalAlunosTurmas,
 		alunosSobTutela,
-		pendenciasTecnicas: {
-			alunosSemPeso,
-			alunosSemTurma,
-			alunosFederacaoPendente
-		},
+		pendenciasTecnicas,
 		aniversariantes,
 		proximosEventos: metricasGerais.proximosEventos
+	};
+}
+
+/**
+ * Retorna as pendências técnicas de conformidade dos alunos (pesagem, alocação em turmas e federação).
+ * Pode ser filtrado por professor responsável (visão do sensei) ou abranger todo o dojo (visão admin/recepção).
+ */
+export async function obterPendenciasTecnicasDojo(
+	idAcademia: number,
+	idProfessorResponsavel?: number | null,
+	idResponsavel?: number | null
+): Promise<PendenciasTecnicasDojo> {
+	const pool = getDbPool();
+	let sql = `
+		SELECT 
+			u.id_usuario,
+			u.nome,
+			a.matricula,
+			a.graduacao_atual,
+			a.peso,
+			a.categoria,
+			a.status_federacao,
+			prof_u.nome AS nome_professor_responsavel,
+			EXISTS(SELECT 1 FROM Aluno_Treino at_sub WHERE at_sub.id_aluno = a.id_usuario) AS tem_turma
+		FROM Aluno a
+		INNER JOIN Usuario u ON u.id_usuario = a.id_usuario
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		LEFT JOIN Professor p ON p.id_usuario = a.id_professor_responsavel
+		LEFT JOIN Usuario prof_u ON prof_u.id_usuario = p.id_usuario
+	`;
+	const params: any[] = [];
+
+	if (idResponsavel) {
+		sql += ` INNER JOIN Responsavel_Aluno ra ON ra.id_aluno = a.id_usuario`;
+	}
+
+	sql += ` WHERE ua.id_academia = ?`;
+	params.push(idAcademia);
+
+	if (idProfessorResponsavel) {
+		sql += ` AND a.id_professor_responsavel = ?`;
+		params.push(idProfessorResponsavel);
+	}
+
+	if (idResponsavel) {
+		sql += ` AND ra.id_responsavel = ?`;
+		params.push(idResponsavel);
+	}
+
+	sql += ` ORDER BY u.nome ASC`;
+
+	const [rowsAlunos] = await pool.execute<RowDataPacket[]>(sql, params);
+	const alunos: AlunoTutelaItem[] = rowsAlunos.map((a) => ({
+		id_usuario: Number(a.id_usuario),
+		nome: String(a.nome),
+		matricula: a.matricula ? String(a.matricula) : null,
+		graduacao_atual: a.graduacao_atual ? String(a.graduacao_atual) : 'Branca',
+		peso: a.peso !== null ? Number(a.peso) : null,
+		categoria: a.categoria ? String(a.categoria) : null,
+		status_federacao: a.status_federacao ? String(a.status_federacao) : null,
+		tem_turma: Boolean(a.tem_turma),
+		nome_professor_responsavel: a.nome_professor_responsavel ? String(a.nome_professor_responsavel) : null
+	}));
+
+	// 2. Campeonatos com inscrição de menores aguardando autorização do responsável legal
+	let sqlCamp = `
+		SELECT 
+			ie.id_inscricao,
+			ie.id_evento,
+			e.nome AS nome_campeonato,
+			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_campeonato,
+			a.id_usuario AS id_aluno,
+			u.nome AS nome_aluno,
+			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
+			prof_u.nome AS nome_professor_responsavel
+		FROM Inscricao_Evento ie
+		INNER JOIN Evento e ON ie.id_evento = e.id_evento
+		INNER JOIN Campeonato c ON e.id_evento = c.id_evento
+		INNER JOIN Aluno a ON ie.id_aluno = a.id_usuario
+		INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
+		INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+		LEFT JOIN Professor p ON p.id_usuario = a.id_professor_responsavel
+		LEFT JOIN Usuario prof_u ON prof_u.id_usuario = p.id_usuario
+	`;
+	const paramsCamp: any[] = [];
+
+	if (idResponsavel) {
+		sqlCamp += ` INNER JOIN Responsavel_Aluno ra ON ra.id_aluno = a.id_usuario`;
+	}
+
+	sqlCamp += ` WHERE e.id_academia = ? AND ua.id_academia = ?`;
+	paramsCamp.push(idAcademia, idAcademia);
+
+	sqlCamp += ` AND COALESCE(ie.confirmado_responsavel, 0) = 0`;
+	sqlCamp += ` AND ie.status_inscricao != 'Cancelada'`;
+	sqlCamp += ` AND e.data_inicio >= CURDATE()`;
+	sqlCamp += ` AND TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) < 18`;
+
+	if (idProfessorResponsavel) {
+		sqlCamp += ` AND a.id_professor_responsavel = ?`;
+		paramsCamp.push(idProfessorResponsavel);
+	}
+
+	if (idResponsavel) {
+		sqlCamp += ` AND ra.id_responsavel = ?`;
+		paramsCamp.push(idResponsavel);
+	}
+
+	sqlCamp += ` ORDER BY e.data_inicio ASC, u.nome ASC`;
+
+	const [rowsCamp] = await pool.execute<RowDataPacket[]>(sqlCamp, paramsCamp);
+	const campeonatosPendentesAutorizacao: PendenciaCampeonatoAutorizacao[] = rowsCamp.map((r) => ({
+		id_inscricao: Number(r.id_inscricao),
+		id_evento: Number(r.id_evento),
+		nome_campeonato: String(r.nome_campeonato),
+		data_campeonato: r.data_campeonato ? String(r.data_campeonato) : null,
+		id_aluno: Number(r.id_aluno),
+		nome_aluno: String(r.nome_aluno),
+		graduacao_atual: String(r.graduacao_atual),
+		nome_professor_responsavel: r.nome_professor_responsavel ? String(r.nome_professor_responsavel) : null
+	}));
+
+	return {
+		alunosSemPeso: alunos.filter((a) => a.peso === null),
+		alunosSemTurma: alunos.filter((a) => !a.tem_turma),
+		alunosFederacaoPendente: alunos.filter((a) => a.status_federacao !== 'Ativo'),
+		campeonatosPendentesAutorizacao
 	};
 }
 
@@ -1031,6 +1205,11 @@ export async function obterPainelResponsavel(
 	}
 
 	const metricasGerais = await obterMetricasDoDojo(idAcademia);
+	const pendenciasTecnicas = await obterPendenciasTecnicasDojo(
+		idAcademia,
+		null,
+		idUsuarioResponsavel
+	);
 
 	return {
 		responsavel: {
@@ -1044,6 +1223,7 @@ export async function obterPainelResponsavel(
 		totalMedalhasFamilia,
 		totalPendenciasFamilia,
 		dependentes,
+		pendenciasTecnicas,
 		proximosEventos: metricasGerais.proximosEventos
 	};
 }

@@ -3,15 +3,15 @@
 	import StatCard from '#lib/components/ui/StatCard.svelte';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import CardAniversariantes from './CardAniversariantes.svelte';
+	import CardConformidadeAlunos from './CardConformidadeAlunos.svelte';
 	import {
 		Award,
 		Users,
 		Calendar,
 		Clock,
 		ArrowRight,
-		Scale,
-		AlertTriangle,
 		CheckCircle2,
+		AlertTriangle,
 		Sparkles,
 		Flame,
 		UserPlus,
@@ -30,7 +30,8 @@
 	const totalPendencias = $derived(
 		painel.pendenciasTecnicas.alunosSemPeso.length +
 			painel.pendenciasTecnicas.alunosSemTurma.length +
-			painel.pendenciasTecnicas.alunosFederacaoPendente.length
+			painel.pendenciasTecnicas.alunosFederacaoPendente.length +
+			(painel.pendenciasTecnicas.campeonatosPendentesAutorizacao?.length || 0)
 	);
 </script>
 
@@ -219,122 +220,7 @@
 			<!-- ===================================================================== -->
 			<!-- ALERTAS & PENDÊNCIAS TÉCNICAS DA TUTELA                               -->
 			<!-- ===================================================================== -->
-			<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
-				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-					<div class="flex items-center gap-2.5">
-						<div
-							class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400"
-						>
-							<AlertTriangle class="w-4 h-4 text-red-400" />
-						</div>
-						<div>
-							<h2 class="text-sm font-bold text-white font-display">
-								Conformidade & Pendências dos Alunos
-							</h2>
-							<p class="text-[11px] text-zinc-500">
-								Atletas sob sua tutela que necessitam de intervenção ou regularização
-							</p>
-						</div>
-					</div>
-					{#if totalPendencias === 0}
-						<span
-							class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800 text-emerald-400"
-						>
-							✓ 100% Em Dia
-						</span>
-					{/if}
-				</div>
-
-				{#if totalPendencias === 0}
-					<div class="py-6 text-center space-y-1.5">
-						<CheckCircle2 class="w-8 h-8 mx-auto text-emerald-500" />
-						<p class="text-xs text-zinc-300 font-semibold">Nenhuma pendência técnica encontrada!</p>
-						<p class="text-[11px] text-zinc-500">
-							Todos os judocas sob sua responsabilidade estão devidamente pesados e matriculados em turmas.
-						</p>
-					</div>
-				{:else}
-					<div class="space-y-3">
-						<!-- 1. Alunos sem peso -->
-						{#if painel.pendenciasTecnicas.alunosSemPeso.length > 0}
-							<div class="p-4 rounded-xl bg-amber-950/20 border border-amber-800/50 space-y-2">
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-2 text-xs font-bold text-amber-300">
-										<Scale class="w-4 h-4 text-amber-400" />
-										<span>Pesagem Pendente ({painel.pendenciasTecnicas.alunosSemPeso.length} aluno(s))</span>
-									</div>
-									<span class="text-[10px] font-mono text-amber-400/80">Necessário para competições</span>
-								</div>
-								<p class="text-[11px] text-zinc-400">
-									Os seguintes judocas ainda não tiveram seu peso corporal registrado no dojo:
-								</p>
-								<div class="flex items-center gap-2 flex-wrap pt-1">
-									{#each painel.pendenciasTecnicas.alunosSemPeso as a}
-										<a
-											href="/dashboard/alunos/{a.id_usuario}"
-											class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-amber-500 transition-colors"
-										>
-											<span>{a.nome}</span>
-											<BadgeFaixa faixa={a.graduacao_atual} size="sm" />
-										</a>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						<!-- 2. Alunos sem turma vinculada -->
-						{#if painel.pendenciasTecnicas.alunosSemTurma.length > 0}
-							<div class="p-4 rounded-xl bg-red-950/20 border border-red-800/50 space-y-2">
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-2 text-xs font-bold text-red-300">
-										<Users class="w-4 h-4 text-red-400" />
-										<span>Sem Turma Vinculada ({painel.pendenciasTecnicas.alunosSemTurma.length} aluno(s))</span>
-									</div>
-									<span class="text-[10px] font-mono text-red-400/80">Alocação no tatame</span>
-								</div>
-								<p class="text-[11px] text-zinc-400">
-									Judocas que respondem a você mas não estão matriculados em nenhum horário semanal:
-								</p>
-								<div class="flex items-center gap-2 flex-wrap pt-1">
-									{#each painel.pendenciasTecnicas.alunosSemTurma as a}
-										<a
-											href="/dashboard/alunos/{a.id_usuario}"
-											class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-red-500 transition-colors"
-										>
-											<span>{a.nome}</span>
-											<BadgeFaixa faixa={a.graduacao_atual} size="sm" />
-										</a>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						<!-- 3. Alunos com federação pendente -->
-						{#if painel.pendenciasTecnicas.alunosFederacaoPendente.length > 0}
-							<div class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-2 text-xs font-bold text-zinc-300">
-										<Award class="w-4 h-4 text-zinc-400" />
-										<span>Federação Pendente ({painel.pendenciasTecnicas.alunosFederacaoPendente.length} aluno(s))</span>
-									</div>
-									<span class="text-[10px] font-mono text-zinc-500">FPJ / CBJ</span>
-								</div>
-								<div class="flex items-center gap-2 flex-wrap pt-1">
-									{#each painel.pendenciasTecnicas.alunosFederacaoPendente as a}
-										<a
-											href="/dashboard/alunos/{a.id_usuario}"
-											class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 hover:border-zinc-600 transition-colors"
-										>
-											<span>{a.nome}</span>
-											<span class="text-[10px] text-amber-400 font-mono">({a.status_federacao || 'Pendente'})</span>
-										</a>
-									{/each}
-								</div>
-							</div>
-						{/if}
-					</div>
-				{/if}
-			</section>
+			<CardConformidadeAlunos pendencias={painel.pendenciasTecnicas} escopo="tutela" />
 
 			<!-- ===================================================================== -->
 			<!-- PRÓXIMOS EVENTOS DO DOJO                                              -->

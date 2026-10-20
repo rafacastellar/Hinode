@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PainelResponsavelDados } from '#lib/server/repositorios/dashboard.repo';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import CardConformidadeAlunos from './CardConformidadeAlunos.svelte';
 	import {
 		HeartHandshake,
 		Users,
@@ -126,6 +127,22 @@
 			</div>
 		</div>
 	{:else}
+		<!-- ========================================================================= -->
+		<!-- CONFORMIDADE & PENDÊNCIAS TÉCNICAS DOS TUTELADOS                          -->
+		<!-- ========================================================================= -->
+		{#if painel.pendenciasTecnicas}
+			<CardConformidadeAlunos
+				pendencias={painel.pendenciasTecnicas}
+				escopo="responsavel"
+				onSelecionarAluno={(idAluno) => {
+					const idx = painel.dependentes.findIndex((d) => d.aluno.id_usuario === idAluno);
+					if (idx !== -1) {
+						indiceSelecionado = idx;
+					}
+				}}
+			/>
+		{/if}
+
 		<!-- ========================================================================= -->
 		<!-- 2. SELETOR DE ATLETA TUTELADO (TABS MULTI-FILHOS)                         -->
 		<!-- ========================================================================= -->

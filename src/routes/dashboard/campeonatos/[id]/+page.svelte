@@ -22,8 +22,11 @@
 		Filter,
 		Edit3,
 		DollarSign,
-		Sparkles
+		Sparkles,
+		Save,
+		X
 	} from '@lucide/svelte';
+	import { SUGESTOES_CLASSIFICACAO_ACADEMIA } from '#lib/dominio/campeonato';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -33,9 +36,44 @@
 	let carregandoInscricao = $state(false);
 	let carregandoAcao = $state(false);
 	let carregandoResultado = $state(false);
+	let carregandoClassificacaoDojo = $state(false);
 	let carregandoAutoInscricao = $state(false);
 	let carregandoExclusao = $state(false);
 	let modalExclusaoAberto = $state(false);
+
+	// Modais de Edição e Exclusão de Resultado do Atleta
+	let modalEditarResultadoAberto = $state(false);
+	let modalExcluirResultadoAberto = $state(false);
+	let carregandoEdicaoResultado = $state(false);
+	let carregandoExclusaoResultado = $state(false);
+	let resultadoEmEdicao = $state<{
+		id_classificacao: number;
+		id_aluno: number;
+		nome_aluno: string;
+		faixa_aluno: string;
+		classificacao_aluno: string;
+		qtd_lutas: number;
+		qtd_vitorias: number;
+	} | null>(null);
+	let resultadoEmExclusao = $state<{
+		id_classificacao: number;
+		nome_aluno: string;
+		classificacao_aluno: string;
+	} | null>(null);
+
+	function abrirEdicaoResultado(res: (typeof data.resultados)[number]) {
+		resultadoEmEdicao = { ...res };
+		modalEditarResultadoAberto = true;
+	}
+
+	function abrirExclusaoResultado(res: (typeof data.resultados)[number]) {
+		resultadoEmExclusao = {
+			id_classificacao: res.id_classificacao,
+			nome_aluno: res.nome_aluno,
+			classificacao_aluno: res.classificacao_aluno
+		};
+		modalExcluirResultadoAberto = true;
+	}
 
 	// Filtro de alunos já inscritos no campeonato
 	const idsAlunosInscritos = $derived(
@@ -129,6 +167,14 @@
 						<span class="text-purple-400 font-bold uppercase text-[10px]">Período de Inscrição:</span>
 						<span class="font-semibold text-white">{data.rotuloPeriodoInscricao}</span>
 					</div>
+
+					{#if data.campeonato.classificacao_academia}
+						<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono bg-amber-950/60 border border-amber-800/80 text-amber-300 shadow-sm">
+							<Trophy class="w-3.5 h-3.5 text-amber-400 shrink-0" />
+							<span class="text-amber-400/80 uppercase text-[10px] font-bold">Colocação Hinodê:</span>
+							<span class="font-extrabold text-amber-200">{data.campeonato.classificacao_academia}</span>
+						</div>
+					{/if}
 				</div>
 			</div>
 
@@ -207,6 +253,34 @@
 		<div class="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs sm:text-sm flex items-center gap-3">
 			<CheckCircle2 class="w-5 h-5 text-red-400 shrink-0" />
 			<span>{form.sucessoRemocao}</span>
+		</div>
+	{/if}
+
+	{#if form?.sucessoClassificacaoDojo}
+		<div class="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-emerald-400 shrink-0" />
+			<span>{form.sucessoClassificacaoDojo}</span>
+		</div>
+	{/if}
+
+	{#if form?.sucessoEdicaoResultado}
+		<div class="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-emerald-400 shrink-0" />
+			<span>{form.sucessoEdicaoResultado}</span>
+		</div>
+	{/if}
+
+	{#if form?.sucessoExclusaoResultado}
+		<div class="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs sm:text-sm flex items-center gap-3">
+			<CheckCircle2 class="w-5 h-5 text-red-400 shrink-0" />
+			<span>{form.sucessoExclusaoResultado}</span>
+		</div>
+	{/if}
+
+	{#if form?.erroClassificacaoDojo}
+		<div class="p-4 rounded-xl bg-red-950/40 border border-red-800/80 text-red-200 text-xs sm:text-sm flex items-center gap-3">
+			<AlertCircle class="w-5 h-5 text-red-400 shrink-0" />
+			<span>{form.erroClassificacaoDojo}</span>
 		</div>
 	{/if}
 
@@ -861,7 +935,96 @@
 	<!-- ========================================================================= -->
 	{#if abaAtiva === 'resultados'}
 		<div class="space-y-6">
-			<!-- Alerta de erro de resultado -->
+			<!-- CARD DE COLOCAÇÃO GERAL DA ACADEMIA NO CAMPEONATO -->
+			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-900">
+					<div class="flex items-center gap-2.5">
+						<div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+							<Trophy class="w-4 h-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-bold text-white font-display">
+								Colocação Geral da Hinodê no Campeonato
+							</h3>
+							<p class="text-[11px] text-zinc-500">
+								Classificação geral da equipe/dojo no quadro oficial da federação ou torneio
+							</p>
+						</div>
+					</div>
+
+					{#if data.campeonato.classificacao_academia}
+						<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-950/60 border border-amber-800/80 text-amber-300">
+							<Trophy class="w-3.5 h-3.5 text-amber-400" />
+							<span>{data.campeonato.classificacao_academia}</span>
+						</span>
+					{:else}
+						<span class="px-2.5 py-0.5 rounded-full text-[11px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800">
+							Ainda não lançada
+						</span>
+					{/if}
+				</div>
+
+				{#if data.ehProfessorOuAdmin}
+					<form
+						action="?/salvarClassificacaoDojo"
+						method="POST"
+						use:enhance={() => {
+							carregandoClassificacaoDojo = true;
+							return async ({ update }) => {
+								await update();
+								carregandoClassificacaoDojo = false;
+							};
+						}}
+						class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3"
+					>
+						<div class="flex-1">
+							<label for="classificacaoAcademia" class="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+								Colocação da Academia (Texto Livre - ex: Campeã, 2º Lugar, Décima, Vigésima...)
+							</label>
+							<div class="relative">
+								<input
+									type="text"
+									id="classificacaoAcademia"
+									name="classificacaoAcademia"
+									list="sugestoesClassificacaoDojo"
+									value={data.campeonato.classificacao_academia || ''}
+									placeholder="Ex: Campeã Geral, Vice-campeã, 3º Lugar Geral, 10ª Colocada, Vigésima..."
+									class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 font-medium"
+								/>
+								<datalist id="sugestoesClassificacaoDojo">
+									{#each SUGESTOES_CLASSIFICACAO_ACADEMIA as sugestao}
+										<option value={sugestao}></option>
+									{/each}
+								</datalist>
+							</div>
+							<span class="text-[10px] text-zinc-500 mt-1 block">
+								Campo livre: registre qualquer colocação ou troféu do dojo. Deixe em branco para remover.
+							</span>
+						</div>
+
+						<button
+							type="submit"
+							disabled={carregandoClassificacaoDojo}
+							class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-colors shrink-0 disabled:opacity-50"
+						>
+							{#if carregandoClassificacaoDojo}
+								<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+								<span>Gravando...</span>
+							{:else}
+								<Save class="w-4 h-4" />
+								<span>Salvar Colocação</span>
+							{/if}
+						</button>
+					</form>
+				{:else if data.campeonato.classificacao_academia}
+					<div class="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 text-xs text-zinc-300 flex items-center gap-2.5">
+						<Trophy class="w-4 h-4 text-amber-400 shrink-0" />
+						<span>Colocação oficial do dojo Hinodê: <strong class="text-amber-300">{data.campeonato.classificacao_academia}</strong></span>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Alerta de erro de resultado individual -->
 			{#if form?.erroResultado}
 				<div class="p-4 rounded-xl bg-red-950/40 border border-red-800/80 text-red-200 text-xs flex items-center gap-2">
 					<AlertCircle class="w-4 h-4 text-red-400 shrink-0" />
@@ -996,6 +1159,9 @@
 									<th class="px-6 py-3.5">Classificação / Pódio</th>
 									<th class="px-6 py-3.5">Combates</th>
 									<th class="px-6 py-3.5">Vitórias</th>
+									{#if data.ehProfessorOuAdmin}
+										<th class="px-6 py-3.5 text-right">Ações</th>
+									{/if}
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-zinc-900">
@@ -1026,6 +1192,31 @@
 										</td>
 										<td class="px-6 py-3.5 font-mono">{res.qtd_lutas}</td>
 										<td class="px-6 py-3.5 font-mono text-emerald-400 font-bold">{res.qtd_vitorias}</td>
+										{#if data.ehProfessorOuAdmin}
+											<td class="px-6 py-3.5 text-right">
+												<div class="flex items-center justify-end gap-1.5">
+													<button
+														type="button"
+														onclick={() => abrirEdicaoResultado(res)}
+														class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 hover:text-white transition-colors"
+														title="Alterar resultado do atleta"
+													>
+														<Edit3 class="w-3.5 h-3.5 text-zinc-400" />
+														<span>Alterar</span>
+													</button>
+
+													<button
+														type="button"
+														onclick={() => abrirExclusaoResultado(res)}
+														class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-950/30 hover:bg-red-900/50 border border-red-900/50 text-xs text-red-400 hover:text-red-300 transition-colors"
+														title="Apagar lançamento equivocado"
+													>
+														<Trash2 class="w-3.5 h-3.5" />
+														<span>Apagar</span>
+													</button>
+												</div>
+											</td>
+										{/if}
 									</tr>
 								{/each}
 							</tbody>
@@ -1107,6 +1298,208 @@
 					</button>
 				</form>
 			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ========================================================================= -->
+<!-- MODAL DE EDIÇÃO DE RESULTADO DO ATLETA -->
+<!-- ========================================================================= -->
+{#if modalEditarResultadoAberto && resultadoEmEdicao}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="w-full max-w-lg p-6 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl space-y-5">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2.5">
+					<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400 shrink-0">
+						<Medal class="w-4 h-4" />
+					</div>
+					<div>
+						<h3 class="text-sm font-bold text-white font-display">
+							Alterar Resultado do Judoca
+						</h3>
+						<p class="text-[11px] text-zinc-400">
+							{resultadoEmEdicao.nome_aluno} • Faixa {resultadoEmEdicao.faixa_aluno}
+						</p>
+					</div>
+				</div>
+				<button
+					type="button"
+					onclick={() => (modalEditarResultadoAberto = false)}
+					class="text-zinc-500 hover:text-white transition-colors"
+					title="Fechar"
+				>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<form
+				action="?/editarResultado"
+				method="POST"
+				use:enhance={() => {
+					carregandoEdicaoResultado = true;
+					return async ({ update }) => {
+						await update();
+						carregandoEdicaoResultado = false;
+						modalEditarResultadoAberto = false;
+					};
+				}}
+				class="space-y-4"
+			>
+				<input type="hidden" name="idClassificacao" value={resultadoEmEdicao.id_classificacao} />
+
+				<div>
+					<label for="modalClassificacaoAluno" class="block text-xs font-mono uppercase text-zinc-400 mb-1">
+						Classificação / Pódio *
+					</label>
+					<select
+						id="modalClassificacaoAluno"
+						name="classificacaoAluno"
+						bind:value={resultadoEmEdicao.classificacao_aluno}
+						required
+						class="w-full px-3 py-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600"
+					>
+						<option value="Ouro / Campeão">🥇 Ouro / Campeão</option>
+						<option value="Prata / Vice-Campeão">🥈 Prata / Vice-Campeão</option>
+						<option value="Bronze (3º Lugar)">🥉 Bronze (3º Lugar)</option>
+						<option value="5º Lugar">5º Lugar</option>
+						<option value="Participação">Participação</option>
+					</select>
+				</div>
+
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label for="modalQtdLutas" class="block text-xs font-mono uppercase text-zinc-400 mb-1">
+							Total de Lutas *
+						</label>
+						<input
+							type="number"
+							id="modalQtdLutas"
+							name="qtdLutas"
+							bind:value={resultadoEmEdicao.qtd_lutas}
+							required
+							min="0"
+							class="w-full px-3 py-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600"
+						/>
+					</div>
+					<div>
+						<label for="modalQtdVitorias" class="block text-xs font-mono uppercase text-zinc-400 mb-1">
+							Vitórias *
+						</label>
+						<input
+							type="number"
+							id="modalQtdVitorias"
+							name="qtdVitorias"
+							bind:value={resultadoEmEdicao.qtd_vitorias}
+							required
+							min="0"
+							class="w-full px-3 py-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600"
+						/>
+					</div>
+				</div>
+
+				{#if resultadoEmEdicao.qtd_vitorias > resultadoEmEdicao.qtd_lutas}
+					<p class="text-xs text-red-400">
+						O número de vitórias não pode ser maior do que o total de lutas disputadas.
+					</p>
+				{/if}
+
+				<div class="pt-3 border-t border-zinc-900 flex items-center justify-end gap-2">
+					<button
+						type="button"
+						onclick={() => (modalEditarResultadoAberto = false)}
+						class="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 transition-colors"
+					>
+						Cancelar
+					</button>
+					<button
+						type="submit"
+						disabled={carregandoEdicaoResultado || resultadoEmEdicao.qtd_vitorias > resultadoEmEdicao.qtd_lutas}
+						class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors disabled:opacity-50"
+					>
+						{#if carregandoEdicaoResultado}
+							<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+							<span>Salvando...</span>
+						{:else}
+							<Save class="w-3.5 h-3.5" />
+							<span>Salvar Alterações</span>
+						{/if}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- ========================================================================= -->
+<!-- MODAL DE EXCLUSÃO DE RESULTADO DO ATLETA -->
+<!-- ========================================================================= -->
+{#if modalExcluirResultadoAberto && resultadoEmExclusao}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="w-full max-w-md p-6 rounded-2xl bg-zinc-950 border border-red-950/80 shadow-2xl space-y-4">
+			<div class="flex items-center gap-3">
+				<div class="w-10 h-10 rounded-xl bg-red-950/60 border border-red-800 flex items-center justify-center text-red-400 shrink-0">
+					<Trash2 class="w-5 h-5" />
+				</div>
+				<div>
+					<h3 class="text-sm font-bold text-white font-display">Apagar Lançamento de Resultado</h3>
+					<p class="text-xs text-zinc-400">Correção de lançamento equivocado</p>
+				</div>
+			</div>
+
+			<div class="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs text-zinc-300 space-y-1">
+				<p>
+					Deseja realmente apagar o resultado de <strong class="text-white">{resultadoEmExclusao.nome_aluno}</strong> ({resultadoEmExclusao.classificacao_aluno})?
+				</p>
+				<p class="text-zinc-500 text-[11px] pt-1">
+					O pódio e as vitórias serão removidos do quadro de medalhas. O atleta continuará inscrito no campeonato normalmente.
+				</p>
+			</div>
+
+			<form
+				action="?/excluirResultado"
+				method="POST"
+				use:enhance={() => {
+					carregandoExclusaoResultado = true;
+					return async ({ update }) => {
+						await update();
+						carregandoExclusaoResultado = false;
+						modalExcluirResultadoAberto = false;
+					};
+				}}
+				class="flex items-center justify-end gap-2 pt-2"
+			>
+				<input type="hidden" name="idClassificacao" value={resultadoEmExclusao.id_classificacao} />
+
+				<button
+					type="button"
+					onclick={() => (modalExcluirResultadoAberto = false)}
+					class="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 transition-colors"
+				>
+					Cancelar
+				</button>
+
+				<button
+					type="submit"
+					disabled={carregandoExclusaoResultado}
+					class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors disabled:opacity-50"
+				>
+					{#if carregandoExclusaoResultado}
+						<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+						<span>Removendo...</span>
+					{:else}
+						<Trash2 class="w-3.5 h-3.5" />
+						<span>Confirmar Exclusão</span>
+					{/if}
+				</button>
+			</form>
 		</div>
 	</div>
 {/if}

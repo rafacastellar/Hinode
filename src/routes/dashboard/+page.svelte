@@ -22,6 +22,7 @@
 	import PainelResponsavel from '#lib/components/dashboard/PainelResponsavel.svelte';
 	import SeletorPerspectiva from '#lib/components/dashboard/SeletorPerspectiva.svelte';
 	import CardAniversariantes from '#lib/components/dashboard/CardAniversariantes.svelte';
+	import CardConformidadeAlunos from '#lib/components/dashboard/CardConformidadeAlunos.svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>
@@ -34,7 +35,9 @@
 				? 'Tatame do Sensei - Judô Hinodê'
 				: data.visaoAtiva === 'responsavel'
 					? 'Painel da Família - Judô Hinodê'
-					: 'Gestão do Dojo - Judô Hinodê'}
+					: data.visaoAtiva === 'recepcao'
+						? 'Secretaria & Recepção - Judô Hinodê'
+						: 'Gestão do Dojo - Judô Hinodê'}
 	</title>
 </svelte:head>
 
@@ -78,8 +81,9 @@
 					Bem-vindo ao Tatame, {data.usuario?.nome}
 				</h1>
 				<p class="text-sm text-zinc-400 mt-1 max-w-2xl">
-					Painel central de controle pedagógico, graduações imutáveis e gestão multi-tenant do
-					seu dojo de Judô.
+					{data.visaoAtiva === 'recepcao'
+						? 'Painel de atendimento, matrículas e conformidade de judocas do dojo.'
+						: 'Painel central de controle pedagógico, graduações imutáveis e gestão multi-tenant do seu dojo de Judô.'}
 				</p>
 			</div>
 
@@ -147,6 +151,11 @@
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		<!-- Coluna da Esquerda (2 slots): Ações Rápidas de Operação -->
 		<div class="lg:col-span-2 space-y-6">
+			<!-- Conformidade & Pendências dos Alunos (Admin & Recepção) -->
+			{#if data.pendenciasTecnicas}
+				<CardConformidadeAlunos pendencias={data.pendenciasTecnicas} escopo="geral" />
+			{/if}
+
 			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900">
 				<div class="flex items-center justify-between mb-5">
 					<div>

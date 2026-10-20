@@ -4,7 +4,8 @@ import {
 	obterPainelJudoca,
 	obterPainelProfessor,
 	obterPainelResponsavel,
-	obterAniversariantesDaSemana
+	obterAniversariantesDaSemana,
+	obterPendenciasTecnicasDojo
 } from '#lib/server/repositorios/dashboard.repo';
 import { temPermissao } from '#lib/server/auth/rbac';
 
@@ -41,7 +42,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		} else if (temProfessor) {
 			visaoAtiva = 'professor';
 		} else if (temRecepcao) {
-			visaoAtiva = 'admin'; // ou recepção quando implementado
+			visaoAtiva = 'recepcao';
 		} else if (temAluno) {
 			visaoAtiva = 'aluno';
 		} else if (temResponsavel) {
@@ -54,6 +55,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	let painelProfessor = null;
 	let painelResponsavel = null;
 	let aniversariantes = null;
+	let pendenciasTecnicas = null;
 
 	if (visaoAtiva === 'aluno' && idUsuario) {
 		painelJudoca = await obterPainelJudoca(idAcademia, idUsuario);
@@ -74,6 +76,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		aniversariantes = await obterAniversariantesDaSemana(idAcademia);
 	}
 
+	// Pendências técnicas de conformidade de alunos para a equipe administrativa e recepção do dojo
+	if (
+		visaoAtiva === 'admin' ||
+		visaoAtiva === 'recepcao' ||
+		(!painelJudoca && !painelProfessor && !painelResponsavel && (temAdmin || temRecepcao))
+	) {
+		pendenciasTecnicas = await obterPendenciasTecnicasDojo(idAcademia);
+	}
+
 	const metricas = await obterMetricasDoDojo(idAcademia);
 
 	return {
@@ -87,6 +98,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		painelProfessor,
 		painelResponsavel,
 		aniversariantes,
+		pendenciasTecnicas,
 		metricas,
 		podeVerAlunos: temPermissao(perfis, 'ALUNOS_VER'),
 		podeCriarAlunos: temPermissao(perfis, 'ALUNOS_CRIAR'),
