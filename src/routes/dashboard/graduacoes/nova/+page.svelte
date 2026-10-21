@@ -2,6 +2,7 @@
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import { OPCOES_FAIXAS_CADASTRO, LISTA_TODAS_FAIXAS_VALORES } from '#lib/dominio/graduacao';
 	import {
 		Award,
 		Calendar,
@@ -19,21 +20,7 @@
 	let alunoIdSelecionado = $state<number | ''>('');
 	let novaFaixaSelecionada = $state('Cinza');
 
-	const faixasDisponiveis = [
-		'Branca',
-		'Cinza',
-		'Azul',
-		'Amarela',
-		'Laranja',
-		'Verde',
-		'Roxa',
-		'Marrom',
-		'Preta (1º Dan)',
-		'Preta (2º Dan)',
-		'Preta (3º Dan)',
-		'Preta (4º Dan)',
-		'Preta (5º Dan)'
-	];
+	const faixasDisponiveis = LISTA_TODAS_FAIXAS_VALORES;
 
 	// Localiza o judoca selecionado para exibir sua faixa atual
 	const judocaSelecionado = $derived(
@@ -174,8 +161,8 @@
 					required
 					class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 				>
-					{#each faixasDisponiveis as faixa}
-						<option value={faixa}>{faixa}</option>
+					{#each OPCOES_FAIXAS_CADASTRO as opt}
+						<option value={opt.valor}>{opt.rotulo}</option>
 					{/each}
 				</select>
 			</div>

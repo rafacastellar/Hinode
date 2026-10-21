@@ -22,6 +22,7 @@
 	} from '@lucide/svelte';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import { obterClassificacaoJudo } from '#lib/dominio/regras-categoria-peso';
+	import { OPCOES_FAIXAS_CADASTRO, LISTA_TODAS_FAIXAS_VALORES, normalizarFaixaParaCadastro } from '#lib/dominio/graduacao';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -129,22 +130,12 @@
 		if (v.statusFederacao) statusFederacao = String(v.statusFederacao);
 		if (v.dataInicio) dataInicio = String(v.dataInicio);
 		if (v.dataPrimeiraGraduacao) dataPrimeiraGraduacao = String(v.dataPrimeiraGraduacao);
-		if (v.graduacaoAtual) graduacaoSelecionada = String(v.graduacaoAtual);
+		if (v.graduacaoAtual) graduacaoSelecionada = normalizarFaixaParaCadastro(String(v.graduacaoAtual));
 		if (v.grupoEspecialAspirante) grupoEspecialAspirante = String(v.grupoEspecialAspirante);
 		if (v.idProfessorResponsavel) idProfessorResponsavel = Number(v.idProfessorResponsavel);
 	});
 
-	const faixasDisponiveis = [
-		'Branca',
-		'Cinza',
-		'Azul',
-		'Amarela',
-		'Laranja',
-		'Verde',
-		'Roxa',
-		'Marrom',
-		'Preta'
-	];
+	const faixasDisponiveis = LISTA_TODAS_FAIXAS_VALORES;
 
 	function selecionar(c: Candidato) {
 		if (c.ja_matriculado) return;
@@ -581,9 +572,12 @@
 								required
 								class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 							>
-								{#each faixasDisponiveis as faixa}
-									<option value={faixa}>{faixa}</option>
+								{#each OPCOES_FAIXAS_CADASTRO as opt}
+									<option value={opt.valor}>{opt.rotulo}</option>
 								{/each}
+								{#if graduacaoSelecionada && !LISTA_TODAS_FAIXAS_VALORES.includes(graduacaoSelecionada)}
+									<option value={graduacaoSelecionada}>{graduacaoSelecionada} (Atual)</option>
+								{/if}
 							</select>
 							<BadgeFaixa faixa={graduacaoSelecionada} size="md" />
 						</div>

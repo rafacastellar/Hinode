@@ -437,9 +437,6 @@
 										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'}">
 											Sensei
 										</th>
-										{#if modoDensidade === 'detalhada'}
-											<th class="px-6 py-4">Matrícula</th>
-										{/if}
 										<th class="{modoDensidade === 'compacta' ? 'px-4 py-2.5' : 'px-6 py-4'} text-right">
 											Ações
 										</th>
@@ -448,25 +445,49 @@
 								<tbody class="divide-y divide-zinc-900">
 									{#each alunosOrdenados as aluno}
 										<tr class="hover:bg-zinc-900/30 transition-colors group">
-											<!-- Nome & CPF -->
+											<!-- Judoca (Matrícula antes do Nome, sem exibição de CPF) -->
 											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
-												<a
-													href="/dashboard/alunos/{aluno.id_usuario}"
-													class="font-semibold text-white group-hover:text-red-400 transition-colors block {modoDensidade === 'compacta' ? 'text-xs' : ''}"
-												>
-													{aluno.nome}
-												</a>
-												<div class="text-[10px] font-mono text-zinc-500 mt-0.5">
-													CPF: {aluno.cpf.slice(0, 3)}.***.***-{aluno.cpf.slice(-2)}
-													{#if modoDensidade === 'compacta' && aluno.matricula}
-														<span class="text-zinc-600 ml-1.5">• Mat: {aluno.matricula}</span>
-													{/if}
-												</div>
+												{#if modoDensidade === 'detalhada'}
+													<div class="flex flex-col gap-1 items-start">
+														{#if aluno.matricula}
+															<span
+																class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase tracking-wider bg-zinc-900 border border-zinc-800 text-zinc-300"
+															>
+																{aluno.matricula}
+															</span>
+														{/if}
+														<a
+															href="/dashboard/alunos/{aluno.id_usuario}"
+															class="font-semibold text-white group-hover:text-red-400 transition-colors block text-sm"
+														>
+															{aluno.nome}
+														</a>
+													</div>
+												{:else}
+													<div class="flex items-center gap-2">
+														{#if aluno.matricula}
+															<span
+																class="font-mono text-[10px] font-semibold text-zinc-400 bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800 shrink-0"
+															>
+																{aluno.matricula}
+															</span>
+														{/if}
+														<a
+															href="/dashboard/alunos/{aluno.id_usuario}"
+															class="font-semibold text-white group-hover:text-red-400 transition-colors text-xs truncate"
+														>
+															{aluno.nome}
+														</a>
+													</div>
+												{/if}
 											</td>
 
-											<!-- Faixa Atual -->
+											<!-- Faixa Atual com maior destaque na versão detalhada -->
 											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
-												<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+												<BadgeFaixa
+													faixa={aluno.graduacao_atual}
+													size={modoDensidade === 'detalhada' ? 'md' : 'sm'}
+												/>
 											</td>
 
 											<!-- Idade & Menoridade -->
@@ -544,13 +565,6 @@
 											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2 text-xs' : 'px-6 py-4'} text-zinc-300">
 												{aluno.nome_professor_responsavel}
 											</td>
-
-											<!-- Matrícula (quando detalhada) -->
-											{#if modoDensidade === 'detalhada'}
-												<td class="px-6 py-4 font-mono text-zinc-400">
-													{aluno.matricula || '-'}
-												</td>
-											{/if}
 
 											<!-- Ações -->
 											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} text-right">

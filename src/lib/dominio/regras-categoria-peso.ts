@@ -348,6 +348,7 @@ export function calcularDivisao(graduacao: string | null | undefined): DivisaoJu
 		g.includes('preta') ||
 		g.includes('dan') ||
 		g.includes('coral') ||
+		g.includes('kodansha') ||
 		g.includes('vermelha')
 	) {
 		return 'Especial';

@@ -18,6 +18,11 @@
 		Info
 	} from '@lucide/svelte';
 	import { obterClassificacaoJudo } from '#lib/dominio/regras-categoria-peso';
+	import {
+		OPCOES_FAIXAS_CADASTRO,
+		LISTA_TODAS_FAIXAS_VALORES,
+		normalizarFaixaParaCadastro
+	} from '#lib/dominio/graduacao';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -66,7 +71,7 @@
 		statusFederacao = data.aluno.status_federacao || 'Ativo';
 		dataInicio = data.aluno.data_inicio || '';
 		dataPrimeiraGraduacao = data.aluno.data_primeira_graduacao || '';
-		graduacaoSelecionada = data.aluno.graduacao_atual || 'Branca';
+		graduacaoSelecionada = normalizarFaixaParaCadastro(data.aluno.graduacao_atual) || 'Branca';
 		grupoEspecialAspirante = data.aluno.grupo_especial_aspirante || '';
 		idProfessorResponsavel = data.aluno.id_professor_responsavel || '';
 	});
@@ -92,17 +97,7 @@
 		}
 	});
 
-	const faixasDisponiveis = [
-		'Branca',
-		'Cinza',
-		'Azul',
-		'Amarela',
-		'Laranja',
-		'Verde',
-		'Roxa',
-		'Marrom',
-		'Preta'
-	];
+	const faixasDisponiveis = LISTA_TODAS_FAIXAS_VALORES;
 </script>
 
 <svelte:head>
@@ -319,7 +314,7 @@
 				<!-- Graduação / Faixa Atual -->
 				<div>
 					<label for="graduacaoAtual" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Graduação Atual (Faixa) *
+						Graduação Atual (Faixa & Dan) *
 					</label>
 					<div class="flex items-center gap-3">
 						<select
@@ -329,9 +324,12 @@
 							required
 							class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 						>
-							{#each faixasDisponiveis as faixa}
-								<option value={faixa}>{faixa}</option>
+							{#each OPCOES_FAIXAS_CADASTRO as opt}
+								<option value={opt.valor}>{opt.rotulo}</option>
 							{/each}
+							{#if graduacaoSelecionada && !LISTA_TODAS_FAIXAS_VALORES.includes(graduacaoSelecionada)}
+								<option value={graduacaoSelecionada}>{graduacaoSelecionada} (Atual)</option>
+							{/if}
 						</select>
 						<BadgeFaixa faixa={graduacaoSelecionada} size="md" />
 					</div>

@@ -41,6 +41,27 @@ export function obterIndiceClasseIdade(categoriaTexto: string | null | undefined
 }
 
 /**
+ * Extrai o número do grau Dan (1 a 10) de uma faixa se presente.
+ */
+export function extrairNumeroDan(faixa: string | null | undefined): number {
+	if (!faixa) return 0;
+	const match = faixa.match(/(\d+)\s*[ºo°]?\s*dan/i);
+	if (match) return parseInt(match[1], 10);
+	const f = faixa.toLowerCase();
+	if (f.includes('shodan')) return 1;
+	if (f.includes('nidan')) return 2;
+	if (f.includes('sandan')) return 3;
+	if (f.includes('yondan')) return 4;
+	if (f.includes('godan')) return 5;
+	if (f.includes('rokudan')) return 6;
+	if (f.includes('nanadan') || f.includes('shichidan')) return 7;
+	if (f.includes('hachidan')) return 8;
+	if (f.includes('kudan')) return 9;
+	if (f.includes('judan')) return 10;
+	return 0;
+}
+
+/**
  * Função utilitária pura para ordenar listas de atletas judocas.
  */
 export function ordenarAtletas<T extends AtletaBaseOrdenavel>(
@@ -57,6 +78,13 @@ export function ordenarAtletas<T extends AtletaBaseOrdenavel>(
 			const idxA = obterIndiceFaixa(faixaA);
 			const idxB = obterIndiceFaixa(faixaB);
 			cmp = idxA - idxB;
+
+			// Desempate específico por grau Dan (ex: 1º Dan vs 3º Dan ou 6º Dan vs 8º Dan)
+			if (cmp === 0) {
+				const danA = extrairNumeroDan(faixaA);
+				const danB = extrairNumeroDan(faixaB);
+				cmp = danA - danB;
+			}
 
 			// Desempate por idade e depois nome
 			if (cmp === 0) {

@@ -61,8 +61,9 @@ export function validarElegibilidadeCompleta(dados: {
 			motivo: `Faixa ${faixaNome} está abaixo da faixa mínima permitida (${faixaMinNome}).`
 		};
 	}
-	if (idxAtleta > idxFim) {
-		const faixaMaxNome = dados.faixaFim || 'Preta';
+	const tetoEfetivo = idxFim === 8 ? 10 : idxFim;
+	if (idxAtleta > tetoEfetivo) {
+		const faixaMaxNome = dados.faixaFim || 'Vermelha';
 		return {
 			elegivel: false,
 			motivo: `Faixa ${faixaNome} está acima da faixa máxima permitida (${faixaMaxNome}).`

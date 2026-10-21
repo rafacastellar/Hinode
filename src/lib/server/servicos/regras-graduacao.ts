@@ -9,11 +9,16 @@ export const FAIXAS_SEQUENCIA_OFICIAL = [
 	'Verde',
 	'Roxa',
 	'Marrom',
-	'Preta (1º Dan)',
-	'Preta (2º Dan)',
-	'Preta (3º Dan)',
-	'Preta (4º Dan)',
-	'Preta (5º Dan)'
+	'Preta Shodan',
+	'Preta Nidan',
+	'Preta Sandan',
+	'Preta Yondan',
+	'Preta Godan',
+	'Kodansha Rokudan',
+	'Kodansha Shichidan',
+	'Kodansha Hachidan',
+	'Vermelha Kudan',
+	'Vermelha Judan'
 ] as const;
 
 /**
@@ -30,13 +35,23 @@ export function obterProximaFaixa(faixaAtual?: string | null): string {
 	if (normalizada.includes('laranja')) return 'Verde';
 	if (normalizada.includes('verde')) return 'Roxa';
 	if (normalizada.includes('roxa')) return 'Marrom';
-	if (normalizada.includes('marrom')) return 'Preta (1º Dan)';
-	if (normalizada.includes('1º dan') || normalizada.includes('1o dan')) return 'Preta (2º Dan)';
-	if (normalizada.includes('2º dan') || normalizada.includes('2o dan')) return 'Preta (3º Dan)';
-	if (normalizada.includes('3º dan') || normalizada.includes('3o dan')) return 'Preta (4º Dan)';
-	if (normalizada.includes('4º dan') || normalizada.includes('4o dan')) return 'Preta (5º Dan)';
+	if (normalizada.includes('marrom')) return 'Preta Shodan';
+	if (normalizada.includes('shodan') || normalizada.includes('1º dan') || normalizada.includes('1o dan') || normalizada.includes('1 dan')) return 'Preta Nidan';
+	if (normalizada.includes('nidan') || normalizada.includes('2º dan') || normalizada.includes('2o dan') || normalizada.includes('2 dan')) return 'Preta Sandan';
+	if (normalizada.includes('sandan') || normalizada.includes('3º dan') || normalizada.includes('3o dan') || normalizada.includes('3 dan')) return 'Preta Yondan';
+	if (normalizada.includes('yondan') || normalizada.includes('4º dan') || normalizada.includes('4o dan') || normalizada.includes('4 dan')) return 'Preta Godan';
+	if (normalizada.includes('godan') || normalizada.includes('5º dan') || normalizada.includes('5o dan') || normalizada.includes('5 dan')) return 'Kodansha Rokudan';
+	if (normalizada.includes('rokudan') || normalizada.includes('6º dan') || normalizada.includes('6o dan') || normalizada.includes('6 dan')) return 'Kodansha Shichidan';
+	if (normalizada.includes('shichidan') || normalizada.includes('nanadan') || normalizada.includes('7º dan') || normalizada.includes('7o dan') || normalizada.includes('7 dan')) return 'Kodansha Hachidan';
+	if (normalizada.includes('hachidan') || normalizada.includes('8º dan') || normalizada.includes('8o dan') || normalizada.includes('8 dan')) return 'Vermelha Kudan';
+	if (normalizada.includes('kudan') || normalizada.includes('9º dan') || normalizada.includes('9o dan') || normalizada.includes('9 dan')) return 'Vermelha Judan';
+	if (normalizada.includes('judan') || normalizada.includes('10º dan') || normalizada.includes('10o dan') || normalizada.includes('10 dan')) return 'Vermelha Judan';
 
-	return 'Preta (1º Dan)';
+	if (normalizada.includes('preta')) return 'Preta Nidan';
+	if (normalizada.includes('coral') || normalizada.includes('kodansha') || normalizada.includes('kodancha')) return 'Kodansha Shichidan';
+	if (normalizada.includes('vermelha')) return 'Vermelha Judan';
+
+	return 'Preta Shodan';
 }
 
 /**
@@ -114,8 +129,9 @@ export function validarElegibilidadeGraduacao(
 	const idxAtleta = obterIndiceFaixa(dados.faixaAtleta);
 	const idxInicio = obterIndiceFaixa(dados.faixaInicioEvento);
 	const idxFim = obterIndiceFaixa(dados.faixaFimEvento);
+	const tetoEfetivo = idxFim === 8 ? 10 : idxFim;
 
-	if (idxAtleta < idxInicio || idxAtleta > idxFim) {
+	if (idxAtleta < idxInicio || idxAtleta > tetoEfetivo) {
 		return {
 			elegivel: false,
 			motivo: `Graduação atual (${dados.faixaAtleta}) fora do intervalo permitido para este exame (${formatarIntervaloFaixas(dados.faixaInicioEvento, dados.faixaFimEvento)}).`,

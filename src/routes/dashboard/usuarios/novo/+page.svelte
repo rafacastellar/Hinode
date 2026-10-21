@@ -849,14 +849,14 @@
 
 					<div>
 						<label for="grauFaixa" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-							Grau / Dan de Faixa Preta
+							Graduação / Dan (Preta, Kodansha ou Vermelha)
 						</label>
 						<input
 							type="text"
 							id="grauFaixa"
 							name="grauFaixa"
 							value={form?.valores?.grauFaixa || ''}
-							placeholder="Ex: 1º Dan (Shodan), 2º Dan (Nidan)"
+							placeholder="Ex: 1º a 5º Dan (Preta), 6º a 8º Dan (Kodansha), 9º ou 10º Dan (Vermelha)"
 							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500 transition-colors"
 						/>
 					</div>

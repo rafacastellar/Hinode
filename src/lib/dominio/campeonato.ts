@@ -13,7 +13,9 @@ export const FAIXAS_JUDO_LISTA = [
 	'Verde',
 	'Roxa',
 	'Marrom',
-	'Preta'
+	'Preta',
+	'Coral (Kodansha)',
+	'Vermelha'
 ] as const;
 
 export type FaixaJudo = (typeof FAIXAS_JUDO_LISTA)[number];
@@ -27,11 +29,16 @@ export const FAIXAS_JUDO_ORDEM: Record<string, number> = {
 	verde: 5,
 	roxa: 6,
 	marrom: 7,
-	preta: 8
+	preta: 8,
+	coral: 9,
+	kodansha: 9,
+	vermelha: 10
 };
 
 /**
- * Normaliza e obtém o índice numérico sequencial da graduação (0 a 8).
+ * Normaliza e obtém o índice numérico sequencial da graduação (0 a 10).
+ * 0: Branca, 1: Cinza, 2: Azul, 3: Amarela, 4: Laranja, 5: Verde, 6: Roxa, 7: Marrom,
+ * 8: Preta (1º a 5º Dan), 9: Kodansha / Coral (6º a 8º Dan), 10: Vermelha (9º e 10º Dan).
  */
 export function obterIndiceFaixa(faixa: string | null | undefined): number {
 	if (!faixa) return 0;
@@ -41,14 +48,45 @@ export function obterIndiceFaixa(faixa: string | null | undefined): number {
 		.replace(/[\u0300-\u036f]/g, '')
 		.trim();
 
+	// 9º e 10º Dan: Faixa Vermelha (Grandes Mestres)
+	if (
+		(normalizada.includes('vermelha') && !normalizada.includes('branca')) ||
+		((normalizada.includes('9') || normalizada.includes('10')) && normalizada.includes('dan')) ||
+		normalizada.includes('kudan') ||
+		normalizada.includes('judan')
+	) {
+		return 10;
+	}
+
+	// 6º, 7º e 8º Dan: Faixa Kodansha / Coral (Vermelha e Branca)
+	if (
+		normalizada.includes('coral') ||
+		normalizada.includes('kodansha') ||
+		normalizada.includes('kodancha') ||
+		normalizada.includes('vermelha e branca') ||
+		((normalizada.includes('6') || normalizada.includes('7') || normalizada.includes('8')) &&
+			normalizada.includes('dan')) ||
+		normalizada.includes('rokudan') ||
+		normalizada.includes('nanadan') ||
+		normalizada.includes('shichidan') ||
+		normalizada.includes('hachidan')
+	) {
+		return 9;
+	}
+
+	// 1º ao 5º Dan: Faixa Preta (Yudansha)
 	if (
 		normalizada.includes('preta') ||
 		normalizada.includes('dan') ||
-		normalizada.includes('coral') ||
-		normalizada.includes('vermelha')
+		normalizada.includes('shodan') ||
+		normalizada.includes('nidan') ||
+		normalizada.includes('sandan') ||
+		normalizada.includes('yondan') ||
+		normalizada.includes('godan')
 	) {
 		return 8;
 	}
+
 	if (normalizada.includes('marrom')) return 7;
 	if (normalizada.includes('roxa')) return 6;
 	if (normalizada.includes('verde')) return 5;
