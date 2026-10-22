@@ -44,6 +44,7 @@ export const actions: Actions = {
 			nome: formData.get('nome'),
 			edicao: formData.get('edicao'),
 			tipoCampeonato: formData.get('tipoCampeonato'),
+			classificacaoAcademia: formData.get('classificacaoAcademia'),
 			dataInicio: formData.get('dataInicio'),
 			dataInicioInscricao: formData.get('dataInicioInscricao'),
 			dataFimInscricao: formData.get('dataFimInscricao'),

@@ -11,7 +11,10 @@ import {
 	confirmarInscricaoResponsavel,
 	removerInscricaoDoCampeonato,
 	atualizarStatusInscricao,
-	salvarClassificacaoEmTransacao
+	salvarClassificacaoEmTransacao,
+	atualizarClassificacaoAcademia,
+	atualizarClassificacao,
+	excluirClassificacao
 } from '../repositorios/campeonato.repo';
 import { buscarAlunoPorId } from '../repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '../repositorios/professor.repo';
@@ -23,7 +26,8 @@ import {
 import type {
 	CampeonatoInput,
 	InscricaoInput,
-	ResultadoInput
+	ResultadoInput,
+	EditarResultadoInput
 } from '../validacao/campeonato.schema';
 
 /**
@@ -326,3 +330,49 @@ export async function registrarResultadoCampeonato(
 		return { sucesso: true };
 	});
 }
+
+/**
+ * Grava ou atualiza a colocação geral livre da academia no campeonato.
+ */
+export async function salvarClassificacaoDojo(
+	idAcademia: number,
+	idEvento: number,
+	classificacao: string | null
+): Promise<{ sucesso: boolean; classificacao: string | null }> {
+	const campeonato = await buscarCampeonatoPorId(idAcademia, idEvento);
+	if (!campeonato) {
+		throw error(404, { message: 'Campeonato não encontrado nesta academia.' });
+	}
+
+	await atualizarClassificacaoAcademia(idAcademia, idEvento, classificacao);
+	return { sucesso: true, classificacao };
+}
+
+/**
+ * Altera o resultado e pódio de um atleta (correção de lançamento equivocado).
+ */
+export async function editarResultadoCampeonato(
+	idAcademia: number,
+	dados: EditarResultadoInput
+): Promise<{ sucesso: boolean }> {
+	if (dados.qtdVitorias > dados.qtdLutas) {
+		throw error(400, {
+			message: 'A quantidade de vitórias não pode ser maior que o número de lutas.'
+		});
+	}
+
+	await atualizarClassificacao(idAcademia, dados);
+	return { sucesso: true };
+}
+
+/**
+ * Exclui definitivamente o resultado de um atleta em caso de lançamento equivocado.
+ */
+export async function removerResultadoCampeonato(
+	idAcademia: number,
+	idClassificacao: number
+): Promise<{ sucesso: boolean }> {
+	await excluirClassificacao(idAcademia, idClassificacao);
+	return { sucesso: true };
+}
+

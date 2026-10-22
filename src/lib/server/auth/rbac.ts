@@ -49,6 +49,8 @@ const PERMISSOES_POR_PAPEL: Record<string, readonly Permissao[]> = {
 	professor: [
 		'DASHBOARD_VER',
 		'ALUNOS_VER',
+		'ALUNOS_CRIAR',
+		'ALUNOS_EDITAR',
 		'TURMAS_VER',
 		'TURMAS_GERENCIAR',
 		'GRADUACOES_VER',
@@ -87,7 +89,7 @@ const PERMISSOES_POR_PAPEL: Record<string, readonly Permissao[]> = {
 /**
  * Normaliza o nome do papel removendo acentuação e convertendo para minúsculas.
  */
-function normalizarNomePapel(papel: string): string {
+export function normalizarNomePapel(papel: string): string {
 	return papel
 		.toLowerCase()
 		.normalize('NFD')
@@ -141,7 +143,9 @@ export type IconeMenu =
 	| 'award'
 	| 'trophy'
 	| 'settings'
-	| 'users-cog';
+	| 'users-cog'
+	| 'user'
+	| 'heart-handshake';
 
 export interface ItemMenu {
 	titulo: string;
@@ -149,8 +153,12 @@ export interface ItemMenu {
 	icone: IconeMenu;
 	descricao: string;
 	permissao?: Permissao;
-	fase: number;
 	badge?: string;
+	badgeUrgente?: boolean;
+}
+
+export interface ContextoMenu {
+	totalDependentes?: number;
 }
 
 /**
@@ -162,73 +170,113 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
 		href: '/dashboard',
 		icone: 'dashboard',
 		descricao: 'Visão executiva do dojo e métricas',
-		permissao: 'DASHBOARD_VER',
-		fase: 3
+		permissao: 'DASHBOARD_VER'
 	},
 	{
 		titulo: 'Alunos & Judocas',
 		href: '/dashboard/alunos',
 		icone: 'users',
 		descricao: 'Matrículas, responsáveis e prontuário',
-		permissao: 'ALUNOS_VER',
-		fase: 4,
-		badge: 'Fase 4'
+		permissao: 'ALUNOS_VER'
 	},
 	{
 		titulo: 'Turmas & Treinos',
 		href: '/dashboard/turmas',
 		icone: 'calendar',
 		descricao: 'Horários, tatame e alocação de senseis',
-		permissao: 'TURMAS_VER',
-		fase: 5,
-		badge: 'Fase 5'
+		permissao: 'TURMAS_VER'
 	},
 	{
 		titulo: 'Graduações & Faixas',
 		href: '/dashboard/graduacoes',
 		icone: 'award',
 		descricao: 'Histórico imutável de Dan/Kyu e homologação',
-		permissao: 'GRADUACOES_VER',
-		fase: 6,
-		badge: 'Fase 6'
+		permissao: 'GRADUACOES_VER'
 	},
 	{
 		titulo: 'Campeonatos',
 		href: '/dashboard/campeonatos',
 		icone: 'trophy',
 		descricao: 'Inscrições em torneios e resultados',
-		permissao: 'CAMPEONATOS_VER',
-		fase: 7,
-		badge: 'Fase 7'
+		permissao: 'CAMPEONATOS_VER'
+	},
+	{
+		titulo: 'Meu Perfil',
+		href: '/dashboard/perfil',
+		icone: 'user',
+		descricao: 'Meus dados cadastrais, contato e endereço'
+	},
+	{
+		titulo: 'Perfil do Responsável',
+		href: '/dashboard/responsavel',
+		icone: 'heart-handshake',
+		descricao: 'Dados cadastrais e técnicos dos judocas sob sua tutela'
 	},
 	{
 		titulo: 'Equipe & Usuários',
 		href: '/dashboard/usuarios',
 		icone: 'users-cog',
 		descricao: 'Gestão de operadores e perfis acumulativos',
-		permissao: 'USUARIOS_VER',
-		fase: 9,
-		badge: 'Fase 9'
+		permissao: 'USUARIOS_VER'
 	},
 	{
 		titulo: 'Configurações do Dojo',
 		href: '/dashboard/configuracoes',
 		icone: 'settings',
 		descricao: 'Dados da academia e auditoria LGPD',
-		permissao: 'ACADEMIA_CONFIGURAR',
-		fase: 8,
-		badge: 'Fase 8'
+		permissao: 'ACADEMIA_CONFIGURAR'
 	}
 ];
 
 /**
  * Retorna os itens de navegação autorizados para o conjunto de papéis do usuário logado.
  */
-export function obterMenuAutorizado(perfis: string[]): ItemMenu[] {
+export function obterMenuAutorizado(perfis: string[], contexto?: ContextoMenu): ItemMenu[] {
 	const permissoesAtivas = new Set(calcularPermissoes(perfis));
+	const ehGestorOuProfessor = perfis.some((p) => {
+		const norm = normalizarNomePapel(p);
+		return norm === 'admin' || norm === 'professor' || norm === 'recepcao';
+	});
+	const ehAluno = perfis.some((p) => normalizarNomePapel(p) === 'aluno');
 
 	return CATALOGO_MENU.filter((item) => {
+		if (item.href === '/dashboard/responsavel') {
+			// Visível exclusivamente para quem tem pelo menos um judoca para se responsabilizar
+			return Boolean(contexto?.totalDependentes && contexto.totalDependentes > 0);
+		}
 		if (!item.permissao) return true;
 		return permissoesAtivas.has(item.permissao);
+	}).map((item) => {
+		if (ehAluno && !ehGestorOuProfessor) {
+			if (item.href === '/dashboard') {
+				return {
+					...item,
+					titulo: 'Meu Painel',
+					descricao: 'Minha jornada, graduações e treinos'
+				};
+			}
+			if (item.href === '/dashboard/turmas') {
+				return {
+					...item,
+					titulo: 'Meus Treinos & Grade',
+					descricao: 'Horários do dojo e turmas inscritas'
+				};
+			}
+			if (item.href === '/dashboard/graduacoes') {
+				return {
+					...item,
+					titulo: 'Minhas Graduações',
+					descricao: 'Histórico de faixas e exames agendados'
+				};
+			}
+			if (item.href === '/dashboard/campeonatos') {
+				return {
+					...item,
+					titulo: 'Torneios & Inscrições',
+					descricao: 'Calendário de competições e inscrições'
+				};
+			}
+		}
+		return item;
 	});
 }

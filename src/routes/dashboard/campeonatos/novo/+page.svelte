@@ -13,7 +13,7 @@
 		Search,
 		Loader2
 	} from '@lucide/svelte';
-	import { FAIXAS_JUDO_LISTA } from '#lib/dominio/campeonato';
+	import { FAIXAS_JUDO_LISTA, SUGESTOES_CLASSIFICACAO_ACADEMIA } from '#lib/dominio/campeonato';
 
 	let { form }: { form: ActionData } = $props();
 
@@ -104,8 +104,6 @@
 			<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 				Calendário Esportivo
 			</span>
-			<span class="text-xs text-zinc-600">•</span>
-			<span class="text-xs text-zinc-400 font-mono">Fase 7</span>
 		</div>
 		<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 			Novo Campeonato
@@ -236,6 +234,30 @@
 					</div>
 					<span class="text-[10px] text-zinc-500 mt-1 block">
 						Valor padrão cobrado de cada judoca. Deixe 0.00 se for isento/gratuito.
+					</span>
+				</div>
+
+				<!-- Colocação Geral da Academia (Livre) -->
+				<div class="sm:col-span-2">
+					<label for="classificacaoAcademia" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Colocação Geral da Hinodê no Torneio (Opcional - Campo Livre)
+					</label>
+					<input
+						type="text"
+						id="classificacaoAcademia"
+						name="classificacaoAcademia"
+						list="sugestoesClassificacaoNovo"
+						value={(form?.valores?.classificacaoAcademia as string) || ''}
+						placeholder="Ex: Campeã Geral, Vice-campeã, 3º Lugar Geral, 10ª Colocada, Vigésima..."
+						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					/>
+					<datalist id="sugestoesClassificacaoNovo">
+						{#each SUGESTOES_CLASSIFICACAO_ACADEMIA as sugestao}
+							<option value={sugestao}></option>
+						{/each}
+					</datalist>
+					<span class="text-[11px] text-zinc-500 mt-1 block">
+						Geralmente preenchido após o evento. Você pode deixar em branco e preencher mais tarde na página do torneio.
 					</span>
 				</div>
 

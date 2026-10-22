@@ -102,8 +102,6 @@
 			<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 				Cerimônias & Exames
 			</span>
-			<span class="text-xs text-zinc-600">•</span>
-			<span class="text-xs text-zinc-400 font-mono">Fase 6</span>
 		</div>
 		<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 			Novo Exame de Graduação

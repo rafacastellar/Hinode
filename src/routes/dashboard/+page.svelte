@@ -17,15 +17,42 @@
 		UserCog,
 		Settings
 	} from '@lucide/svelte';
+	import PainelJudoca from '#lib/components/dashboard/PainelJudoca.svelte';
+	import PainelProfessor from '#lib/components/dashboard/PainelProfessor.svelte';
+	import PainelResponsavel from '#lib/components/dashboard/PainelResponsavel.svelte';
+	import SeletorPerspectiva from '#lib/components/dashboard/SeletorPerspectiva.svelte';
+	import CardAniversariantes from '#lib/components/dashboard/CardAniversariantes.svelte';
+	import CardConformidadeAlunos from '#lib/components/dashboard/CardConformidadeAlunos.svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>
 
 <svelte:head>
-	<title>Visão Geral do Dojo - Judô Hinodê</title>
+	<title>
+		{data.visaoAtiva === 'aluno'
+			? 'Meu Painel - Judô Hinodê'
+			: data.visaoAtiva === 'professor'
+				? 'Tatame do Sensei - Judô Hinodê'
+				: data.visaoAtiva === 'responsavel'
+					? 'Painel da Família - Judô Hinodê'
+					: data.visaoAtiva === 'recepcao'
+						? 'Secretaria & Recepção - Judô Hinodê'
+						: 'Gestão do Dojo - Judô Hinodê'}
+	</title>
 </svelte:head>
 
-<div class="space-y-8">
+<div class="space-y-6">
+	<!-- 0. SELETOR DE PERSPECTIVA (APENAS PARA USUÁRIOS COM MÚLTIPLOS PAPÉIS) -->
+	<SeletorPerspectiva perfis={data.perfis} visaoAtiva={data.visaoAtiva} />
+
+	{#if data.visaoAtiva === 'aluno' && data.painelJudoca}
+		<PainelJudoca painel={data.painelJudoca} nomeAcademia={data.nomeAcademia} />
+	{:else if data.visaoAtiva === 'professor' && data.painelProfessor}
+		<PainelProfessor painel={data.painelProfessor} nomeAcademia={data.nomeAcademia} />
+	{:else if data.visaoAtiva === 'responsavel' && data.painelResponsavel}
+		<PainelResponsavel painel={data.painelResponsavel} nomeAcademia={data.nomeAcademia} />
+	{:else}
+		<div class="space-y-8">
 	<!-- ========================================================================= -->
 	<!-- 1. BANNER DE BOAS-VINDAS & CONTEXTO MULTI-TENANT -->
 	<!-- ========================================================================= -->
@@ -54,8 +81,9 @@
 					Bem-vindo ao Tatame, {data.usuario?.nome}
 				</h1>
 				<p class="text-sm text-zinc-400 mt-1 max-w-2xl">
-					Painel central de controle pedagógico, graduações imutáveis e gestão multi-tenant do
-					seu dojo de Judô.
+					{data.visaoAtiva === 'recepcao'
+						? 'Painel de atendimento, matrículas e conformidade de judocas do dojo.'
+						: 'Painel central de controle pedagógico, graduações imutáveis e gestão multi-tenant do seu dojo de Judô.'}
 				</p>
 			</div>
 
@@ -123,6 +151,11 @@
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		<!-- Coluna da Esquerda (2 slots): Ações Rápidas de Operação -->
 		<div class="lg:col-span-2 space-y-6">
+			<!-- Conformidade & Pendências dos Alunos (Admin & Recepção) -->
+			{#if data.pendenciasTecnicas}
+				<CardConformidadeAlunos pendencias={data.pendenciasTecnicas} escopo="geral" />
+			{/if}
+
 			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900">
 				<div class="flex items-center justify-between mb-5">
 					<div>
@@ -149,7 +182,6 @@
 									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 										{data.podeCriarAlunos ? 'Matricular Judoca' : 'Alunos & Judocas'}
 									</span>
-									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 4</span>
 								</div>
 								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 									{data.podeCriarAlunos
@@ -174,7 +206,6 @@
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 									{data.podeGerenciarTurmas ? 'Organizar Turmas' : 'Turmas & Treinos'}
 								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 5</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 								{data.podeGerenciarTurmas
@@ -198,7 +229,6 @@
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 									{data.podeHomologarGraduacoes ? 'Exame & Graduação' : 'Graduações & Faixas'}
 								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 6</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 								{data.podeHomologarGraduacoes
@@ -222,7 +252,6 @@
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 									{data.podeGerenciarCampeonatos ? 'Gestão de Campeonatos' : 'Campeonatos & Inscrições'}
 								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 7</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 								{data.podeGerenciarCampeonatos
@@ -247,7 +276,6 @@
 									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 										Equipe & Usuários
 									</span>
-									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 9</span>
 								</div>
 								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 									Gestão de operadores e atribuição de perfis acumulativos.
@@ -271,7 +299,6 @@
 									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 										Configurações do Dojo
 									</span>
-									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 8</span>
 								</div>
 								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 									Dados da academia, telemetria e conformidade LGPD.
@@ -283,8 +310,13 @@
 			</div>
 		</div>
 
-		<!-- Coluna da Direita (1 slot): Próximos Eventos & Filosofia do Judô -->
+		<!-- Coluna da Direita (1 slot): Aniversariantes, Próximos Eventos & Filosofia do Judô -->
 		<div class="space-y-6">
+			<!-- Aniversariantes da Semana (Equipe do Dojo) -->
+			{#if data.aniversariantes}
+				<CardAniversariantes aniversariantes={data.aniversariantes} />
+			{/if}
+
 			<!-- Próximos Eventos -->
 			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900">
 				<div class="flex items-center justify-between mb-4">
@@ -376,4 +408,6 @@
 			</div>
 		</div>
 	</div>
+</div>
+{/if}
 </div>

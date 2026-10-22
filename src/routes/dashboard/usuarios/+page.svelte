@@ -85,7 +85,7 @@
 		<div>
 			<div class="flex items-center gap-2 mb-1">
 				<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-semibold">
-					Fase 9 • Governança de Equipe
+					Governança de Equipe
 				</span>
 				<span class="text-zinc-600">•</span>
 				<span class="text-xs font-mono text-zinc-400">RBAC Acumulativo</span>

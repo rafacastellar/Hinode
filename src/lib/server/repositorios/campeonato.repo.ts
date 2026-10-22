@@ -1,7 +1,11 @@
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { getDbPool } from '../db/pool';
 import { calcularIdadeServidor } from './aluno.repo';
-import type { CampeonatoInput, ResultadoInput } from '../validacao/campeonato.schema';
+import type {
+	CampeonatoInput,
+	ResultadoInput,
+	EditarResultadoInput
+} from '../validacao/campeonato.schema';
 
 export interface CampeonatoResumo {
 	id_evento: number;
@@ -11,6 +15,7 @@ export interface CampeonatoResumo {
 	data_inicio_inscricao: string | null;
 	data_fim_inscricao: string | null;
 	tipo_campeonato: string | null;
+	classificacao_academia: string | null;
 	limite_graduacao: string | null;
 	faixa_inicio: string;
 	faixa_fim: string;
@@ -36,6 +41,7 @@ export interface CampeonatoDetalhado {
 	data_fim_inscricao: string | null;
 	data_fim_inscricao_iso: string | null;
 	tipo_campeonato: string | null;
+	classificacao_academia: string | null;
 	limite_graduacao: string | null;
 	faixa_inicio: string;
 	faixa_fim: string;
@@ -72,6 +78,8 @@ export interface InscricaoItem {
 	data_confirmacao_responsavel: string | null;
 	status_inscricao: 'Pendente' | 'Confirmada' | 'Cancelada';
 	valor: number | null;
+	categoria_participante?: string | null;
+	peso_participante?: number | null;
 }
 
 export interface ClassificacaoItem {
@@ -102,6 +110,7 @@ export async function listarCampeonatosDoDojo(
 			DATE_FORMAT(c.data_inicio_inscricao, '%d/%m/%Y') AS data_inicio_inscricao,
 			DATE_FORMAT(c.data_fim_inscricao, '%d/%m/%Y') AS data_fim_inscricao,
 			c.tipo_campeonato,
+			c.classificacao_academia,
 			c.limite_graduacao,
 			COALESCE(c.faixa_inicio, 'Branca') AS faixa_inicio,
 			COALESCE(c.faixa_fim, 'Preta') AS faixa_fim,
@@ -143,6 +152,7 @@ export async function listarCampeonatosDoDojo(
 		data_inicio_inscricao: linha.data_inicio_inscricao ? String(linha.data_inicio_inscricao) : null,
 		data_fim_inscricao: linha.data_fim_inscricao ? String(linha.data_fim_inscricao) : null,
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
+		classificacao_academia: linha.classificacao_academia ? String(linha.classificacao_academia) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
 		faixa_inicio: String(linha.faixa_inicio),
 		faixa_fim: String(linha.faixa_fim),
@@ -179,6 +189,7 @@ export async function buscarCampeonatoPorId(
 			DATE_FORMAT(c.data_fim_inscricao, '%d/%m/%Y') AS data_fim_inscricao,
 			DATE_FORMAT(c.data_fim_inscricao, '%Y-%m-%d') AS data_fim_inscricao_iso,
 			c.tipo_campeonato,
+			c.classificacao_academia,
 			c.limite_graduacao,
 			COALESCE(c.faixa_inicio, 'Branca') AS faixa_inicio,
 			COALESCE(c.faixa_fim, 'Preta') AS faixa_fim,
@@ -215,6 +226,7 @@ export async function buscarCampeonatoPorId(
 		data_fim_inscricao: linha.data_fim_inscricao ? String(linha.data_fim_inscricao) : null,
 		data_fim_inscricao_iso: linha.data_fim_inscricao_iso ? String(linha.data_fim_inscricao_iso) : null,
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
+		classificacao_academia: linha.classificacao_academia ? String(linha.classificacao_academia) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
 		faixa_inicio: String(linha.faixa_inicio),
 		faixa_fim: String(linha.faixa_fim),
@@ -269,6 +281,7 @@ export async function inserirCampeonatoEmTransacao(
 		`INSERT INTO Campeonato (
 			id_evento,
 			tipo_campeonato,
+			classificacao_academia,
 			limite_graduacao,
 			faixa_inicio,
 			faixa_fim,
@@ -278,10 +291,11 @@ export async function inserirCampeonatoEmTransacao(
 			valor_inscricao,
 			data_inicio_inscricao,
 			data_fim_inscricao
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			idEvento,
 			dados.tipoCampeonato,
+			dados.classificacaoAcademia || null,
 			dados.limiteGraduacao,
 			dados.faixaInicio || 'Branca',
 			dados.faixaFim || 'Preta',
@@ -351,6 +365,7 @@ export async function atualizarCampeonatoEmTransacao(
 	await conn.execute(
 		`UPDATE Campeonato
 		 SET tipo_campeonato = ?,
+		     classificacao_academia = ?,
 		     limite_graduacao = ?,
 		     faixa_inicio = ?,
 		     faixa_fim = ?,
@@ -363,6 +378,7 @@ export async function atualizarCampeonatoEmTransacao(
 		 WHERE id_evento = ?`,
 		[
 			dados.tipoCampeonato,
+			dados.classificacaoAcademia || null,
 			dados.limiteGraduacao,
 			dados.faixaInicio || 'Branca',
 			dados.faixaFim || 'Preta',
@@ -375,6 +391,30 @@ export async function atualizarCampeonatoEmTransacao(
 			idEvento
 		]
 	);
+}
+
+/**
+ * Atualiza exclusivamente a classificação geral da academia no campeonato.
+ * Garante segurança multi-tenant vinculando Evento.id_academia.
+ */
+export async function atualizarClassificacaoAcademia(
+	idAcademia: number,
+	idEvento: number,
+	classificacaoAcademia: string | null
+): Promise<void> {
+	const pool = getDbPool();
+
+	const [res] = await pool.execute<ResultSetHeader>(
+		`UPDATE Campeonato c
+		 INNER JOIN Evento e ON c.id_evento = e.id_evento
+		 SET c.classificacao_academia = ?
+		 WHERE c.id_evento = ? AND e.id_academia = ?`,
+		[classificacaoAcademia, idEvento, idAcademia]
+	);
+
+	if (res.affectedRows === 0) {
+		throw new Error('Campeonato não encontrado ou não pertence a esta academia.');
+	}
 }
 
 /**
@@ -420,6 +460,8 @@ export async function listarInscricoesDoCampeonato(
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			COALESCE(a.graduacao_atual, p.grau_faixa, 'Faixa Preta') AS faixa_participante,
 			a.grupo_especial_aspirante AS grupo_participante,
+			a.categoria AS categoria_participante,
+			a.peso AS peso_participante,
 			COALESCE(ie.confirmado_atleta, 0) AS confirmado_atleta,
 			COALESCE(ie.confirmado_responsavel, 0) AS confirmado_responsavel,
 			DATE_FORMAT(ie.data_confirmacao_atleta, '%d/%m/%Y %H:%i') AS data_confirmacao_atleta,
@@ -448,6 +490,8 @@ export async function listarInscricoesDoCampeonato(
 			a.graduacao_atual,
 			p.grau_faixa,
 			a.grupo_especial_aspirante,
+			a.categoria,
+			a.peso,
 			ie.confirmado_atleta,
 			ie.confirmado_responsavel,
 			ie.data_confirmacao_atleta,
@@ -497,7 +541,9 @@ export async function listarInscricoesDoCampeonato(
 			data_confirmacao_atleta: linha.data_confirmacao_atleta ? String(linha.data_confirmacao_atleta) : null,
 			data_confirmacao_responsavel: linha.data_confirmacao_responsavel ? String(linha.data_confirmacao_responsavel) : null,
 			status_inscricao: linha.status_inscricao as 'Pendente' | 'Confirmada' | 'Cancelada',
-			valor: linha.valor !== null ? Number(linha.valor) : null
+			valor: linha.valor !== null ? Number(linha.valor) : null,
+			categoria_participante: linha.categoria_participante ? String(linha.categoria_participante) : null,
+			peso_participante: linha.peso_participante !== null && linha.peso_participante !== undefined ? Number(linha.peso_participante) : null
 		};
 	});
 }
@@ -765,4 +811,61 @@ export async function salvarClassificacaoEmTransacao(
 	]);
 
 	return res.insertId;
+}
+
+/**
+ * Atualiza o resultado / desempenho de um atleta em um campeonato.
+ * Valida a academia através do JOIN com Evento (multi-tenant).
+ */
+export async function atualizarClassificacao(
+	idAcademia: number,
+	dados: EditarResultadoInput
+): Promise<void> {
+	const pool = getDbPool();
+
+	const sql = `
+		UPDATE Classificacao cl
+		INNER JOIN Campeonato c ON cl.id_campeonato = c.id_evento
+		INNER JOIN Evento e ON c.id_evento = e.id_evento
+		SET cl.classificacao_aluno = ?,
+		    cl.qtd_lutas = ?,
+		    cl.qtd_vitorias = ?
+		WHERE cl.id_classificacao = ? AND e.id_academia = ?
+	`;
+
+	const [res] = await pool.execute<ResultSetHeader>(sql, [
+		dados.classificacaoAluno,
+		dados.qtdLutas,
+		dados.qtdVitorias,
+		dados.idClassificacao,
+		idAcademia
+	]);
+
+	if (res.affectedRows === 0) {
+		throw new Error('Resultado não encontrado ou não pertence a esta academia.');
+	}
+}
+
+/**
+ * Remove o resultado / classificação de um atleta em caso de lançamento equivocado.
+ * Valida a academia através do JOIN com Evento (multi-tenant).
+ */
+export async function excluirClassificacao(
+	idAcademia: number,
+	idClassificacao: number
+): Promise<void> {
+	const pool = getDbPool();
+
+	const sql = `
+		DELETE cl FROM Classificacao cl
+		INNER JOIN Campeonato c ON cl.id_campeonato = c.id_evento
+		INNER JOIN Evento e ON c.id_evento = e.id_evento
+		WHERE cl.id_classificacao = ? AND e.id_academia = ?
+	`;
+
+	const [res] = await pool.execute<ResultSetHeader>(sql, [idClassificacao, idAcademia]);
+
+	if (res.affectedRows === 0) {
+		throw new Error('Resultado não encontrado ou não pertence a esta academia.');
+	}
 }

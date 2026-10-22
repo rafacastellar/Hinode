@@ -34,6 +34,12 @@ export const campeonatoSchema = z
 			.string()
 			.trim()
 			.min(1, { message: 'Selecione o tipo de campeonato' }),
+		classificacaoAcademia: z
+			.string()
+			.trim()
+			.max(100, { message: 'Classificação muito longa (máx. 100 caracteres)' })
+			.nullish()
+			.transform((val) => val || null),
 		dataInicio: z
 			.string()
 			.trim()
@@ -216,3 +222,58 @@ export const resultadoSchema = z
 	});
 
 export type ResultadoInput = z.infer<typeof resultadoSchema>;
+
+/**
+ * Schema Zod para atualização direta da classificação geral da academia pelo Sensei
+ */
+export const salvarClassificacaoAcademiaSchema = z.object({
+	idEvento: z.coerce.number().int().positive({ message: 'Evento inválido' }),
+	classificacaoAcademia: z
+		.string()
+		.trim()
+		.max(100, { message: 'Classificação muito longa (máx. 100 caracteres)' })
+		.nullish()
+		.transform((val) => val || null)
+});
+
+export type SalvarClassificacaoAcademiaInput = z.infer<typeof salvarClassificacaoAcademiaSchema>;
+
+/**
+ * Schema Zod para edição de resultado individual de atleta
+ */
+export const editarResultadoSchema = z
+	.object({
+		idClassificacao: z.coerce.number().int().positive({ message: 'Classificação inválida' }),
+		classificacaoAluno: z
+			.string()
+			.trim()
+			.min(1, { message: 'Informe a classificação final do atleta' }),
+		qtdLutas: z.coerce
+			.number()
+			.int()
+			.min(0, { message: 'Quantidade de lutas não pode ser negativa' }),
+		qtdVitorias: z.coerce
+			.number()
+			.int()
+			.min(0, { message: 'Quantidade de vitórias não pode ser negativa' })
+	})
+	.refine((dados) => dados.qtdVitorias <= dados.qtdLutas, {
+		message: 'O número de vitórias não pode exceder o número total de lutas disputadas',
+		path: ['qtdVitorias']
+	});
+
+export type EditarResultadoInput = z.infer<typeof editarResultadoSchema>;
+
+/**
+ * Schema Zod para exclusão de resultado individual de atleta
+ */
+export const excluirResultadoSchema = z.object({
+	idClassificacao: z.coerce
+		.number()
+		.int()
+		.positive({ message: 'Identificador do resultado inválido para exclusão' })
+});
+
+export type ExcluirResultadoInput = z.infer<typeof excluirResultadoSchema>;
+
+

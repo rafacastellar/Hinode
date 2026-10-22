@@ -15,6 +15,9 @@ export interface AlunoMatriculadoTurma {
 	matricula: string | null;
 	graduacao_atual: string;
 	idade: number;
+	menor_idade: boolean;
+	categoria: string | null;
+	peso: number | null;
 }
 
 export interface TurmaResumo {
@@ -173,7 +176,9 @@ export async function buscarTurmaPorId(
 			u.nome,
 			a.matricula,
 			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
-			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			a.categoria,
+			a.peso
 		FROM Aluno_Treino at
 		INNER JOIN Aluno a ON at.id_aluno = a.id_usuario
 		INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
@@ -183,13 +188,19 @@ export async function buscarTurmaPorId(
 	`;
 	const [linhasAlunos] = await pool.execute<RowDataPacket[]>(sqlAlunos, [idTreino, idAcademia]);
 
-	const alunosMatriculados: AlunoMatriculadoTurma[] = linhasAlunos.map((la) => ({
-		id_usuario: Number(la.id_usuario),
-		nome: String(la.nome),
-		matricula: la.matricula ? String(la.matricula) : null,
-		graduacao_atual: String(la.graduacao_atual),
-		idade: calcularIdadeServidor(String(la.data_nascimento))
-	}));
+	const alunosMatriculados: AlunoMatriculadoTurma[] = linhasAlunos.map((la) => {
+		const idade = calcularIdadeServidor(String(la.data_nascimento));
+		return {
+			id_usuario: Number(la.id_usuario),
+			nome: String(la.nome),
+			matricula: la.matricula ? String(la.matricula) : null,
+			graduacao_atual: String(la.graduacao_atual),
+			idade,
+			menor_idade: idade < 18,
+			categoria: la.categoria ? String(la.categoria) : null,
+			peso: la.peso !== null && la.peso !== undefined ? Number(la.peso) : null
+		};
+	});
 
 	return {
 		id_treino: Number(turma.id_treino),

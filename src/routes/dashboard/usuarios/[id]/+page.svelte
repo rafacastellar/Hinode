@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
+	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import {
 		Pencil,
 		ArrowLeft,
@@ -121,6 +122,15 @@
 
 	let ehProfessorSelecionado = $derived(
 		perfilProfessorId ? perfisSelecionados.includes(perfilProfessorId) : false
+	);
+
+	// Perfil Aluno
+	let perfilAlunoId = $derived(
+		data.perfis.find((p: any) => p.role.toLowerCase() === 'aluno')?.id_perfil
+	);
+
+	let ehAlunoSelecionado = $derived(
+		perfilAlunoId ? perfisSelecionados.includes(perfilAlunoId) : false
 	);
 
 	// Filtra responsáveis disponíveis que não sejam o próprio usuário e que não estejam já vinculados
@@ -832,18 +842,181 @@
 
 					<div>
 						<label for="grauFaixa" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-							Grau / Dan de Faixa Preta
+							Graduação / Dan (Preta, Kodansha ou Vermelha)
 						</label>
 						<input
 							type="text"
 							id="grauFaixa"
 							name="grauFaixa"
 							defaultValue={data.usuario.dados_professor?.grau_faixa || ''}
-							placeholder="Ex: 1º Dan (Shodan)"
+							placeholder="Ex: 1º a 5º Dan (Preta), 6º a 8º Dan (Kodansha), 9º ou 10º Dan (Vermelha)"
 							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500 transition-colors"
 						/>
 					</div>
 				</div>
+			</section>
+		{/if}
+
+		<!-- ========================================================================= -->
+		<!-- 7. DADOS TÉCNICOS DO JUDÔ (SE POSSUIR PERFIL ALUNO) -->
+		<!-- ========================================================================= -->
+		{#if ehAlunoSelecionado && data.usuario.dados_aluno}
+			<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 transition-all">
+				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+					<div class="flex items-center gap-2.5">
+						<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+							<Award class="w-4 h-4 text-zinc-400" />
+						</div>
+						<div>
+							<h2 class="text-sm font-bold text-white font-display">7. Dados Técnicos do Judô</h2>
+							<p class="text-[11px] text-zinc-500">Faixa atual, Sensei técnico e dados de competição/federação</p>
+						</div>
+					</div>
+					<div class="flex items-center gap-2">
+						<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+							Somente Leitura
+						</span>
+						<a
+							href="/dashboard/alunos/{data.usuario.id_usuario}"
+							class="text-[11px] font-mono text-red-400 hover:text-red-300 transition-colors"
+						>
+							Gerenciar em Alunos →
+						</a>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<!-- 1. Graduação Atual (Faixa) -->
+					<div class="space-y-1">
+						<label for="usr-faixa" class="text-xs font-semibold text-zinc-400">Graduação Atual (Faixa)</label>
+						<div class="relative flex items-center">
+							<input
+								id="usr-faixa"
+								type="text"
+								readonly
+								value={data.usuario.dados_aluno.graduacao_atual}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed pr-28 select-all"
+							/>
+							<div class="absolute right-2.5 pointer-events-none">
+								<BadgeFaixa faixa={data.usuario.dados_aluno.graduacao_atual} size="sm" />
+							</div>
+						</div>
+					</div>
+
+					<!-- 2. Sensei Técnico Responsável -->
+					<div class="space-y-1">
+						<label for="usr-sensei" class="text-xs font-semibold text-zinc-400">Sensei Técnico Responsável</label>
+						<input
+							id="usr-sensei"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.nome_professor_responsavel}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 3. Matrícula no Dojo -->
+					<div class="space-y-1">
+						<label for="usr-matricula" class="text-xs font-semibold text-zinc-400">Matrícula no Dojo</label>
+						<input
+							id="usr-matricula"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.matricula || 'Pendente de atribuição'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 4. Peso Atual (kg) -->
+					<div class="space-y-1">
+						<label for="usr-peso" class="text-xs font-semibold text-zinc-400">Peso Atual (kg)</label>
+						<input
+							id="usr-peso"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.peso !== null && data.usuario.dados_aluno.peso !== undefined
+								? `${data.usuario.dados_aluno.peso} kg`
+								: 'Pendente de pesagem'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 5. Categoria de Peso / Idade -->
+					<div class="space-y-1">
+						<label for="usr-categoria" class="text-xs font-semibold text-zinc-400">Categoria de Peso / Idade</label>
+						<input
+							id="usr-categoria"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.categoria || 'Não classificada'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 6. Nº de Registro Federativo (FPJ/CBJ) -->
+					<div class="space-y-1">
+						<label for="usr-federacao" class="text-xs font-semibold text-zinc-400">Nº de Registro Federativo (FPJ/CBJ)</label>
+						<input
+							id="usr-federacao"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.n_federacao || 'Pendente na Secretaria'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 7. Status na Federação -->
+					<div class="space-y-1">
+						<label for="usr-status-fed" class="text-xs font-semibold text-zinc-400">Status na Federação</label>
+						<input
+							id="usr-status-fed"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.status_federacao || 'Pendente'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 8. Grupo Competitivo -->
+					<div class="space-y-1">
+						<label for="usr-grupo" class="text-xs font-semibold text-zinc-400">Grupo Competitivo</label>
+						<input
+							id="usr-grupo"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.grupo_especial_aspirante || 'Não classificado / Tradicional'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 9. Data de Início no Tatame -->
+					<div class="space-y-1">
+						<label for="usr-data-inicio" class="text-xs font-semibold text-zinc-400">Data de Início no Tatame</label>
+						<input
+							id="usr-data-inicio"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.data_inicio_br || 'Não informada'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+						/>
+					</div>
+
+					<!-- 10. Data da 1ª Graduação (Faixa) -->
+					<div class="space-y-1">
+						<label for="usr-data-grad" class="text-xs font-semibold text-zinc-400">Data da 1ª Graduação (Faixa)</label>
+						<input
+							id="usr-data-grad"
+							type="text"
+							readonly
+							value={data.usuario.dados_aluno.data_primeira_graduacao_br || 'Não informada'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+						/>
+					</div>
+				</div>
+
+				<p class="text-[11px] text-zinc-500 italic pt-1 border-t border-zinc-900">
+					* A alteração de graduações, faixas, categorias e registros federativos do judoca deve ser realizada no cadastro de alunos do dojo.
+				</p>
 			</section>
 		{/if}
 

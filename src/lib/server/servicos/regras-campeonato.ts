@@ -9,7 +9,11 @@ export {
 	FAIXAS_JUDO_ORDEM,
 	obterIndiceFaixa,
 	formatarIntervaloFaixas,
-	formatarIdadeLimite
+	formatarIdadeLimite,
+	SUGESTOES_CLASSIFICACAO_ACADEMIA,
+	correspondeClassificacaoAcademia,
+	ehPodioOuCampeao,
+	normalizarTexto
 } from '../../dominio/campeonato';
 import {
 	obterIndiceFaixa,
@@ -57,8 +61,9 @@ export function validarElegibilidadeCompleta(dados: {
 			motivo: `Faixa ${faixaNome} está abaixo da faixa mínima permitida (${faixaMinNome}).`
 		};
 	}
-	if (idxAtleta > idxFim) {
-		const faixaMaxNome = dados.faixaFim || 'Preta';
+	const tetoEfetivo = idxFim === 8 ? 10 : idxFim;
+	if (idxAtleta > tetoEfetivo) {
+		const faixaMaxNome = dados.faixaFim || 'Vermelha';
 		return {
 			elegivel: false,
 			motivo: `Faixa ${faixaNome} está acima da faixa máxima permitida (${faixaMaxNome}).`

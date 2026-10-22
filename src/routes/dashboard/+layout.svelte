@@ -9,12 +9,14 @@
 		Trophy,
 		Settings,
 		UserCog,
+		User,
 		LogOut,
 		Menu,
 		X,
 		Building2,
 		ShieldCheck,
-		ChevronRight
+		ChevronRight,
+		HeartHandshake
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 
@@ -29,8 +31,15 @@
 		award: Award,
 		trophy: Trophy,
 		settings: Settings,
-		'users-cog': UserCog
+		'users-cog': UserCog,
+		user: User,
+		'heart-handshake': HeartHandshake
 	};
+
+	const ehApenasAluno = $derived(
+		data.perfis.some((p) => p.toLowerCase() === 'aluno') &&
+			!data.perfis.some((p) => ['admin', 'professor', 'recepcao'].includes(p.toLowerCase()))
+	);
 
 	function rotaAtiva(href: string): boolean {
 		const caminhoAtual = page.url.pathname;
@@ -115,11 +124,20 @@
 					</div>
 
 					{#if item.badge}
-						<span
-							class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500 shrink-0"
-						>
-							{item.badge}
-						</span>
+						{#if item.badgeUrgente}
+							<span
+								class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-red-600 text-white shrink-0 shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse flex items-center gap-1.5"
+							>
+								<span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+								<span>{item.badge}</span>
+							</span>
+						{:else}
+							<span
+								class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500 shrink-0"
+							>
+								{item.badge}
+							</span>
+						{/if}
 					{/if}
 				</a>
 			{/each}
@@ -259,11 +277,20 @@
 								<span>{item.titulo}</span>
 							</div>
 							{#if item.badge}
-								<span
-									class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500"
-								>
-									{item.badge}
-								</span>
+								{#if item.badgeUrgente}
+									<span
+										class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse flex items-center gap-1.5"
+									>
+										<span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+										<span>{item.badge}</span>
+									</span>
+								{:else}
+									<span
+										class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500"
+									>
+										{item.badge}
+									</span>
+								{/if}
 							{/if}
 						</a>
 					{/each}
@@ -299,12 +326,23 @@
 		<div
 			class="hidden lg:flex h-16 border-b border-zinc-900/80 bg-zinc-950/40 backdrop-blur-md px-8 items-center justify-between sticky top-0 z-30"
 		>
-			<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+			<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono flex-wrap">
 				<span>Dojo</span>
 				<ChevronRight class="w-3.5 h-3.5 text-zinc-600" />
 				<span class="text-zinc-200 font-medium">{data.nomeAcademia}</span>
 				<span class="text-zinc-600">/</span>
-				<span class="text-red-400 font-semibold uppercase tracking-wider">Painel Administrativo</span>
+				<span class="text-red-400 font-semibold uppercase tracking-wider">
+					{ehApenasAluno ? 'Portal do Judoca' : 'Painel Administrativo'}
+				</span>
+				{#if data.totalAcoesPendentes && data.totalAcoesPendentes > 0}
+					<span class="text-zinc-600">•</span>
+					<span
+						class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-red-600/20 border border-red-500/60 text-red-300 flex items-center gap-1.5 animate-pulse"
+					>
+						<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+						<span>{data.totalAcoesPendentes} Ação Pendente</span>
+					</span>
+				{/if}
 			</div>
 
 			<div class="flex items-center gap-3">

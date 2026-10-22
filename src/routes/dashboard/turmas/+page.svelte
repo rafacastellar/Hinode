@@ -48,8 +48,6 @@
 				<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 					Gestão de Tatame
 				</span>
-				<span class="text-xs text-zinc-600">•</span>
-				<span class="text-xs text-zinc-400 font-mono">Fase 5</span>
 			</div>
 			<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 				Turmas & Treinos

@@ -13,6 +13,7 @@ export interface AlunoListaItem {
 	graduacao_atual: string;
 	peso: number | null;
 	categoria: string | null;
+	genero?: 'M' | 'F';
 	status_federacao?: string | null;
 	grupo_especial_aspirante?: string | null;
 	id_professor_responsavel: number;
@@ -30,6 +31,7 @@ export interface ResponsavelVinculadoAluno {
 
 export interface AlunoDetalhado extends AlunoListaItem {
 	telefone: string | null;
+	genero: 'M' | 'F';
 	n_federacao: string | null;
 	status_federacao: string | null;
 	data_inicio: string | null;
@@ -88,6 +90,7 @@ export async function listarAlunos(
 			u.nome,
 			u.cpf,
 			u.email,
+			u.genero,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			a.matricula,
 			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
@@ -124,6 +127,7 @@ export async function listarAlunos(
 			u.nome,
 			u.cpf,
 			u.email,
+			u.genero,
 			u.data_nascimento,
 			a.matricula,
 			a.graduacao_atual,
@@ -151,6 +155,7 @@ export async function listarAlunos(
 			menor_idade: idade < 18,
 			matricula: linha.matricula ? String(linha.matricula) : null,
 			graduacao_atual: String(linha.graduacao_atual),
+			genero: (linha.genero === 'F' ? 'F' : 'M') as 'M' | 'F',
 			peso: linha.peso !== null ? Number(linha.peso) : null,
 			categoria: linha.categoria ? String(linha.categoria) : null,
 			status_federacao: linha.status_federacao ? String(linha.status_federacao) : null,
@@ -183,6 +188,7 @@ export async function buscarAlunoPorId(
 			u.cpf,
 			u.email,
 			u.telefone,
+			u.genero,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			a.matricula,
 			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
@@ -212,6 +218,7 @@ export async function buscarAlunoPorId(
 			u.cpf,
 			u.email,
 			u.telefone,
+			u.genero,
 			u.data_nascimento,
 			a.matricula,
 			a.graduacao_atual,
@@ -260,6 +267,7 @@ export async function buscarAlunoPorId(
 		menor_idade: idade < 18,
 		matricula: linha.matricula ? String(linha.matricula) : null,
 		graduacao_atual: String(linha.graduacao_atual),
+		genero: (linha.genero === 'F' ? 'F' : 'M') as 'M' | 'F',
 		peso: linha.peso !== null ? Number(linha.peso) : null,
 		categoria: linha.categoria ? String(linha.categoria) : null,
 		n_federacao: linha.n_federacao ? String(linha.n_federacao) : null,

@@ -1,17 +1,63 @@
 import type { LayoutServerLoad } from './$types';
-import { calcularPermissoes, obterMenuAutorizado } from '#lib/server/auth/rbac';
+import { calcularPermissoes, obterMenuAutorizado, normalizarNomePapel } from '#lib/server/auth/rbac';
+import { contarPendenciasAcaoAluno } from '#lib/server/repositorios/dashboard.repo';
+import { contarAlunosDoResponsavel } from '#lib/server/repositorios/responsavel.repo';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	const perfis = locals.perfis || [];
+	const idAcademia = locals.idAcademia;
+	const idUsuario = locals.usuario?.id;
 	const permissoes = calcularPermissoes(perfis);
-	const itensMenu = obterMenuAutorizado(perfis);
+
+	const ehGestorOuProfessor = perfis.some((p) => {
+		const norm = normalizarNomePapel(p);
+		return norm === 'admin' || norm === 'professor' || norm === 'recepcao';
+	});
+	const ehAluno = perfis.some((p) => normalizarNomePapel(p) === 'aluno');
+
+	let totalAcoesPendentes = 0;
+	if (ehAluno && !ehGestorOuProfessor && idAcademia && idUsuario) {
+		try {
+			totalAcoesPendentes = await contarPendenciasAcaoAluno(idAcademia, idUsuario);
+		} catch (e) {
+			console.error('Erro ao verificar pendências do aluno para menu:', e);
+		}
+	}
+
+	let totalDependentes = 0;
+	if (idAcademia && idUsuario) {
+		try {
+			totalDependentes = await contarAlunosDoResponsavel(idAcademia, idUsuario);
+		} catch (e) {
+			console.error('Erro ao verificar dependentes do responsável para menu:', e);
+		}
+	}
+
+	const itensMenu = obterMenuAutorizado(perfis, { totalDependentes }).map((item) => {
+		if (ehAluno && !ehGestorOuProfessor && item.href === '/dashboard' && totalAcoesPendentes > 0) {
+			return {
+				...item,
+				badge: `${totalAcoesPendentes} pendente${totalAcoesPendentes > 1 ? 's' : ''}`,
+				badgeUrgente: true
+			};
+		}
+		if (item.href === '/dashboard/responsavel' && totalDependentes > 0) {
+			return {
+				...item,
+				badge: `${totalDependentes} judoca${totalDependentes > 1 ? 's' : ''}`
+			};
+		}
+		return item;
+	});
 
 	return {
 		usuario: locals.usuario,
-		idAcademia: locals.idAcademia,
+		idAcademia,
 		nomeAcademia: locals.nomeAcademia,
 		perfis,
 		permissoes,
-		itensMenu
+		itensMenu,
+		totalAcoesPendentes,
+		totalDependentes
 	};
 };
