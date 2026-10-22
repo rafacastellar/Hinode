@@ -17,11 +17,26 @@
 		formatarPeriodoInscricaoExame,
 		obterStatusPeriodoInscricao
 	} from '#lib/dominio/graduacao';
+	import { obterIndiceFaixa } from '#lib/dominio/campeonato';
+	import { extrairNumeroDan } from '#lib/dominio/ordenacao-atletas';
 
 	let { data }: { data: PageData } = $props();
 
 	const totalHomologacoes = $derived(data.graduacoes.length);
 	const totalEventos = $derived(data.eventos.length);
+
+	const distribuicaoOrdenada = $derived(
+		[...data.distribuicao].sort((a, b) => {
+			const idxA = obterIndiceFaixa(a.faixa);
+			const idxB = obterIndiceFaixa(b.faixa);
+			if (idxA !== idxB) return idxA - idxB;
+			return extrairNumeroDan(a.faixa) - extrairNumeroDan(b.faixa);
+		})
+	);
+
+	const totalGeralJudocasCenso = $derived(
+		data.distribuicao.reduce((acc, curr) => acc + curr.total, 0)
+	);
 </script>
 
 <svelte:head>
@@ -36,8 +51,6 @@
 				<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 					Pedagogia & Tradição
 				</span>
-				<span class="text-xs text-zinc-600">•</span>
-				<span class="text-xs text-zinc-400 font-mono">Fase 6</span>
 			</div>
 			<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 				Graduações & Faixas
@@ -215,34 +228,47 @@
 	</div>
 
 	<!-- SEÇÃO 2: CENSO DE GRADUAÇÃO DO DOJO -->
-	<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-		<div class="flex items-center justify-between">
-			<div class="flex items-center gap-2">
-				<Users class="w-4 h-4 text-zinc-400" />
-				<h2 class="text-xs font-mono uppercase tracking-wider text-zinc-400 font-bold">
+	<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5">
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-900">
+			<div class="flex items-center gap-2.5 flex-wrap">
+				<Users class="w-4 h-4 text-red-500" />
+				<h2 class="text-xs font-mono uppercase tracking-wider text-white font-bold">
 					Censo de Graduação do Dojo
 				</h2>
+				<span class="text-zinc-600">•</span>
+				<span class="text-xs font-mono text-zinc-400">
+					{totalGeralJudocasCenso} {totalGeralJudocasCenso === 1 ? 'judoca ativo' : 'judocas ativos'} em {distribuicaoOrdenada.length} {distribuicaoOrdenada.length === 1 ? 'graduação' : 'graduações'}
+				</span>
 			</div>
-			<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
+			<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 self-start sm:self-auto">
 				<ShieldCheck class="w-3.5 h-3.5" />
-				<span>Trilha Imutável ACID</span>
+				<span>Ordem Oficial CBJ / FPJ</span>
 			</div>
 		</div>
 
-		{#if data.distribuicao.length > 0}
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-				{#each data.distribuicao as item}
+		{#if distribuicaoOrdenada.length > 0}
+			<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+				{#each distribuicaoOrdenada as item}
+					{@const pct = totalGeralJudocasCenso > 0 ? Math.round((item.total / totalGeralJudocasCenso) * 100) : 0}
 					<div
-						class="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800 flex items-center justify-between gap-2"
+						class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700/80 transition-all flex flex-col justify-between gap-3.5 shadow-xs group"
 					>
-						<BadgeFaixa faixa={item.faixa} size="sm" />
-						<div class="text-right">
-							<span class="text-base font-extrabold text-white font-mono block leading-none">
-								{item.total}
+						<div class="flex items-center justify-between border-b border-zinc-800/60 pb-2">
+							<div class="flex items-baseline gap-1">
+								<span class="text-base font-black text-white font-mono group-hover:text-red-400 transition-colors">
+									{item.total}
+								</span>
+								<span class="text-[11px] font-mono text-zinc-400">
+									{item.total === 1 ? 'judoca' : 'judocas'}
+								</span>
+							</div>
+							<span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-400">
+								{pct}%
 							</span>
-							<span class="text-[10px] text-zinc-500 font-mono">
-								{item.total === 1 ? 'judoca' : 'judocas'}
-							</span>
+						</div>
+
+						<div class="flex items-center justify-center py-1">
+							<BadgeFaixa faixa={item.faixa} size="sm" />
 						</div>
 					</div>
 				{/each}

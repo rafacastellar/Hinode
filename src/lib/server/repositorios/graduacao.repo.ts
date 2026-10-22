@@ -2,6 +2,8 @@ import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/prom
 import { getDbPool } from '../db/pool';
 import type { EventoGraduacaoInput, HomologacaoEventoInput } from '../validacao/graduacao.schema';
 import { validarElegibilidadeGraduacao } from '../servicos/regras-graduacao';
+import { obterIndiceFaixa } from '#lib/dominio/campeonato';
+import { extrairNumeroDan } from '#lib/dominio/ordenacao-atletas';
 
 export interface GraduacaoFeedItem {
 	id_historico: number;
@@ -838,10 +840,17 @@ export async function obterDistribuicaoFaixasDoDojo(
 
 	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia]);
 
-	return linhas.map((linha) => ({
+	const itens = linhas.map((linha) => ({
 		faixa: String(linha.faixa),
 		total: Number(linha.total)
 	}));
+
+	return itens.sort((a, b) => {
+		const idxA = obterIndiceFaixa(a.faixa);
+		const idxB = obterIndiceFaixa(b.faixa);
+		if (idxA !== idxB) return idxA - idxB;
+		return extrairNumeroDan(a.faixa) - extrairNumeroDan(b.faixa);
+	});
 }
 
 /**

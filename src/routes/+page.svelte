@@ -64,7 +64,7 @@
 		<div class="max-w-3xl mb-12">
 			<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-300 mb-6">
 				<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-				<span>Fase 1: Setup SvelteKit & Design System Concluído</span>
+				<span>Sistema Oficial de Gestão para Dojos de Judô</span>
 			</div>
 
 			<h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1] mb-6 font-display">

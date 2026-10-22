@@ -3,6 +3,7 @@ import { obterIndiceFaixa, formatarIntervaloFaixas } from '#lib/dominio/campeona
 export const FAIXAS_SEQUENCIA_OFICIAL = [
 	'Branca',
 	'Cinza',
+	'Azul Claro',
 	'Azul',
 	'Amarela',
 	'Laranja',
@@ -17,8 +18,8 @@ export const FAIXAS_SEQUENCIA_OFICIAL = [
 	'Kodansha Rokudan',
 	'Kodansha Shichidan',
 	'Kodansha Hachidan',
-	'Vermelha Kudan',
-	'Vermelha Judan'
+	'Kodansha Kudan',
+	'Kodansha Judan'
 ] as const;
 
 /**
@@ -29,7 +30,8 @@ export function obterProximaFaixa(faixaAtual?: string | null): string {
 	const normalizada = faixaAtual.toLowerCase().trim();
 
 	if (normalizada.includes('branca')) return 'Cinza';
-	if (normalizada.includes('cinza')) return 'Azul';
+	if (normalizada.includes('cinza')) return 'Azul Claro';
+	if (normalizada.includes('azul claro') || normalizada.includes('azul-claro')) return 'Azul';
 	if (normalizada.includes('azul')) return 'Amarela';
 	if (normalizada.includes('amarela')) return 'Laranja';
 	if (normalizada.includes('laranja')) return 'Verde';
@@ -39,17 +41,17 @@ export function obterProximaFaixa(faixaAtual?: string | null): string {
 	if (normalizada.includes('shodan') || normalizada.includes('1º dan') || normalizada.includes('1o dan') || normalizada.includes('1 dan')) return 'Preta Nidan';
 	if (normalizada.includes('nidan') || normalizada.includes('2º dan') || normalizada.includes('2o dan') || normalizada.includes('2 dan')) return 'Preta Sandan';
 	if (normalizada.includes('sandan') || normalizada.includes('3º dan') || normalizada.includes('3o dan') || normalizada.includes('3 dan')) return 'Preta Yondan';
-	if (normalizada.includes('yondan') || normalizada.includes('4º dan') || normalizada.includes('4o dan') || normalizada.includes('4 dan')) return 'Preta Godan';
-	if (normalizada.includes('godan') || normalizada.includes('5º dan') || normalizada.includes('5o dan') || normalizada.includes('5 dan')) return 'Kodansha Rokudan';
+	if (normalizada.includes('yondan') || normalizada.includes('yodan') || normalizada.includes('4º dan') || normalizada.includes('4o dan') || normalizada.includes('4 dan')) return 'Preta Godan';
+	if (normalizada.includes('godan') || normalizada.includes('gondan') || normalizada.includes('5º dan') || normalizada.includes('5o dan') || normalizada.includes('5 dan')) return 'Kodansha Rokudan';
 	if (normalizada.includes('rokudan') || normalizada.includes('6º dan') || normalizada.includes('6o dan') || normalizada.includes('6 dan')) return 'Kodansha Shichidan';
 	if (normalizada.includes('shichidan') || normalizada.includes('nanadan') || normalizada.includes('7º dan') || normalizada.includes('7o dan') || normalizada.includes('7 dan')) return 'Kodansha Hachidan';
-	if (normalizada.includes('hachidan') || normalizada.includes('8º dan') || normalizada.includes('8o dan') || normalizada.includes('8 dan')) return 'Vermelha Kudan';
-	if (normalizada.includes('kudan') || normalizada.includes('9º dan') || normalizada.includes('9o dan') || normalizada.includes('9 dan')) return 'Vermelha Judan';
-	if (normalizada.includes('judan') || normalizada.includes('10º dan') || normalizada.includes('10o dan') || normalizada.includes('10 dan')) return 'Vermelha Judan';
+	if (normalizada.includes('hachidan') || normalizada.includes('8º dan') || normalizada.includes('8o dan') || normalizada.includes('8 dan')) return 'Kodansha Kudan';
+	if ((normalizada.includes('kudan') && !normalizada.includes('rokudan')) || normalizada.includes('9º dan') || normalizada.includes('9o dan') || normalizada.includes('9 dan')) return 'Kodansha Judan';
+	if (normalizada.includes('judan') || normalizada.includes('10º dan') || normalizada.includes('10o dan') || normalizada.includes('10 dan')) return 'Kodansha Judan';
 
 	if (normalizada.includes('preta')) return 'Preta Nidan';
 	if (normalizada.includes('coral') || normalizada.includes('kodansha') || normalizada.includes('kodancha')) return 'Kodansha Shichidan';
-	if (normalizada.includes('vermelha')) return 'Vermelha Judan';
+	if (normalizada.includes('vermelha')) return 'Kodansha Judan';
 
 	return 'Preta Shodan';
 }

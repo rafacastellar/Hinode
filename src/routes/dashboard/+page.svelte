@@ -182,7 +182,6 @@
 									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 										{data.podeCriarAlunos ? 'Matricular Judoca' : 'Alunos & Judocas'}
 									</span>
-									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 4</span>
 								</div>
 								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 									{data.podeCriarAlunos
@@ -207,7 +206,6 @@
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 									{data.podeGerenciarTurmas ? 'Organizar Turmas' : 'Turmas & Treinos'}
 								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 5</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 								{data.podeGerenciarTurmas
@@ -231,7 +229,6 @@
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 									{data.podeHomologarGraduacoes ? 'Exame & Graduação' : 'Graduações & Faixas'}
 								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 6</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 								{data.podeHomologarGraduacoes
@@ -255,7 +252,6 @@
 								<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 									{data.podeGerenciarCampeonatos ? 'Gestão de Campeonatos' : 'Campeonatos & Inscrições'}
 								</span>
-								<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 7</span>
 							</div>
 							<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 								{data.podeGerenciarCampeonatos
@@ -280,7 +276,6 @@
 									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 										Equipe & Usuários
 									</span>
-									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 9</span>
 								</div>
 								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 									Gestão de operadores e atribuição de perfis acumulativos.
@@ -304,7 +299,6 @@
 									<span class="text-xs font-semibold text-white group-hover:text-red-300 transition-colors">
 										Configurações do Dojo
 									</span>
-									<span class="text-[9px] font-mono text-zinc-500 uppercase">Fase 8</span>
 								</div>
 								<p class="text-[11px] text-zinc-400 mt-0.5 leading-snug">
 									Dados da academia, telemetria e conformidade LGPD.

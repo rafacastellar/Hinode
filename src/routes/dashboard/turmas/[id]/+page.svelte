@@ -45,7 +45,7 @@
 
 	// Estados de controle da chamada: minimização (accordion), ordenação e densidade
 	let listaChamadaExpandida = $state(true);
-	let densidadeChamada = $state<'detalhada' | 'compacta'>('detalhada');
+	let densidadeChamada = $state<'detalhada' | 'compacta'>('compacta');
 	let campoOrdenacaoChamada = $state<CampoOrdenacaoAtleta>('graduacao');
 	let direcaoOrdenacaoChamada = $state<DirecaoOrdenacao>('desc');
 	let filtroBuscaChamada = $state('');
@@ -564,9 +564,13 @@
 														{/if}
 													</td>
 
-													<!-- Faixa -->
+													<!-- Faixa com mesmo tamanho uniforme e legenda na versão detalhada -->
 													<td class="{densidadeChamada === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
-														<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+														<BadgeFaixa
+															faixa={aluno.graduacao_atual}
+															size={densidadeChamada === 'detalhada' ? 'md' : 'sm'}
+															showLegend={densidadeChamada === 'detalhada'}
+														/>
 													</td>
 
 													<!-- Idade -->

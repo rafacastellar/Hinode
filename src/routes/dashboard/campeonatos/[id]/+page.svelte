@@ -107,7 +107,7 @@
 
 	// Estados de controle: minimização (accordion), ordenação e densidade da lista oficial
 	let listaOficialExpandida = $state(true);
-	let densidadeOficial = $state<'detalhada' | 'compacta'>('detalhada');
+	let densidadeOficial = $state<'detalhada' | 'compacta'>('compacta');
 	let campoOrdenacaoOficial = $state<CampoOrdenacaoAtleta>('graduacao');
 	let direcaoOrdenacaoOficial = $state<DirecaoOrdenacao>('desc');
 	let filtroChipOficial = $state<'TODOS' | 'ALUNOS' | 'PROFESSORES' | 'MENORES' | 'ADULTOS'>('TODOS');
@@ -959,9 +959,13 @@
 															</span>
 														</td>
 
-														<!-- Faixa -->
+														<!-- Faixa com mesmo tamanho uniforme e legenda na versão detalhada -->
 														<td class="{densidadeOficial === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
-															<BadgeFaixa faixa={inscr.faixa_participante} size="sm" />
+															<BadgeFaixa
+																faixa={inscr.faixa_participante}
+																size={densidadeOficial === 'detalhada' ? 'md' : 'sm'}
+																showLegend={densidadeOficial === 'detalhada'}
+															/>
 														</td>
 
 														<!-- Categoria & Idade -->

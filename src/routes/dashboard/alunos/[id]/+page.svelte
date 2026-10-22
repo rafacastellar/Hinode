@@ -310,54 +310,57 @@
 				</div>
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<!-- Graduação / Faixa Atual -->
-				<div>
-					<label for="graduacaoAtual" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
-						Graduação Atual (Faixa & Dan) *
-					</label>
-					<div class="flex items-center gap-3">
-						<select
-							id="graduacaoAtual"
-							name="graduacaoAtual"
-							bind:value={graduacaoSelecionada}
-							required
-							class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-						>
-							{#each OPCOES_FAIXAS_CADASTRO as opt}
-								<option value={opt.valor}>{opt.rotulo}</option>
-							{/each}
-							{#if graduacaoSelecionada && !LISTA_TODAS_FAIXAS_VALORES.includes(graduacaoSelecionada)}
-								<option value={graduacaoSelecionada}>{graduacaoSelecionada} (Atual)</option>
-							{/if}
-						</select>
-						<BadgeFaixa faixa={graduacaoSelecionada} size="md" />
+			<!-- 1ª Linha: Sensei Técnico Responsável -->
+			<div>
+				<label
+					for="idProfessorResponsavel"
+					class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+				>
+					Sensei Técnico Responsável *
+				</label>
+				<select
+					id="idProfessorResponsavel"
+					name="idProfessorResponsavel"
+					bind:value={idProfessorResponsavel}
+					required
+					class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+				>
+					<option value="">Selecione o Sensei...</option>
+					{#each data.professores as prof}
+						<option value={prof.id_usuario}>
+							{prof.nome} ({prof.grau_faixa || 'Sensei'})
+						</option>
+					{/each}
+				</select>
+			</div>
+
+			<!-- 2ª Linha: Seletor de Faixa & Visualização com Legenda Oficial -->
+			<div>
+				<label for="graduacaoAtual" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+					Graduação Atual (Faixa & Dan) *
+				</label>
+				<div class="flex flex-col sm:flex-row sm:items-center gap-3.5 p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/80">
+					<select
+						id="graduacaoAtual"
+						name="graduacaoAtual"
+						bind:value={graduacaoSelecionada}
+						required
+						class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+					>
+						{#each OPCOES_FAIXAS_CADASTRO as opt}
+							<option value={opt.valor}>{opt.rotulo}</option>
+						{/each}
+						{#if graduacaoSelecionada && !LISTA_TODAS_FAIXAS_VALORES.includes(graduacaoSelecionada)}
+							<option value={graduacaoSelecionada}>{graduacaoSelecionada} (Atual)</option>
+						{/if}
+					</select>
+					<div class="shrink-0 flex justify-center sm:justify-start">
+						<BadgeFaixa faixa={graduacaoSelecionada} size="md" showLegend={true} />
 					</div>
 				</div>
+			</div>
 
-				<!-- Professor Responsável -->
-				<div>
-					<label
-						for="idProfessorResponsavel"
-						class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
-					>
-						Sensei Técnico Responsável *
-					</label>
-					<select
-						id="idProfessorResponsavel"
-						name="idProfessorResponsavel"
-						bind:value={idProfessorResponsavel}
-						required
-						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
-					>
-						<option value="">Selecione o Sensei...</option>
-						{#each data.professores as prof}
-							<option value={prof.id_usuario}>
-								{prof.nome} ({prof.grau_faixa || 'Sensei'})
-							</option>
-						{/each}
-					</select>
-				</div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
 				<!-- Matrícula -->
 				<div>

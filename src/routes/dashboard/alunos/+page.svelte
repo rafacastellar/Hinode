@@ -34,7 +34,7 @@
 
 	// Estados de controle: minimização (accordion), ordenação e densidade
 	let listaExpandida = $state(true);
-	let modoDensidade = $state<'detalhada' | 'compacta'>('detalhada');
+	let modoDensidade = $state<'detalhada' | 'compacta'>('compacta');
 	let campoOrdenacao = $state<CampoOrdenacaoAtleta>('nome');
 	let direcaoOrdenacao = $state<DirecaoOrdenacao>('asc');
 	let filtroChip = $state<'TODOS' | 'MENORES' | 'ADULTOS' | 'ASPIRANTES' | 'ESPECIAIS'>('TODOS');
@@ -98,8 +98,6 @@
 				<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
 					Módulo de Atletas
 				</span>
-				<span class="text-xs text-zinc-600">•</span>
-				<span class="text-xs text-zinc-400 font-mono">Fase 4</span>
 			</div>
 			<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
 				Judocas do Dojo
@@ -482,11 +480,12 @@
 												{/if}
 											</td>
 
-											<!-- Faixa Atual com maior destaque na versão detalhada -->
+											<!-- Faixa Atual com legenda na versão detalhada e mesmo tamanho uniforme -->
 											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'}">
 												<BadgeFaixa
 													faixa={aluno.graduacao_atual}
 													size={modoDensidade === 'detalhada' ? 'md' : 'sm'}
+													showLegend={modoDensidade === 'detalhada'}
 												/>
 											</td>
 

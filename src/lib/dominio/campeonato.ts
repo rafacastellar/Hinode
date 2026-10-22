@@ -23,6 +23,7 @@ export type FaixaJudo = (typeof FAIXAS_JUDO_LISTA)[number];
 export const FAIXAS_JUDO_ORDEM: Record<string, number> = {
 	branca: 0,
 	cinza: 1,
+	'azul claro': 1.5,
 	azul: 2,
 	amarela: 3,
 	laranja: 4,
@@ -52,7 +53,7 @@ export function obterIndiceFaixa(faixa: string | null | undefined): number {
 	if (
 		(normalizada.includes('vermelha') && !normalizada.includes('branca')) ||
 		((normalizada.includes('9') || normalizada.includes('10')) && normalizada.includes('dan')) ||
-		normalizada.includes('kudan') ||
+		(normalizada.includes('kudan') && !normalizada.includes('rokudan')) ||
 		normalizada.includes('judan')
 	) {
 		return 10;
@@ -92,6 +93,7 @@ export function obterIndiceFaixa(faixa: string | null | undefined): number {
 	if (normalizada.includes('verde')) return 5;
 	if (normalizada.includes('laranja')) return 4;
 	if (normalizada.includes('amarela')) return 3;
+	if (normalizada.includes('azul claro') || normalizada.includes('azul-claro')) return 1.5;
 	if (normalizada.includes('azul')) return 2;
 	if (normalizada.includes('cinza')) return 1;
 	return 0; // Branca
