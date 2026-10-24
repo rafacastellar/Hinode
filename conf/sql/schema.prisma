@@ -34,7 +34,9 @@ model Academia {
 model Usuario {
   id_usuario      Int                @id @default(autoincrement())
   nome            String             @db.VarChar(255)
-  cpf             String             @unique @db.VarChar(14)
+  tipo_documento  String             @default("CPF") @db.VarChar(20)
+  cpf             String             @unique @db.VarChar(30)
+  pais_origem     String             @default("Brasil") @db.VarChar(60)
   data_nascimento DateTime           @db.Date
   genero          String             @default("M") @db.Char(1)
   email           String             @unique @db.VarChar(255)

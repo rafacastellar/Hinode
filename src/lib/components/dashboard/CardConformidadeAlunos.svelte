@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PendenciasTecnicasDojo } from '#lib/server/repositorios/dashboard.repo';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import {
@@ -8,7 +9,11 @@
 		Users,
 		Award,
 		Trophy,
-		ArrowRight
+		ArrowRight,
+		CalendarDays,
+		Sparkles,
+		History,
+		RefreshCw
 	} from '@lucide/svelte';
 
 	interface Props {
@@ -20,18 +25,28 @@
 
 	let { pendencias, escopo = 'geral', subtitulo, onSelecionarAluno }: Props = $props();
 
+	let atualizandoCategorias = $state(false);
+
 	const alunosSemPeso = $derived(pendencias?.alunosSemPeso || []);
 	const alunosSemTurma = $derived(pendencias?.alunosSemTurma || []);
-	const alunosFederacaoPendente = $derived(pendencias?.alunosFederacaoPendente || []);
+	const alunosFederacaoPendente = $derived(
+		(pendencias?.alunosFederacaoPendente || []).filter(
+			(a) => a.status_federacao && a.status_federacao.trim().toLowerCase() === 'pendente'
+		)
+	);
 	const campeonatosPendentesAutorizacao = $derived(
 		pendencias?.campeonatosPendentesAutorizacao || []
 	);
+	const mudancasRecentesPeso = $derived(pendencias?.mudancasRecentesPeso || []);
+	const mudancasExibidas = $derived(mudancasRecentesPeso.slice(0, 3));
+	const viradaTemporada = $derived(pendencias?.viradaTemporada || null);
 
 	const totalPendencias = $derived(
 		alunosSemPeso.length +
 			alunosSemTurma.length +
 			alunosFederacaoPendente.length +
-			campeonatosPendentesAutorizacao.length
+			campeonatosPendentesAutorizacao.length +
+			(viradaTemporada?.totalDesatualizados || 0)
 	);
 
 	const subtituloCalculado = $derived(
@@ -97,6 +112,106 @@
 			</span>
 		{/if}
 	</div>
+
+	<!-- ========================================================================= -->
+	<!-- 0. ALERTA DE VIRADA DE TEMPORADA / MUDANÇA DE FAIXA ETÁRIA (CBJ / FPJ)   -->
+	<!-- ========================================================================= -->
+	{#if viradaTemporada && viradaTemporada.totalDesatualizados > 0}
+		<div
+			class="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-950/40 via-amber-900/20 to-zinc-950 border border-amber-500/50 shadow-lg space-y-3"
+		>
+			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+				<div class="flex items-start gap-2.5">
+					<div
+						class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5"
+					>
+						<CalendarDays class="w-4 h-4 text-amber-400" />
+					</div>
+					<div>
+						<div class="flex items-center gap-2 flex-wrap">
+							<span class="text-xs font-bold text-amber-300">
+								Alerta de Virada de Temporada — Ano Calendário {viradaTemporada.anoVigente}
+							</span>
+							<span
+								class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/90 border border-amber-700 text-amber-300"
+							>
+								{viradaTemporada.totalDesatualizados} atleta{viradaTemporada.totalDesatualizados > 1 ? 's' : ''} com classe defasada
+							</span>
+						</div>
+						<p class="text-[11px] text-zinc-300 mt-0.5 leading-relaxed">
+							Pelo regulamento oficial da CBJ/FPJ, a classe etária (Sub-11, Sub-15, Sub-18, etc.) é calculada pelo ano civil de nascimento ({viradaTemporada.anoVigente} - ano). Com a virada do calendário, as categorias dos atletas abaixo precisam de sincronização.
+						</p>
+					</div>
+				</div>
+
+				<form
+					method="POST"
+					action="/dashboard?/recalcularCategorias"
+					use:enhance={() => {
+						atualizandoCategorias = true;
+						return async ({ update }) => {
+							await update();
+							atualizandoCategorias = false;
+						};
+					}}
+					class="shrink-0"
+				>
+					<button
+						type="submit"
+						disabled={atualizandoCategorias}
+						class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-zinc-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+					>
+						{#if atualizandoCategorias}
+							<RefreshCw class="w-3.5 h-3.5 animate-spin" />
+							<span>Atualizando...</span>
+						{:else}
+							<Sparkles class="w-3.5 h-3.5 text-zinc-950" />
+							<span>Atualizar Temporada {viradaTemporada.anoVigente}</span>
+						{/if}
+					</button>
+				</form>
+			</div>
+
+			<!-- Lista detalhada dos judocas com categoria defasada pela virada do ano -->
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+				{#each viradaTemporada.alunos as aluno (aluno.id_usuario)}
+					<div
+						class="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-900/90 border border-amber-900/40 text-xs"
+					>
+						<div class="flex items-center gap-2 min-w-0">
+							{#if onSelecionarAluno}
+								<button
+									type="button"
+									onclick={() => onSelecionarAluno(aluno.id_usuario)}
+									class="text-left font-semibold text-white truncate hover:text-amber-400 cursor-pointer"
+								>
+									{aluno.nome}
+								</button>
+							{:else}
+								<a
+									href="/dashboard/alunos/{aluno.id_usuario}"
+									class="font-semibold text-white truncate hover:text-amber-400"
+								>
+									{aluno.nome}
+								</a>
+							{/if}
+							<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+							<span class="text-[10px] font-mono text-zinc-400">({aluno.classe_esperada})</span>
+						</div>
+						<div class="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
+							<span class="text-zinc-500 line-through truncate max-w-[85px]" title={aluno.categoria_atual || ''}>
+								{aluno.categoria_atual || 'Sem cat.'}
+							</span>
+							<ArrowRight class="w-3 h-3 text-amber-400 shrink-0" />
+							<span class="text-amber-300 font-bold truncate max-w-[110px]" title={aluno.categoria_esperada || ''}>
+								{aluno.categoria_esperada || 'A calcular'}
+							</span>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	{#if totalPendencias === 0}
 		<div class="py-6 text-center space-y-1.5">
@@ -288,6 +403,121 @@
 					</div>
 				</div>
 			{/if}
+		</div>
+	{/if}
+
+	<!-- ========================================================================= -->
+	<!-- 5. AVISO TÉCNICO: ALTERAÇÕES RECENTES DE PESO E CATEGORIA (SENSEI/ADMIN) -->
+	<!-- ========================================================================= -->
+	{#if mudancasRecentesPeso.length > 0}
+		<div class="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-3 pt-3">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<History class="w-4 h-4 text-emerald-400" />
+					<span class="text-xs font-bold text-white">
+						Alterações Recentes de Peso & Categoria ({mudancasRecentesPeso.length})
+					</span>
+				</div>
+				<span class="text-[10px] font-mono text-zinc-500">Últimos 30 dias</span>
+			</div>
+			<p class="text-[11px] text-zinc-400 leading-relaxed">
+				{escopo === 'tutela'
+					? 'Judocas sob sua responsabilidade técnica que atualizaram a pesagem corporal e tiveram categoria recalculada:'
+					: 'Atletas do dojo que atualizaram a pesagem corporal na balança e tiveram categoria recalculada:'}
+			</p>
+
+			<div class="space-y-2">
+				{#each mudancasExibidas as m (m.id_log)}
+					<div
+						class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-950/80 border border-zinc-800/70 hover:border-zinc-700 transition-colors"
+					>
+						<div class="flex items-center gap-2 flex-wrap min-w-0">
+							{#if onSelecionarAluno}
+								<button
+									type="button"
+									onclick={() => onSelecionarAluno(m.id_aluno)}
+									class="text-left font-semibold text-xs text-white hover:text-emerald-400 cursor-pointer truncate"
+								>
+									{m.nome_aluno}
+								</button>
+							{:else}
+								<a
+									href="/dashboard/alunos/{m.id_aluno}"
+									class="font-semibold text-xs text-white hover:text-emerald-400 truncate"
+								>
+									{m.nome_aluno}
+								</a>
+							{/if}
+							<BadgeFaixa faixa={m.graduacao_atual} size="sm" />
+							<span class="text-[10px] font-mono text-zinc-500">
+								{#if m.origem}
+									• {m.origem}
+								{/if}
+								{#if m.nome_professor_responsavel}
+									• Sensei: {m.nome_professor_responsavel}
+								{/if}
+								• {m.data_alteracao}
+							</span>
+						</div>
+
+						<div class="flex items-center gap-2.5 shrink-0 text-xs font-mono">
+							<!-- Variação de Peso -->
+							<div
+								class="flex items-center gap-1 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800"
+								title="Peso anterior &rarr; Peso novo"
+							>
+								<Scale class="w-3 h-3 text-zinc-500" />
+								<span class="text-zinc-400">
+									{m.peso_anterior !== null ? `${m.peso_anterior}kg` : '—'}
+								</span>
+								<ArrowRight class="w-2.5 h-2.5 text-zinc-600" />
+								<span
+									class="font-bold {m.peso_novo && m.peso_anterior && m.peso_novo > m.peso_anterior
+										? 'text-amber-400'
+										: 'text-emerald-400'}"
+								>
+									{m.peso_novo !== null ? `${m.peso_novo}kg` : '—'}
+								</span>
+							</div>
+
+							<!-- Categoria Calculada -->
+							<div
+								class="flex items-center gap-1 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800"
+								title="Categoria anterior &rarr; Categoria nova"
+							>
+								<span class="text-[10px] text-zinc-500 max-w-[85px] truncate">
+									{m.categoria_anterior || '—'}
+								</span>
+								<ArrowRight class="w-2.5 h-2.5 text-zinc-600" />
+								<span
+									class="text-[10px] font-bold text-white max-w-[120px] truncate"
+									title={m.categoria_nova || ''}
+								>
+									{m.categoria_nova || '—'}
+								</span>
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+
+			<!-- Rodapé de Ação: Ver histórico completo na aba Alunos -->
+			<div class="pt-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-zinc-800/80">
+				<span class="text-[11px] text-zinc-500 font-mono">
+					{#if mudancasRecentesPeso.length > 3}
+						Exibindo os 3 mais recentes de {mudancasRecentesPeso.length} registros
+					{:else}
+						Exibindo {mudancasRecentesPeso.length} alteração(ões) nos últimos 30 dias
+					{/if}
+				</span>
+				<a
+					href="/dashboard/alunos#historico-peso"
+					class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+				>
+					<span>Ver histórico completo dos últimos 30 dias</span>
+					<ArrowRight class="w-3.5 h-3.5" />
+				</a>
+			</div>
 		</div>
 	{/if}
 </section>

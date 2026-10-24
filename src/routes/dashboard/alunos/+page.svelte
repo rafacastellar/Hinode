@@ -19,7 +19,10 @@
 		AlignJustify,
 		ArrowUp,
 		ArrowDown,
-		SlidersHorizontal
+		SlidersHorizontal,
+		History,
+		Scale,
+		ArrowRight
 	} from '@lucide/svelte';
 	import {
 		ordenarAtletas,
@@ -34,6 +37,7 @@
 
 	// Estados de controle: minimização (accordion), ordenação e densidade
 	let listaExpandida = $state(true);
+	let historicoExpandido = $state(false);
 	let modoDensidade = $state<'detalhada' | 'compacta'>('compacta');
 	let campoOrdenacao = $state<CampoOrdenacaoAtleta>('nome');
 	let direcaoOrdenacao = $state<DirecaoOrdenacao>('asc');
@@ -41,6 +45,14 @@
 
 	$effect(() => {
 		termoBusca = data.busca || '';
+	});
+
+	$effect(() => {
+		if (typeof window !== 'undefined' && window.location.hash === '#historico-peso') {
+			historicoExpandido = true;
+			const el = document.getElementById('historico-peso');
+			el?.scrollIntoView({ behavior: 'smooth' });
+		}
 	});
 
 	function alternarDirecao() {
@@ -621,4 +633,175 @@
 			{/if}
 		</div>
 	{/if}
+
+	<!-- ========================================================================= -->
+	<!-- HISTÓRICO DE ALTERAÇÕES DE PESO & CATEGORIAS (MINIMIZÁVEL / 30 DIAS)       -->
+	<!-- ========================================================================= -->
+	<section
+		id="historico-peso"
+		class="rounded-2xl sm:rounded-3xl bg-zinc-950 border border-zinc-900 overflow-hidden shadow-sm transition-all"
+	>
+		<!-- Header Colapsável (Accordion) -->
+		<div
+			class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-zinc-900/40 transition-colors"
+			onclick={() => (historicoExpandido = !historicoExpandido)}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Enter' && (historicoExpandido = !historicoExpandido)}
+			aria-expanded={historicoExpandido}
+		>
+			<div class="flex items-center gap-3">
+				<div
+					class="w-10 h-10 rounded-xl bg-emerald-950/40 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shrink-0"
+				>
+					<History class="w-5 h-5 text-emerald-400" />
+				</div>
+				<div>
+					<div class="flex items-center gap-2 flex-wrap">
+						<h2 class="text-sm sm:text-base font-bold text-white font-display">
+							Histórico de Pesagens & Categorias
+						</h2>
+						<span
+							class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase {data.historicoMudancasPeso.length > 0
+								? 'bg-emerald-950/60 border border-emerald-800 text-emerald-300'
+								: 'bg-zinc-900 border border-zinc-800 text-zinc-500'}"
+						>
+							{data.historicoMudancasPeso.length} alteração(ões) nos últimos 30 dias
+						</span>
+					</div>
+					<p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">
+						Auditoria de aferições na balança e recálculos automáticos de categoria oficial (CBJ/FPJ).
+					</p>
+				</div>
+			</div>
+
+			<div class="flex items-center gap-2 self-end sm:self-auto">
+				<span class="text-xs text-zinc-500 font-mono hidden sm:inline">
+					{historicoExpandido ? 'Recolher' : 'Expandir'}
+				</span>
+				<div
+					class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-transform duration-200 {historicoExpandido
+						? 'rotate-180'
+						: ''}"
+				>
+					<ChevronDown class="w-4 h-4" />
+				</div>
+			</div>
+		</div>
+
+		<!-- Conteúdo Expandido -->
+		{#if historicoExpandido}
+			<div class="p-4 sm:p-6 border-t border-zinc-900 bg-zinc-950/60 space-y-3 animate-in fade-in duration-200">
+				{#if data.historicoMudancasPeso.length === 0}
+					<div class="py-8 text-center space-y-2">
+						<Scale class="w-8 h-8 text-zinc-600 mx-auto" />
+						<p class="text-xs sm:text-sm text-zinc-400 font-medium">
+							Nenhuma alteração de peso registrada nos últimos 30 dias.
+						</p>
+						<p class="text-[11px] text-zinc-600">
+							Quando um judoca ou responsável atualizar o peso corporal na balança, o histórico e a nova categoria oficial calculada aparecerão aqui.
+						</p>
+					</div>
+				{:else}
+					<div class="space-y-2.5">
+						{#each data.historicoMudancasPeso as item (item.id_log)}
+							<div
+								class="p-3 sm:p-3.5 rounded-xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+							>
+								<!-- Identificação do Judoca -->
+								<div class="flex items-center gap-2.5 min-w-0">
+									<a
+										href="/dashboard/alunos/{item.id_aluno}"
+										class="text-xs sm:text-sm font-bold text-white hover:text-emerald-400 transition-colors truncate"
+										title="Ver ficha completa do judoca"
+									>
+										{item.nome_aluno}
+									</a>
+									<BadgeFaixa faixa={item.graduacao_atual} size="sm" />
+									<span
+										class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-950 border border-zinc-800 text-zinc-400 shrink-0"
+									>
+										{item.origem}
+									</span>
+								</div>
+
+								<!-- Detalhes da Mudança: Peso, Categoria e Data -->
+								<div
+									class="flex items-center gap-3 sm:gap-4 flex-wrap text-xs font-mono justify-between md:justify-end"
+								>
+									<!-- Variação do Peso -->
+									<div
+										class="flex items-center gap-1.5 bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800"
+										title="Peso anterior &rarr; Novo peso medido"
+									>
+										<Scale class="w-3.5 h-3.5 text-zinc-500" />
+										<span class="text-zinc-400">
+											{item.peso_anterior !== null ? `${item.peso_anterior}kg` : 'Sem peso'}
+										</span>
+										<ArrowRight class="w-3 h-3 text-zinc-600" />
+										<span
+											class="font-bold {item.peso_novo && item.peso_anterior && item.peso_novo > item.peso_anterior
+												? 'text-amber-400'
+												: 'text-emerald-400'}"
+										>
+											{item.peso_novo !== null ? `${item.peso_novo}kg` : '—'}
+										</span>
+										{#if item.peso_novo && item.peso_anterior}
+											{@const dif = Number((item.peso_novo - item.peso_anterior).toFixed(1))}
+											<span
+												class="text-[10px] font-bold {dif > 0
+													? 'text-amber-400'
+													: dif < 0
+														? 'text-emerald-400'
+														: 'text-zinc-500'}"
+											>
+												({dif > 0 ? `+${dif}` : dif}kg)
+											</span>
+										{/if}
+									</div>
+
+									<!-- Categoria Anterior -> Nova -->
+									<div
+										class="flex items-center gap-1.5 bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800"
+										title="Categoria anterior &rarr; Nova categoria oficial CBJ"
+									>
+										<span
+											class="text-[11px] text-zinc-500 max-w-[100px] truncate"
+											title={item.categoria_anterior || ''}
+										>
+											{item.categoria_anterior || 'Sem cat.'}
+										</span>
+										<ArrowRight class="w-3 h-3 text-zinc-600" />
+										<span
+											class="text-[11px] font-bold text-white max-w-[150px] truncate"
+											title={item.categoria_nova || ''}
+										>
+											{item.categoria_nova || '—'}
+										</span>
+									</div>
+
+									<!-- Data da Alteração & Sensei -->
+									<div class="text-[11px] text-zinc-500 flex items-center gap-1.5 shrink-0">
+										<span>{item.data_alteracao}</span>
+										{#if item.nome_professor_responsavel}
+											<span class="text-zinc-600">•</span>
+											<span class="text-zinc-400">Sensei: {item.nome_professor_responsavel}</span>
+										{/if}
+									</div>
+
+									<a
+										href="/dashboard/alunos/{item.id_aluno}"
+										class="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
+										title="Abrir judoca"
+									>
+										<Eye class="w-3.5 h-3.5" />
+									</a>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</section>
 </div>

@@ -272,13 +272,15 @@
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				<!-- CPF (Read-only) -->
+				<!-- CPF / Documento (Read-only) -->
 				<div>
 					<div class="flex items-center justify-between mb-1">
 						<label for="cpf" class="text-[11px] font-mono uppercase text-zinc-400 block">
-							CPF (Imutável / Chave Fiscal)
+							{data.usuario.tipo_documento === 'ESTRANGEIRO' ? 'Documento Estrangeiro (Passaporte/RNM)' : 'CPF (Imutável / Chave Fiscal)'}
 						</label>
-						<span class="text-[10px] font-mono text-zinc-500">LGPD</span>
+						<span class="text-[10px] font-mono text-zinc-500">
+							{data.usuario.tipo_documento === 'ESTRANGEIRO' ? (data.usuario.pais_origem || 'Internacional') : 'LGPD'}
+						</span>
 					</div>
 					<input
 						type="text"

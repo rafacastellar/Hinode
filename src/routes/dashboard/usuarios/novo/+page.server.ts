@@ -30,7 +30,9 @@ export const actions: Actions = {
 
 		const dados = {
 			nome: String(formData.get('nome') || ''),
+			tipoDocumento: (formData.get('tipoDocumento') as 'CPF' | 'ESTRANGEIRO') || 'CPF',
 			cpf: String(formData.get('cpf') || ''),
+			paisOrigem: formData.get('paisOrigem') ? String(formData.get('paisOrigem')) : 'Brasil',
 			dataNascimento: String(formData.get('dataNascimento') || ''),
 			genero: (formData.get('genero') || 'M') as 'M' | 'F',
 			email: String(formData.get('email') || ''),

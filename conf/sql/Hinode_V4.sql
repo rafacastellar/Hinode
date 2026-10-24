@@ -2,9 +2,10 @@
 -- Hinode - Sistema de Gestão de Dojos
 -- Script de CRIAÇÃO COMPLETA do banco de dados (V4)
 --
--- Já inclui todos os ajustes de segurança e regras de negócio da migration 001.
--- Use este arquivo para instalações NOVAS. Quem já tem o banco criado com a V3
--- deve usar a migration 001_ajustes_seguranca_regras.sql.
+-- Já inclui todos os ajustes de segurança, confirmações de eventos e suporte a
+-- documentos estrangeiros / internacionais (migrations 001 a 004).
+-- Use este arquivo para instalações NOVAS. Quem já tem o banco criado
+-- deve executar as migrations sequenciais na pasta /migrations.
 --
 -- Requisitos: MySQL 8.0.16 ou superior (CHECK só é aplicado a partir desta versão).
 --
@@ -36,7 +37,9 @@ CREATE TABLE Academia (
 CREATE TABLE Usuario (
     id_usuario INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
-    cpf VARCHAR(14) UNIQUE NOT NULL,
+    tipo_documento ENUM('CPF', 'ESTRANGEIRO') NOT NULL DEFAULT 'CPF',
+    cpf VARCHAR(30) UNIQUE NOT NULL,
+    pais_origem VARCHAR(60) NOT NULL DEFAULT 'Brasil',
     -- Maioridade é SEMPRE calculada no servidor a partir desta data (nunca por campo booleano)
     data_nascimento DATE NOT NULL,
     genero ENUM('M', 'F') NOT NULL DEFAULT 'M',

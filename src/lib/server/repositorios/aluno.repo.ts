@@ -431,3 +431,74 @@ export async function atualizarAlunoEmTransacao(
 	);
 }
 
+export interface HistoricoMudancaPesoItem {
+	id_log: number;
+	id_aluno: number;
+	nome_aluno: string;
+	graduacao_atual: string;
+	peso_anterior: number | null;
+	peso_novo: number | null;
+	categoria_anterior: string | null;
+	categoria_nova: string | null;
+	data_alteracao: string;
+	origem: string;
+	nome_professor_responsavel?: string | null;
+}
+
+/**
+ * Retorna o histórico de alterações de peso e recálculo de categoria dos alunos do dojo
+ * nos últimos N dias (padrão: 30 dias).
+ */
+export async function obterHistoricoMudancasPeso(
+	idAcademia: number,
+	dias: number = 30
+): Promise<HistoricoMudancaPesoItem[]> {
+	const pool = getDbPool();
+	const sqlLogs = `
+		SELECT 
+			l.id_log,
+			l.id_entidade AS id_aluno,
+			l.dados_antes,
+			l.dados_depois,
+			DATE_FORMAT(l.criado_em, '%d/%m/%Y às %H:%i') AS data_alteracao,
+			u.nome AS nome_aluno,
+			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
+			prof_u.nome AS nome_professor_responsavel
+		FROM Log_Auditoria l
+		INNER JOIN Aluno a ON a.id_usuario = CAST(l.id_entidade AS UNSIGNED)
+		INNER JOIN Usuario u ON u.id_usuario = a.id_usuario
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		LEFT JOIN Professor p ON p.id_usuario = a.id_professor_responsavel
+		LEFT JOIN Usuario prof_u ON prof_u.id_usuario = p.id_usuario
+		WHERE l.id_academia = ? AND ua.id_academia = ? AND l.acao = 'MUDANCA_PESO_CATEGORIA'
+		  AND l.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY)
+		ORDER BY l.criado_em DESC
+	`;
+
+	const [rowsLogs] = await pool.execute<RowDataPacket[]>(sqlLogs, [idAcademia, idAcademia, dias]);
+
+	return rowsLogs.map((r) => {
+		let antes: any = {};
+		let depois: any = {};
+		try {
+			antes = typeof r.dados_antes === 'string' ? JSON.parse(r.dados_antes) : r.dados_antes || {};
+			depois = typeof r.dados_depois === 'string' ? JSON.parse(r.dados_depois) : r.dados_depois || {};
+		} catch {}
+
+		return {
+			id_log: Number(r.id_log),
+			id_aluno: Number(r.id_aluno),
+			nome_aluno: String(r.nome_aluno),
+			graduacao_atual: String(r.graduacao_atual),
+			peso_anterior: antes.peso !== undefined && antes.peso !== null ? Number(antes.peso) : null,
+			peso_novo: depois.peso !== undefined && depois.peso !== null ? Number(depois.peso) : null,
+			categoria_anterior: antes.categoria || null,
+			categoria_nova: depois.categoria || null,
+			data_alteracao: String(r.data_alteracao),
+			origem: depois.origem || 'Perfil do Aluno',
+			nome_professor_responsavel: r.nome_professor_responsavel ? String(r.nome_professor_responsavel) : null
+		};
+	});
+}
+
+
