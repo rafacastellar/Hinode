@@ -103,6 +103,19 @@ export async function revogarSessaoPorHash(tokenHash: string): Promise<void> {
 }
 
 /**
+ * Estende o tempo de expiração da sessão ativa no MySQL (Sliding Expiration por inatividade).
+ */
+export async function renovarSessao(idSessao: number, novaExpiraEm: Date): Promise<void> {
+	const pool = getDbPool();
+	const sql = `
+		UPDATE Sessao
+		SET expira_em = ?
+		WHERE id_sessao = ? AND revogada_em IS NULL
+	`;
+	await pool.execute(sql, [novaExpiraEm, idSessao]);
+}
+
+/**
  * Remove sessões antigas que já expiraram há mais de 7 dias (limpeza periódica).
  */
 export async function limparSessoesExpiradas(): Promise<number> {

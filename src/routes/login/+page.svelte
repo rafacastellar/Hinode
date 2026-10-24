@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Lock, Mail, Building2, AlertCircle, ArrowRight, ShieldCheck } from '@lucide/svelte';
+	import type { PageData } from './$types';
+	import { Lock, Mail, Building2, AlertCircle, ArrowRight, ShieldCheck, Clock, Eye, EyeOff } from '@lucide/svelte';
 
 	interface FormState {
 		erro?: string;
@@ -9,11 +10,12 @@
 		academias?: Array<{ id_academia: number; nome: string; nome_fantasia: string | null }>;
 	}
 
-	let { form }: { form: FormState | null } = $props();
+	let { data, form }: { data: PageData; form: FormState | null } = $props();
 
 	let carregando = $state(false);
 	let emailValor = $state('');
 	let senhaValor = $state('');
+	let mostrarSenha = $state(false);
 	let idAcademiaSelecionada = $state<number | null>(null);
 
 	$effect(() => {
@@ -58,7 +60,18 @@
 
 	<div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
 		<div class="bg-zinc-950 py-8 px-6 sm:px-10 border border-zinc-900 rounded-2xl shadow-2xl">
-			<!-- Alerta de Erro -->
+			<!-- Alerta de Sessão Expirada por Inatividade -->
+			{#if data?.expirada && !form?.erro}
+				<div class="mb-6 p-4 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-200 text-sm flex items-start gap-3">
+					<Clock class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+					<div class="leading-relaxed">
+						<span class="font-semibold block text-amber-100">Sessão Expirada por Inatividade</span>
+						Por medidas de segurança, sua sessão foi encerrada após 2 horas sem atividade. Faça login novamente para prosseguir.
+					</div>
+				</div>
+			{/if}
+
+			<!-- Alerta de Erro / Rate Limiting -->
 			{#if form?.erro}
 				<div class="mb-6 p-4 rounded-lg bg-red-950/40 border border-red-900/60 text-red-200 text-sm flex items-start gap-3">
 					<AlertCircle class="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
@@ -113,13 +126,26 @@
 						<input
 							id="senha"
 							name="senha"
-							type="password"
+							type={mostrarSenha ? 'text' : 'password'}
 							autocomplete="current-password"
 							required
 							bind:value={senhaValor}
 							placeholder="••••••••"
-							class="block w-full pl-10 pr-3 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+							class="block w-full pl-10 pr-10 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
 						/>
+						<button
+							type="button"
+							onclick={() => (mostrarSenha = !mostrarSenha)}
+							class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer focus:outline-none"
+							title={mostrarSenha ? 'Ocultar senha' : 'Exibir senha'}
+							aria-label={mostrarSenha ? 'Ocultar senha' : 'Exibir senha'}
+						>
+							{#if mostrarSenha}
+								<EyeOff class="w-4 h-4" />
+							{:else}
+								<Eye class="w-4 h-4" />
+							{/if}
+						</button>
 					</div>
 				</div>
 
@@ -150,6 +176,26 @@
 						</div>
 					</div>
 				{/if}
+
+				<!-- Opção: Lembrar de mim (Persistência vs. Inatividade de 2h) -->
+				<div class="flex items-start gap-3 pt-1">
+					<div class="flex items-center h-5">
+						<input
+							id="lembrar"
+							name="lembrar"
+							type="checkbox"
+							class="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-red-600 focus:ring-red-500 focus:ring-offset-zinc-950 transition-colors cursor-pointer"
+						/>
+					</div>
+					<div class="text-xs">
+						<label for="lembrar" class="font-medium text-zinc-300 cursor-pointer select-none">
+							Lembrar de mim neste dispositivo (7 dias)
+						</label>
+						<p class="text-zinc-500 mt-0.5">
+							Desmarque se estiver em computador compartilhado ou recepção (expira em 2h de inatividade).
+						</p>
+					</div>
+				</div>
 
 				<!-- Botão de Login -->
 				<div>
