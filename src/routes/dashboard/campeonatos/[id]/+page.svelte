@@ -31,8 +31,11 @@
 		ArrowDown,
 		LayoutList,
 		AlignJustify,
-		Search
+		Search,
+		Printer
 	} from '@lucide/svelte';
+	import ModalImpressaoDocumento from '#lib/components/documentos/ModalImpressaoDocumento.svelte';
+	import DocumentoCampeonatoImpressao from '#lib/components/documentos/DocumentoCampeonatoImpressao.svelte';
 	import { SUGESTOES_CLASSIFICACAO_ACADEMIA } from '#lib/dominio/campeonato';
 	import {
 		ordenarAtletas,
@@ -44,6 +47,11 @@
 
 	let abaAtiva = $state<'inscricoes' | 'resultados'>('inscricoes');
 	let tipoParticipante = $state<'aluno' | 'professor'>('aluno');
+
+	// Estado do Modal de Impressão da Súmula da Delegação
+	let modalImpressaoAberto = $state(false);
+	let filtroImpressaoStatus = $state<'todos' | 'confirmadas' | 'pendentes'>('todos');
+	let ordenacaoImpressao = $state<'nome' | 'categoria_peso' | 'faixa' | 'status'>('nome');
 	let participanteSelecionado = $state<number | ''>('');
 	let carregandoInscricao = $state(false);
 	let carregandoAcao = $state(false);
@@ -259,9 +267,19 @@
 					{/if}
 				</div>
 
-				<!-- Botões de Ação do Professor/Admin -->
-				{#if data.ehProfessorOuAdmin}
-					<div class="flex items-center gap-2 pt-2 lg:pt-0">
+				<!-- Botões de Ação do Professor/Admin / Impressão -->
+				<div class="flex items-center gap-2 pt-2 lg:pt-0 flex-wrap">
+					<button
+						type="button"
+						onclick={() => (modalImpressaoAberto = true)}
+						class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-xs font-semibold text-white shadow-sm cursor-pointer active:scale-95 transition-all"
+						title="Imprimir súmula e lista oficial da delegação de competidores"
+					>
+						<Printer class="w-3.5 h-3.5 text-red-500" />
+						<span>Imprimir Súmula</span>
+					</button>
+
+					{#if data.ehProfessorOuAdmin}
 						<a
 							href="/dashboard/campeonatos/{data.campeonato.id_evento}/editar"
 							class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs font-medium text-zinc-200 hover:text-white transition-all shadow-sm"
@@ -278,8 +296,8 @@
 							<Trash2 class="w-3.5 h-3.5" />
 							<span>Excluir</span>
 						</button>
-					</div>
-				{/if}
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -1822,3 +1840,46 @@
 		</div>
 	</div>
 {/if}
+
+<!-- MODAL DE IMPRESSÃO DA SÚMULA DA DELEGAÇÃO -->
+{#snippet controlesCampeonato()}
+	<div class="flex items-center gap-2">
+		<!-- Filtro de Confirmação -->
+		<select
+			bind:value={filtroImpressaoStatus}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Filtrar competidores por status"
+		>
+			<option value="todos">Todos os Atletas</option>
+			<option value="confirmadas">Apenas Confirmados</option>
+			<option value="pendentes">Apenas Pendentes</option>
+		</select>
+
+		<!-- Critério de Ordenação -->
+		<select
+			bind:value={ordenacaoImpressao}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Critério de ordenação da súmula"
+		>
+			<option value="nome">Ordem: Nome (A-Z)</option>
+			<option value="categoria_peso">Ordem: Categoria & Peso</option>
+			<option value="faixa">Ordem: Graduação / Faixa</option>
+			<option value="status">Ordem: Status Inscrição</option>
+		</select>
+	</div>
+{/snippet}
+
+<ModalImpressaoDocumento
+	aberto={modalImpressaoAberto}
+	titulo="Súmula da Delegação - {data.campeonato.nome}"
+	subtitulo="Documento oficial com relação de atletas para pesagem e competição"
+	onfechar={() => (modalImpressaoAberto = false)}
+	controles={controlesCampeonato}
+>
+	<DocumentoCampeonatoImpressao
+		campeonato={data.campeonato}
+		inscricoes={data.inscricoes}
+		filtroStatus={filtroImpressaoStatus}
+		criterioOrdenacao={ordenacaoImpressao}
+	/>
+</ModalImpressaoDocumento>

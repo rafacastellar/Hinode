@@ -18,14 +18,22 @@
 		EyeOff,
 		Check,
 		Globe,
-		ShieldCheck
+		ShieldCheck,
+		Printer
 	} from '@lucide/svelte';
+	import ModalImpressaoDocumento from '#lib/components/documentos/ModalImpressaoDocumento.svelte';
+	import DocumentoUsuariosImpressao from '#lib/components/documentos/DocumentoUsuariosImpressao.svelte';
 	import { analisarForcaSenha } from '#lib/dominio/validacao';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let termoBusca = $state('');
 	let perfilFiltro = $state('');
+
+	// Estado de Impressão da Lista de Usuários
+	let modalImpressaoAberto = $state(false);
+	let filtroImpressaoPerfil = $state('todos');
+	let ordenacaoImpressao = $state<'nome' | 'perfil' | 'idade'>('nome');
 
 	$effect(() => {
 		termoBusca = data.busca || '';
@@ -111,13 +119,25 @@
 			</p>
 		</div>
 
-		<a
-			href="/dashboard/usuarios/novo"
-			class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(220,38,38,0.35)] transition-all shrink-0"
-		>
-			<UserPlus class="w-4 h-4" />
-			<span>Novo Usuário</span>
-		</a>
+		<div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+			<button
+				type="button"
+				onclick={() => (modalImpressaoAberto = true)}
+				class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 hover:border-zinc-500 text-xs font-semibold shadow-sm cursor-pointer active:scale-95 transition-all"
+				title="Imprimir relatório e relação cadastral de usuários"
+			>
+				<Printer class="w-4 h-4 text-red-500" />
+				<span>Imprimir Relação</span>
+			</button>
+
+			<a
+				href="/dashboard/usuarios/novo"
+				class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(220,38,38,0.35)] transition-all shrink-0"
+			>
+				<UserPlus class="w-4 h-4" />
+				<span>Novo Usuário</span>
+			</a>
+		</div>
 	</div>
 
 	<!-- Feedback de Operações -->
@@ -508,3 +528,46 @@
 		</div>
 	</div>
 {/if}
+
+<!-- MODAL DE IMPRESSÃO DA RELAÇÃO DE USUÁRIOS -->
+{#snippet controlesUsuarios()}
+	<div class="flex items-center gap-2">
+		<!-- Filtro de Perfil -->
+		<select
+			bind:value={filtroImpressaoPerfil}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Filtrar por perfil"
+		>
+			<option value="todos">Todos os Perfis</option>
+			{#each data.perfis as p}
+				<option value={p.role}>{p.role}</option>
+			{/each}
+		</select>
+
+		<!-- Ordenação -->
+		<select
+			bind:value={ordenacaoImpressao}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Critério de ordenação da relação"
+		>
+			<option value="nome">Ordem: Nome (A-Z)</option>
+			<option value="perfil">Ordem: Função / Perfil</option>
+			<option value="idade">Ordem: Idade</option>
+		</select>
+	</div>
+{/snippet}
+
+<ModalImpressaoDocumento
+	aberto={modalImpressaoAberto}
+	titulo="Relação Cadastral de Membros do Dojo"
+	subtitulo="Documento oficial para governança, conferência e arquivo físico"
+	onfechar={() => (modalImpressaoAberto = false)}
+	controles={controlesUsuarios}
+>
+	<DocumentoUsuariosImpressao
+		usuarios={data.usuarios}
+		perfisDisponiveis={data.perfis}
+		filtroPerfil={filtroImpressaoPerfil}
+		criterioOrdenacao={ordenacaoImpressao}
+	/>
+</ModalImpressaoDocumento>

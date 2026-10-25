@@ -22,8 +22,11 @@
 		LayoutList,
 		AlignJustify,
 		Search,
-		Filter
+		Filter,
+		Printer
 	} from '@lucide/svelte';
+	import ModalImpressaoDocumento from '#lib/components/documentos/ModalImpressaoDocumento.svelte';
+	import DocumentoTreinoImpressao from '#lib/components/documentos/DocumentoTreinoImpressao.svelte';
 	import {
 		ordenarAtletas,
 		type CampoOrdenacaoAtleta,
@@ -40,6 +43,7 @@
 	let carregandoEdicao = $state(false);
 	let carregandoExclusao = $state(false);
 	let modalExcluirAberto = $state(false);
+	let modalImpressaoAberto = $state(false);
 	let alunoSelecionado = $state<number | ''>('');
 	let filtroBuscaAluno = $state('');
 
@@ -183,6 +187,16 @@
 						<span>{abaAtiva === 'editar' ? 'Ver Chamada' : 'Editar Turma'}</span>
 					</button>
 				{/if}
+
+				<button
+					type="button"
+					onclick={() => (modalImpressaoAberto = true)}
+					class="px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-700 shadow-sm hover:border-zinc-500 cursor-pointer active:scale-95"
+					title="Imprimir lista de chamada e controle do treino"
+				>
+					<Printer class="w-3.5 h-3.5 text-red-500" />
+					<span>Imprimir Chamada</span>
+				</button>
 			</div>
 		</div>
 
@@ -914,3 +928,13 @@
 		</div>
 	</div>
 {/if}
+
+<!-- MODAL DE IMPRESSÃO DO TREINO / CHAMADA -->
+<ModalImpressaoDocumento
+	aberto={modalImpressaoAberto}
+	titulo="Documento de Treino - {data.turma.descricao}"
+	subtitulo="Lista oficial de chamada para o tatame"
+	onfechar={() => (modalImpressaoAberto = false)}
+>
+	<DocumentoTreinoImpressao turma={data.turma} />
+</ModalImpressaoDocumento>
