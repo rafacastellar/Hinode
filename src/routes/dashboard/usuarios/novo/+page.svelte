@@ -19,8 +19,19 @@
 		Users,
 		Plus,
 		Trash2,
-		CheckCircle2
+		CheckCircle2,
+		Eye,
+		EyeOff,
+		Globe,
+		Check,
+		X
 	} from '@lucide/svelte';
+	import {
+		validarCpfOficial,
+		validarDocumentoEstrangeiro,
+		formatarCpf,
+		analisarForcaSenha
+	} from '#lib/dominio/validacao';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -29,6 +40,37 @@
 	let perfisSelecionados = $state<number[]>([]);
 	let dataNasc = $state('');
 	let generoSelecionado = $state<'M' | 'F'>('M');
+
+	// Documento e Nacionalidade
+	let tipoDocumento = $state<'CPF' | 'ESTRANGEIRO'>('CPF');
+	let cpfValor = $state('');
+	let paisOrigem = $state('Brasil');
+
+	// Senha com Segurança e Força
+	let senhaValor = $state('');
+	let mostrarSenha = $state(false);
+	const analiseSenha = $derived(analisarForcaSenha(senhaValor));
+
+	const statusCpf = $derived.by(() => {
+		if (tipoDocumento === 'CPF') {
+			const digitos = cpfValor.replace(/\D/g, '');
+			if (!digitos) return 'vazio';
+			if (digitos.length < 11) return 'incompleto';
+			return validarCpfOficial(digitos) ? 'valido' : 'invalido';
+		} else {
+			if (!cpfValor.trim()) return 'vazio';
+			return validarDocumentoEstrangeiro(cpfValor) ? 'valido' : 'invalido';
+		}
+	});
+
+	function tratarInputCpf(e: Event) {
+		const target = e.target as HTMLInputElement;
+		if (tipoDocumento === 'CPF') {
+			cpfValor = formatarCpf(target.value);
+		} else {
+			cpfValor = target.value.toUpperCase();
+		}
+	}
 
 	// Endereço Completo
 	let cep = $state('');
@@ -64,6 +106,15 @@
 		}
 		if (form?.valores?.genero) {
 			generoSelecionado = form.valores.genero;
+		}
+		if (form?.valores?.tipoDocumento) {
+			tipoDocumento = form.valores.tipoDocumento as 'CPF' | 'ESTRANGEIRO';
+		}
+		if (form?.valores?.cpf) {
+			cpfValor = form.valores.cpf;
+		}
+		if (form?.valores?.paisOrigem) {
+			paisOrigem = form.valores.paisOrigem;
 		}
 		if (form?.valores?.cep) cep = form.valores.cep;
 		if (form?.valores?.logradouro) logradouro = form.valores.logradouro;
@@ -317,40 +368,191 @@
 					</div>
 				</div>
 
-				<!-- Senha -->
-				<div>
-					<label for="senha" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-						Senha Inicial (Mín. 6 caracteres) *
-					</label>
-					<div class="relative">
-						<Lock class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-						<input
-							type="password"
-							id="senha"
-							name="senha"
-							required
-							minlength="6"
-							placeholder="••••••••"
-							class="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
-						/>
+				<!-- Seleção de Tipo de Documento -->
+				<div class="md:col-span-2 space-y-2">
+					<div class="flex items-center justify-between">
+						<span class="text-[11px] font-mono uppercase text-zinc-400 block">
+							Documento de Identificação *
+						</span>
+						<span class="text-[10px] font-mono text-zinc-500">
+							Suporte Nacional & Internacional
+						</span>
 					</div>
+
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => { tipoDocumento = 'CPF'; paisOrigem = 'Brasil'; }}
+							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all {tipoDocumento === 'CPF' ? 'bg-red-950/40 border-red-700 text-white shadow-sm' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
+						>
+							<span>🇧🇷</span>
+							<span>Brasileiro (CPF)</span>
+						</button>
+						<button
+							type="button"
+							onclick={() => { tipoDocumento = 'ESTRANGEIRO'; if (paisOrigem === 'Brasil') paisOrigem = ''; }}
+							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all {tipoDocumento === 'ESTRANGEIRO' ? 'bg-blue-950/40 border-blue-700 text-white shadow-sm' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
+						>
+							<Globe class="w-3.5 h-3.5 text-blue-400" />
+							<span>Estrangeiro (Passaporte / RNM)</span>
+						</button>
+					</div>
+					<input type="hidden" name="tipoDocumento" value={tipoDocumento} />
 				</div>
 
-				<!-- CPF -->
-				<div>
-					<label for="cpf" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-						CPF (11 dígitos) *
-					</label>
+				<!-- Campo do Documento -->
+				<div class={tipoDocumento === 'ESTRANGEIRO' ? 'md:col-span-1' : 'md:col-span-2'}>
+					<div class="flex items-center justify-between mb-1">
+						<label for="cpf" class="text-[11px] font-mono uppercase text-zinc-400 block">
+							{tipoDocumento === 'CPF' ? 'CPF do Titular *' : 'Nº do Passaporte / RNM / ID *'}
+						</label>
+						{#if statusCpf === 'valido'}
+							<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+								<Check class="w-3 h-3" />
+								{tipoDocumento === 'CPF' ? 'CPF Oficial Válido' : 'Documento Válido'}
+							</span>
+						{:else if statusCpf === 'invalido'}
+							<span class="text-[10px] font-mono text-red-400 font-bold flex items-center gap-1">
+								<AlertCircle class="w-3 h-3" />
+								{tipoDocumento === 'CPF' ? 'CPF Inválido (Dígitos Incorretos)' : 'Mínimo 3 caracteres'}
+							</span>
+						{:else if statusCpf === 'incompleto'}
+							<span class="text-[10px] font-mono text-zinc-500">
+								Digite os 11 dígitos
+							</span>
+						{/if}
+					</div>
 					<input
 						type="text"
 						id="cpf"
 						name="cpf"
 						required
-						maxlength="14"
-						value={form?.valores?.cpf || ''}
-						placeholder="000.000.000-00"
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-600 transition-colors"
+						maxlength={tipoDocumento === 'CPF' ? 14 : 30}
+						value={cpfValor}
+						oninput={tratarInputCpf}
+						placeholder={tipoDocumento === 'CPF' ? '000.000.000-00' : 'Ex: PA12345678 ou RNM'}
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border text-xs text-white font-mono focus:outline-none transition-colors {statusCpf === 'valido' ? 'border-emerald-600/70 focus:border-emerald-500' : statusCpf === 'invalido' ? 'border-red-600/70 focus:border-red-500' : 'border-zinc-800 focus:border-red-600'}"
 					/>
+				</div>
+
+				<!-- País de Origem (Somente se Estrangeiro) -->
+				{#if tipoDocumento === 'ESTRANGEIRO'}
+					<div>
+						<label for="paisOrigem" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+							País de Origem *
+						</label>
+						<input
+							type="text"
+							id="paisOrigem"
+							name="paisOrigem"
+							required
+							bind:value={paisOrigem}
+							placeholder="Ex: Japão, Estados Unidos, França..."
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-blue-600 transition-colors"
+						/>
+					</div>
+				{:else}
+					<input type="hidden" name="paisOrigem" value="Brasil" />
+				{/if}
+
+				<!-- Senha de Acesso e Força -->
+				<div class="md:col-span-2 space-y-2">
+					<div class="flex items-center justify-between">
+						<label for="senha" class="text-[11px] font-mono uppercase text-zinc-400 block">
+							Senha de Acesso Inicial *
+						</label>
+						{#if analiseSenha.forca === 'forte'}
+							<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+								<ShieldCheck class="w-3 h-3" /> Senha Forte
+							</span>
+						{:else if analiseSenha.forca === 'boa'}
+							<span class="text-[10px] font-mono text-blue-400 font-bold">
+								Senha Boa
+							</span>
+						{:else if analiseSenha.forca === 'media'}
+							<span class="text-[10px] font-mono text-amber-400 font-bold">
+								Senha Média
+							</span>
+						{:else if senhaValor.length > 0}
+							<span class="text-[10px] font-mono text-red-400 font-bold">
+								Senha Fraca
+							</span>
+						{/if}
+					</div>
+
+					<div class="relative">
+						<Lock class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+						<input
+							type={mostrarSenha ? 'text' : 'password'}
+							id="senha"
+							name="senha"
+							required
+							minlength="8"
+							bind:value={senhaValor}
+							placeholder="Crie uma senha forte (mín. 8 caracteres)"
+							class="w-full pl-9 pr-10 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors font-mono"
+						/>
+						<button
+							type="button"
+							onclick={() => (mostrarSenha = !mostrarSenha)}
+							class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+							title={mostrarSenha ? 'Ocultar senha' : 'Exibir senha'}
+						>
+							{#if mostrarSenha}
+								<EyeOff class="w-4 h-4" />
+							{:else}
+								<Eye class="w-4 h-4" />
+							{/if}
+						</button>
+					</div>
+
+					<!-- Barra de Força da Senha -->
+					{#if senhaValor.length > 0}
+						<div class="space-y-1.5 pt-1">
+							<div class="grid grid-cols-4 gap-1.5 h-1.5">
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 1 ? (analiseSenha.forca === 'fraca' ? 'bg-red-500' : analiseSenha.forca === 'media' ? 'bg-amber-500' : analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 2 ? (analiseSenha.forca === 'media' ? 'bg-amber-500' : analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 3 ? (analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
+							</div>
+
+							<!-- Critérios de Segurança -->
+							<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10px] font-mono">
+								<span class="flex items-center gap-1 {analiseSenha.criterios.comprimentoMinimo ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseSenha.criterios.comprimentoMinimo}
+										<Check class="w-3 h-3 shrink-0" />
+									{:else}
+										<span class="w-3 h-3 text-center inline-block">•</span>
+									{/if}
+									8+ caracteres
+								</span>
+								<span class="flex items-center gap-1 {analiseSenha.criterios.maiuscula && analiseSenha.criterios.minuscula ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseSenha.criterios.maiuscula && analiseSenha.criterios.minuscula}
+										<Check class="w-3 h-3 shrink-0" />
+									{:else}
+										<span class="w-3 h-3 text-center inline-block">•</span>
+									{/if}
+									Maiúsculas & minúsculas
+								</span>
+								<span class="flex items-center gap-1 {analiseSenha.criterios.numero ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseSenha.criterios.numero}
+										<Check class="w-3 h-3 shrink-0" />
+									{:else}
+										<span class="w-3 h-3 text-center inline-block">•</span>
+									{/if}
+									Ao menos 1 número
+								</span>
+								<span class="flex items-center gap-1 {analiseSenha.criterios.especial ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseSenha.criterios.especial}
+										<Check class="w-3 h-3 shrink-0" />
+									{:else}
+										<span class="w-3 h-3 text-center inline-block">•</span>
+									{/if}
+									Símbolo (@$!%*?&#)
+								</span>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Data de Nascimento -->

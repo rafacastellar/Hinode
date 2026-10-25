@@ -566,7 +566,7 @@ export async function atualizarPesoAlunoDoResponsavel(
 
 	// Validação de segurança: o aluno deve ser tutelado pelo responsável logado nesta academia
 	const [check] = await pool.query<RowDataPacket[]>(
-		`SELECT ra.id_aluno, u.nome, u.genero, DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento, a.graduacao_atual
+		`SELECT ra.id_aluno, u.nome, u.genero, DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento, a.graduacao_atual, a.peso, a.categoria
 		 FROM Responsavel_Aluno ra
 		 INNER JOIN Aluno a ON ra.id_aluno = a.id_usuario
 		 INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
@@ -602,6 +602,19 @@ export async function atualizarPesoAlunoDoResponsavel(
 		     grupo_especial_aspirante = COALESCE(?, grupo_especial_aspirante)
 		 WHERE id_usuario = ?`,
 		[novoPeso, novaCategoria, novaDivisao, idAluno]
+	);
+
+	// Registra no Log_Auditoria para o Sensei responsável acompanhar a mudança
+	await pool.execute(
+		`INSERT INTO Log_Auditoria (id_academia, id_usuario, acao, entidade, id_entidade, dados_antes, dados_depois)
+		 VALUES (?, ?, 'MUDANCA_PESO_CATEGORIA', 'Aluno', ?, ?, ?)`,
+		[
+			idAcademia,
+			idResponsavel,
+			String(idAluno),
+			JSON.stringify({ peso: row.peso !== null ? Number(row.peso) : null, categoria: row.categoria || null }),
+			JSON.stringify({ peso: novoPeso, categoria: novaCategoria })
+		]
 	);
 
 	return {

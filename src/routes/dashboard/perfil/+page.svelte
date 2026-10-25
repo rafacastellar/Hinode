@@ -22,8 +22,11 @@
 		Calendar,
 		Building2,
 		Flame,
-		Sparkles
+		Sparkles,
+		Check,
+		Globe
 	} from '@lucide/svelte';
+	import { analisarForcaSenha } from '#lib/dominio/validacao';
 
 	interface Props {
 		data: PageData;
@@ -40,6 +43,8 @@
 	let mostrarSenhaAtual = $state(false);
 	let mostrarNovaSenha = $state(false);
 	let mostrarConfirmacao = $state(false);
+	let novaSenha = $state('');
+	const analiseNovaSenha = $derived(analisarForcaSenha(novaSenha));
 
 	let salvandoDados = $state(false);
 	let salvandoSenha = $state(false);
@@ -279,7 +284,16 @@
 					</div>
 
 					<div class="space-y-1">
-						<label for="cpf-civil" class="text-xs font-semibold text-zinc-400">CPF (LGPD Mascarado)</label>
+						<div class="flex items-center justify-between">
+							<label for="cpf-civil" class="text-xs font-semibold text-zinc-400">
+								{data.perfil.tipo_documento === 'ESTRANGEIRO' ? 'Documento Estrangeiro (Passaporte/RNM)' : 'CPF (LGPD Mascarado)'}
+							</label>
+							{#if data.perfil.tipo_documento === 'ESTRANGEIRO'}
+								<span class="text-[10px] font-mono text-blue-400">
+									🌐 {data.perfil.pais_origem || 'Internacional'}
+								</span>
+							{/if}
+						</div>
 						<input
 							id="cpf-civil"
 							type="text"
@@ -916,18 +930,32 @@
 
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 				<div class="space-y-1.5">
-					<label for="novaSenha" class="text-xs font-semibold text-zinc-300">
-						Nova Senha <span class="text-red-500">*</span>
-					</label>
+					<div class="flex items-center justify-between">
+						<label for="novaSenha" class="text-xs font-semibold text-zinc-300">
+							Nova Senha (Mín. 8 caracteres) <span class="text-red-500">*</span>
+						</label>
+						{#if analiseNovaSenha.forca === 'forte'}
+							<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+								<ShieldCheck class="w-3 h-3" /> Senha Forte
+							</span>
+						{:else if analiseNovaSenha.forca === 'boa'}
+							<span class="text-[10px] font-mono text-blue-400 font-bold">Senha Boa</span>
+						{:else if analiseNovaSenha.forca === 'media'}
+							<span class="text-[10px] font-mono text-amber-400 font-bold">Senha Média</span>
+						{:else if novaSenha.length > 0}
+							<span class="text-[10px] font-mono text-red-400 font-bold">Senha Fraca</span>
+						{/if}
+					</div>
 					<div class="relative">
 						<input
 							id="novaSenha"
 							name="novaSenha"
 							type={mostrarNovaSenha ? 'text' : 'password'}
 							required
-							minlength="6"
-							placeholder="Mínimo 6 caracteres"
-							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
+							minlength="8"
+							bind:value={novaSenha}
+							placeholder="Mínimo 8 caracteres com símbolos"
+							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs font-mono transition-all"
 						/>
 						<button
 							type="button"
@@ -942,6 +970,32 @@
 							{/if}
 						</button>
 					</div>
+
+					<!-- Barra de Força da Senha -->
+					{#if novaSenha.length > 0}
+						<div class="space-y-1 pt-1">
+							<div class="grid grid-cols-4 gap-1 h-1.5">
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 1 ? (analiseNovaSenha.forca === 'fraca' ? 'bg-red-500' : analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 2 ? (analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 3 ? (analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
+							</div>
+							<div class="grid grid-cols-2 gap-1 pt-1 text-[10px] font-mono">
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.comprimentoMinimo ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.comprimentoMinimo}<Check class="w-3 h-3" />{:else}•{/if} 8+ chars
+								</span>
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula}<Check class="w-3 h-3" />{:else}•{/if} Maiúsc./Minúsc.
+								</span>
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.numero ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.numero}<Check class="w-3 h-3" />{:else}•{/if} 1+ número
+								</span>
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.especial ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.especial}<Check class="w-3 h-3" />{:else}•{/if} Símbolo (@$!%*?&#)
+								</span>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<div class="space-y-1.5">
@@ -954,9 +1008,9 @@
 							name="confirmacaoNovaSenha"
 							type={mostrarConfirmacao ? 'text' : 'password'}
 							required
-							minlength="6"
+							minlength="8"
 							placeholder="Repita a nova senha"
-							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
+							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs font-mono transition-all"
 						/>
 						<button
 							type="button"

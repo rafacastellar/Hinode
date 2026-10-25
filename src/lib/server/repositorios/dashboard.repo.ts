@@ -3,6 +3,7 @@ import { getDbPool } from '../db/pool';
 import { buscarAlunoPorId } from './aluno.repo';
 import { buscarHistoricoDoAluno, type HistoricoAlunoItem } from './graduacao.repo';
 import { validarElegibilidadeGraduacao } from '../servicos/regras-graduacao';
+import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
 
 export interface MetricasDojo {
 	totalAlunos: number;
@@ -153,11 +154,42 @@ export interface PendenciaCampeonatoAutorizacao {
 	nome_professor_responsavel?: string | null;
 }
 
+export interface MudancaPesoItem {
+	id_log: number;
+	id_aluno: number;
+	nome_aluno: string;
+	graduacao_atual: string;
+	peso_anterior: number | null;
+	peso_novo: number | null;
+	categoria_anterior: string | null;
+	categoria_nova: string | null;
+	data_alteracao: string;
+	origem?: string;
+	nome_professor_responsavel?: string | null;
+}
+
+export interface AlunoViradaTemporadaItem {
+	id_usuario: number;
+	nome: string;
+	graduacao_atual: string;
+	categoria_atual: string;
+	categoria_esperada: string;
+	classe_esperada: string;
+}
+
+export interface ViradaTemporadaInfo {
+	anoVigente: number;
+	totalDesatualizados: number;
+	alunos: AlunoViradaTemporadaItem[];
+}
+
 export interface PendenciasTecnicasDojo {
 	alunosSemPeso: AlunoTutelaItem[];
 	alunosSemTurma: AlunoTutelaItem[];
 	alunosFederacaoPendente: AlunoTutelaItem[];
 	campeonatosPendentesAutorizacao: PendenciaCampeonatoAutorizacao[];
+	mudancasRecentesPeso: MudancaPesoItem[];
+	viradaTemporada: ViradaTemporadaInfo | null;
 }
 
 export interface PainelProfessorDados {
@@ -1012,6 +1044,8 @@ export async function obterPendenciasTecnicasDojo(
 		SELECT 
 			u.id_usuario,
 			u.nome,
+			u.genero,
+			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			a.matricula,
 			a.graduacao_atual,
 			a.peso,
@@ -1059,7 +1093,34 @@ export async function obterPendenciasTecnicasDojo(
 		nome_professor_responsavel: a.nome_professor_responsavel ? String(a.nome_professor_responsavel) : null
 	}));
 
-	// 2. Campeonatos com inscrição de menores aguardando autorização do responsável legal
+	// 2. Alerta de Virada de Temporada / Transição de Idade Civil (ex: 2026 -> 2027)
+	const anoAtual = new Date().getFullYear();
+	const alunosViradaTemporada: AlunoViradaTemporadaItem[] = [];
+
+	for (const a of rowsAlunos) {
+		if (!a.data_nascimento) continue;
+		const classifEsperada = obterClassificacaoJudo({
+			dataNascimento: String(a.data_nascimento),
+			genero: a.genero === 'F' ? 'F' : 'M',
+			peso: a.peso !== null ? Number(a.peso) : null,
+			graduacao: a.graduacao_atual ? String(a.graduacao_atual) : 'Branca',
+			anoVigente: anoAtual
+		});
+
+		// Se a categoria gravada difere da esperada para o ano vigente (especialmente classe de idade)
+		if (a.categoria && a.categoria !== classifEsperada.categoriaCompleta) {
+			alunosViradaTemporada.push({
+				id_usuario: Number(a.id_usuario),
+				nome: String(a.nome),
+				graduacao_atual: String(a.graduacao_atual || 'Branca'),
+				categoria_atual: String(a.categoria),
+				categoria_esperada: classifEsperada.categoriaCompleta,
+				classe_esperada: classifEsperada.classeCodigo
+			});
+		}
+	}
+
+	// 3. Campeonatos com inscrição de menores aguardando autorização do responsável legal
 	let sqlCamp = `
 		SELECT 
 			ie.id_inscricao,
@@ -1117,11 +1178,77 @@ export async function obterPendenciasTecnicasDojo(
 		nome_professor_responsavel: r.nome_professor_responsavel ? String(r.nome_professor_responsavel) : null
 	}));
 
+	// 4. Alerta de Mudança Recente de Peso / Categoria (últimos 30 dias)
+	let sqlLogs = `
+		SELECT 
+			l.id_log,
+			l.id_entidade AS id_aluno,
+			l.dados_antes,
+			l.dados_depois,
+			DATE_FORMAT(l.criado_em, '%d/%m/%Y às %H:%i') AS data_alteracao,
+			u.nome AS nome_aluno,
+			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
+			prof_u.nome AS nome_professor_responsavel
+		FROM Log_Auditoria l
+		INNER JOIN Aluno a ON a.id_usuario = CAST(l.id_entidade AS UNSIGNED)
+		INNER JOIN Usuario u ON u.id_usuario = a.id_usuario
+		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		LEFT JOIN Professor p ON p.id_usuario = a.id_professor_responsavel
+		LEFT JOIN Usuario prof_u ON prof_u.id_usuario = p.id_usuario
+		WHERE l.id_academia = ? AND ua.id_academia = ? AND l.acao = 'MUDANCA_PESO_CATEGORIA'
+		  AND l.criado_em >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+	`;
+	const paramsLogs: any[] = [idAcademia, idAcademia];
+
+	if (idProfessorResponsavel) {
+		sqlLogs += ` AND a.id_professor_responsavel = ?`;
+		paramsLogs.push(idProfessorResponsavel);
+	}
+
+	if (idResponsavel) {
+		sqlLogs += ` AND EXISTS (SELECT 1 FROM Responsavel_Aluno ra_sub WHERE ra_sub.id_aluno = a.id_usuario AND ra_sub.id_responsavel = ?)`;
+		paramsLogs.push(idResponsavel);
+	}
+
+	sqlLogs += ` ORDER BY l.criado_em DESC LIMIT 10`;
+
+	const [rowsLogs] = await pool.execute<RowDataPacket[]>(sqlLogs, paramsLogs);
+	const mudancasRecentesPeso: MudancaPesoItem[] = rowsLogs.map((r) => {
+		let antes: any = {};
+		let depois: any = {};
+		try {
+			antes = typeof r.dados_antes === 'string' ? JSON.parse(r.dados_antes) : r.dados_antes || {};
+			depois = typeof r.dados_depois === 'string' ? JSON.parse(r.dados_depois) : r.dados_depois || {};
+		} catch {}
+
+		return {
+			id_log: Number(r.id_log),
+			id_aluno: Number(r.id_aluno),
+			nome_aluno: String(r.nome_aluno),
+			graduacao_atual: String(r.graduacao_atual),
+			peso_anterior: antes.peso !== undefined && antes.peso !== null ? Number(antes.peso) : null,
+			peso_novo: depois.peso !== undefined && depois.peso !== null ? Number(depois.peso) : null,
+			categoria_anterior: antes.categoria || null,
+			categoria_nova: depois.categoria || null,
+			data_alteracao: String(r.data_alteracao),
+			origem: depois.origem || 'Perfil / Balança',
+			nome_professor_responsavel: r.nome_professor_responsavel ? String(r.nome_professor_responsavel) : null
+		};
+	});
+
 	return {
 		alunosSemPeso: alunos.filter((a) => a.peso === null),
 		alunosSemTurma: alunos.filter((a) => !a.tem_turma),
-		alunosFederacaoPendente: alunos.filter((a) => a.status_federacao !== 'Ativo'),
-		campeonatosPendentesAutorizacao
+		alunosFederacaoPendente: alunos.filter(
+			(a) => a.status_federacao && a.status_federacao.trim().toLowerCase() === 'pendente'
+		),
+		campeonatosPendentesAutorizacao,
+		mudancasRecentesPeso,
+		viradaTemporada: alunosViradaTemporada.length > 0 ? {
+			anoVigente: anoAtual,
+			totalDesatualizados: alunosViradaTemporada.length,
+			alunos: alunosViradaTemporada
+		} : null
 	};
 }
 

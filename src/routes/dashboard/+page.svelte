@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { PageData, ActionData } from './$types';
 	import StatCard from '#lib/components/ui/StatCard.svelte';
 	import BadgePerfil from '#lib/components/ui/BadgePerfil.svelte';
 	import {
@@ -24,7 +24,7 @@
 	import CardAniversariantes from '#lib/components/dashboard/CardAniversariantes.svelte';
 	import CardConformidadeAlunos from '#lib/components/dashboard/CardConformidadeAlunos.svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form?: ActionData } = $props();
 </script>
 
 <svelte:head>
@@ -42,6 +42,16 @@
 </svelte:head>
 
 <div class="space-y-6">
+	<!-- FEEDBACK DE AÇÕES GLOBAIS DO DASHBOARD -->
+	{#if form?.sucesso && form?.mensagem}
+		<div
+			class="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-xs flex items-center gap-2.5 shadow-lg animate-in fade-in duration-300"
+		>
+			<CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
+			<span class="font-medium">{form.mensagem}</span>
+		</div>
+	{/if}
+
 	<!-- 0. SELETOR DE PERSPECTIVA (APENAS PARA USUÁRIOS COM MÚLTIPLOS PAPÉIS) -->
 	<SeletorPerspectiva perfis={data.perfis} visaoAtiva={data.visaoAtiva} />
 

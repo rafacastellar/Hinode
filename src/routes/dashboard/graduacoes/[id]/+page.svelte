@@ -22,8 +22,11 @@
 		Square,
 		Loader2,
 		DollarSign,
-		Sparkles
+		Sparkles,
+		Printer
 	} from '@lucide/svelte';
+	import ModalImpressaoDocumento from '#lib/components/documentos/ModalImpressaoDocumento.svelte';
+	import DocumentoGraduacaoImpressao from '#lib/components/documentos/DocumentoGraduacaoImpressao.svelte';
 	import {
 		formatarPeriodoInscricaoExame,
 		obterStatusPeriodoInscricao,
@@ -38,6 +41,11 @@
 	let termoBusca = $state('');
 	let filtroElegibilidade = $state<'todos' | 'aptos' | 'inscritos' | 'inaptos'>('todos');
 	let carregandoAcao = $state(false);
+
+	// Estado para Impressão da Ficha da Banca
+	let modalImpressaoAberto = $state(false);
+	let filtroImpressaoStatus = $state<'todos' | 'confirmadas' | 'homologadas'>('todos');
+	let ordenacaoImpressao = $state<'nome' | 'faixa'>('nome');
 
 	// Estado para Homologação em Lote
 	let senseiSelecionadoLote = $state<number>(0);
@@ -182,8 +190,18 @@
 			</div>
 		</div>
 
-		{#if data.podeGerenciar}
-			<div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+		<div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+			<button
+				type="button"
+				onclick={() => (modalImpressaoAberto = true)}
+				class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 font-semibold text-xs sm:text-sm shadow-sm hover:border-zinc-500 cursor-pointer active:scale-95 transition-all"
+				title="Imprimir ficha de avaliação da banca examinadora"
+			>
+				<Printer class="w-4 h-4 text-red-500" />
+				<span>Imprimir Ficha da Banca</span>
+			</button>
+
+			{#if data.podeGerenciar}
 				<a
 					href="/dashboard/graduacoes/{data.evento.id_evento}/editar"
 					class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 font-medium text-xs sm:text-sm transition-colors"
@@ -200,8 +218,8 @@
 				>
 					<Trash2 class="w-4 h-4" />
 				</button>
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</div>
 
 	<!-- ALERTAS DE MENSAGEM / FEEDBACK -->
@@ -944,3 +962,43 @@
 		</div>
 	</div>
 {/if}
+
+<!-- MODAL DE IMPRESSÃO DA FICHA DA BANCA -->
+{#snippet controlesGraduacao()}
+	<div class="flex items-center gap-2">
+		<select
+			bind:value={filtroImpressaoStatus}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Filtrar candidatos por status"
+		>
+			<option value="todos">Todos os Inscritos</option>
+			<option value="confirmadas">Apenas Confirmados</option>
+			<option value="homologadas">Apenas Promovidos</option>
+		</select>
+
+		<select
+			bind:value={ordenacaoImpressao}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Critério de ordenação da folha"
+		>
+			<option value="nome">Ordem: Nome (A-Z)</option>
+			<option value="faixa">Ordem: Faixa Atual</option>
+		</select>
+	</div>
+{/snippet}
+
+<ModalImpressaoDocumento
+	aberto={modalImpressaoAberto}
+	titulo="Ficha da Banca - {data.evento.nome}"
+	subtitulo="Documento oficial para avaliação e anotações técnicas do exame"
+	onfechar={() => (modalImpressaoAberto = false)}
+	controles={controlesGraduacao}
+>
+	<DocumentoGraduacaoImpressao
+		evento={data.evento}
+		inscricoes={data.inscricoes}
+		professores={data.professores}
+		filtroStatus={filtroImpressaoStatus}
+		criterioOrdenacao={ordenacaoImpressao}
+	/>
+</ModalImpressaoDocumento>

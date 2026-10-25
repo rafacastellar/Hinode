@@ -13,13 +13,27 @@
 		CheckCircle2,
 		X,
 		Award,
-		Lock
+		Lock,
+		Eye,
+		EyeOff,
+		Check,
+		Globe,
+		ShieldCheck,
+		Printer
 	} from '@lucide/svelte';
+	import ModalImpressaoDocumento from '#lib/components/documentos/ModalImpressaoDocumento.svelte';
+	import DocumentoUsuariosImpressao from '#lib/components/documentos/DocumentoUsuariosImpressao.svelte';
+	import { analisarForcaSenha } from '#lib/dominio/validacao';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let termoBusca = $state('');
 	let perfilFiltro = $state('');
+
+	// Estado de Impressão da Lista de Usuários
+	let modalImpressaoAberto = $state(false);
+	let filtroImpressaoPerfil = $state('todos');
+	let ordenacaoImpressao = $state<'nome' | 'perfil' | 'idade'>('nome');
 
 	$effect(() => {
 		termoBusca = data.busca || '';
@@ -29,18 +43,25 @@
 	// Modais
 	let modalSenhaAberto = $state(false);
 	let usuarioSenhaModal = $state<{ id: number; nome: string } | null>(null);
+	let novaSenhaValor = $state('');
+	let mostrarNovaSenha = $state(false);
+	const analiseNovaSenha = $derived(analisarForcaSenha(novaSenhaValor));
 
 	let modalExcluirAberto = $state(false);
 	let usuarioExcluirModal = $state<{ id: number; nome: string } | null>(null);
 
 	function abrirModalSenha(id: number, nome: string) {
 		usuarioSenhaModal = { id, nome };
+		novaSenhaValor = '';
+		mostrarNovaSenha = false;
 		modalSenhaAberto = true;
 	}
 
 	function fecharModalSenha() {
 		modalSenhaAberto = false;
 		usuarioSenhaModal = null;
+		novaSenhaValor = '';
+		mostrarNovaSenha = false;
 	}
 
 	function abrirModalExcluir(id: number, nome: string) {
@@ -98,13 +119,25 @@
 			</p>
 		</div>
 
-		<a
-			href="/dashboard/usuarios/novo"
-			class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(220,38,38,0.35)] transition-all shrink-0"
-		>
-			<UserPlus class="w-4 h-4" />
-			<span>Novo Usuário</span>
-		</a>
+		<div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+			<button
+				type="button"
+				onclick={() => (modalImpressaoAberto = true)}
+				class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 hover:border-zinc-500 text-xs font-semibold shadow-sm cursor-pointer active:scale-95 transition-all"
+				title="Imprimir relatório e relação cadastral de usuários"
+			>
+				<Printer class="w-4 h-4 text-red-500" />
+				<span>Imprimir Relação</span>
+			</button>
+
+			<a
+				href="/dashboard/usuarios/novo"
+				class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(220,38,38,0.35)] transition-all shrink-0"
+			>
+				<UserPlus class="w-4 h-4" />
+				<span>Novo Usuário</span>
+			</a>
+		</div>
 	</div>
 
 	<!-- Feedback de Operações -->
@@ -209,7 +242,14 @@
 
 								<!-- CPF Mascarado -->
 								<td class="px-5 py-4 font-mono text-zinc-400 whitespace-nowrap">
-									{usuario.cpf_mascarado}
+									<div class="flex items-center gap-1.5">
+										{#if usuario.tipo_documento === 'ESTRANGEIRO'}
+											<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-950/60 border border-blue-800/80 text-blue-300 font-sans" title={usuario.pais_origem || 'Internacional'}>
+												🌐 {usuario.pais_origem || 'EXT'}
+											</span>
+										{/if}
+										<span>{usuario.cpf_mascarado}</span>
+									</div>
 								</td>
 
 								<!-- Idade & Gênero -->
@@ -330,19 +370,74 @@
 			>
 				<input type="hidden" name="idUsuario" value={usuarioSenhaModal.id} />
 
-				<div>
-					<label for="novaSenha" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-						Nova Senha (Mín. 6 caracteres)
-					</label>
-					<input
-						type="password"
-						id="novaSenha"
-						name="novaSenha"
-						required
-						minlength="6"
-						placeholder="••••••••"
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
-					/>
+				<div class="space-y-1.5">
+					<div class="flex items-center justify-between">
+						<label for="novaSenha" class="text-[11px] font-mono uppercase text-zinc-400 block">
+							Nova Senha (Mín. 8 caracteres)
+						</label>
+						{#if analiseNovaSenha.forca === 'forte'}
+							<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+								<ShieldCheck class="w-3 h-3" /> Senha Forte
+							</span>
+						{:else if analiseNovaSenha.forca === 'boa'}
+							<span class="text-[10px] font-mono text-blue-400 font-bold">Senha Boa</span>
+						{:else if analiseNovaSenha.forca === 'media'}
+							<span class="text-[10px] font-mono text-amber-400 font-bold">Senha Média</span>
+						{:else if novaSenhaValor.length > 0}
+							<span class="text-[10px] font-mono text-red-400 font-bold">Senha Fraca</span>
+						{/if}
+					</div>
+
+					<div class="relative">
+						<input
+							type={mostrarNovaSenha ? 'text' : 'password'}
+							id="novaSenha"
+							name="novaSenha"
+							required
+							minlength="8"
+							bind:value={novaSenhaValor}
+							placeholder="Crie uma nova senha forte"
+							class="w-full pl-3.5 pr-10 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors font-mono"
+						/>
+						<button
+							type="button"
+							onclick={() => (mostrarNovaSenha = !mostrarNovaSenha)}
+							class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+							title={mostrarNovaSenha ? 'Ocultar senha' : 'Exibir senha'}
+						>
+							{#if mostrarNovaSenha}
+								<EyeOff class="w-3.5 h-3.5" />
+							{:else}
+								<Eye class="w-3.5 h-3.5" />
+							{/if}
+						</button>
+					</div>
+
+					<!-- Barra de Força -->
+					{#if novaSenhaValor.length > 0}
+						<div class="space-y-1 pt-1">
+							<div class="grid grid-cols-4 gap-1 h-1.5">
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 1 ? (analiseNovaSenha.forca === 'fraca' ? 'bg-red-500' : analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 2 ? (analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 3 ? (analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
+							</div>
+							<div class="grid grid-cols-2 gap-1 pt-1 text-[10px] font-mono">
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.comprimentoMinimo ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.comprimentoMinimo}<Check class="w-3 h-3" />{:else}•{/if} 8+ chars
+								</span>
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula}<Check class="w-3 h-3" />{:else}•{/if} Maiúsc./Minúsc.
+								</span>
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.numero ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.numero}<Check class="w-3 h-3" />{:else}•{/if} Ao menos 1 número
+								</span>
+								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.especial ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+									{#if analiseNovaSenha.criterios.especial}<Check class="w-3 h-3" />{:else}•{/if} Símbolo (@$!%*?&#)
+								</span>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<div>
@@ -354,9 +449,9 @@
 						id="confirmacaoSenha"
 						name="confirmacaoSenha"
 						required
-						minlength="6"
-						placeholder="••••••••"
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
+						minlength="8"
+						placeholder="Repita a nova senha"
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors font-mono"
 					/>
 				</div>
 
@@ -433,3 +528,46 @@
 		</div>
 	</div>
 {/if}
+
+<!-- MODAL DE IMPRESSÃO DA RELAÇÃO DE USUÁRIOS -->
+{#snippet controlesUsuarios()}
+	<div class="flex items-center gap-2">
+		<!-- Filtro de Perfil -->
+		<select
+			bind:value={filtroImpressaoPerfil}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Filtrar por perfil"
+		>
+			<option value="todos">Todos os Perfis</option>
+			{#each data.perfis as p}
+				<option value={p.role}>{p.role}</option>
+			{/each}
+		</select>
+
+		<!-- Ordenação -->
+		<select
+			bind:value={ordenacaoImpressao}
+			class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-red-500 cursor-pointer"
+			title="Critério de ordenação da relação"
+		>
+			<option value="nome">Ordem: Nome (A-Z)</option>
+			<option value="perfil">Ordem: Função / Perfil</option>
+			<option value="idade">Ordem: Idade</option>
+		</select>
+	</div>
+{/snippet}
+
+<ModalImpressaoDocumento
+	aberto={modalImpressaoAberto}
+	titulo="Relação Cadastral de Membros do Dojo"
+	subtitulo="Documento oficial para governança, conferência e arquivo físico"
+	onfechar={() => (modalImpressaoAberto = false)}
+	controles={controlesUsuarios}
+>
+	<DocumentoUsuariosImpressao
+		usuarios={data.usuarios}
+		perfisDisponiveis={data.perfis}
+		filtroPerfil={filtroImpressaoPerfil}
+		criterioOrdenacao={ordenacaoImpressao}
+	/>
+</ModalImpressaoDocumento>

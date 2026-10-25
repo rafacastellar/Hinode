@@ -15,7 +15,11 @@ export const loginSchema = z.object({
 		.number()
 		.int()
 		.positive()
+		.optional(),
+	lembrar: z
+		.boolean()
 		.optional()
+		.default(false)
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

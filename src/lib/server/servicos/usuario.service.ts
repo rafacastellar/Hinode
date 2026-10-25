@@ -46,11 +46,18 @@ export async function cadastrarUsuarioNoDojo(
 	const dados: CriarUsuarioInput = criarUsuarioSchema.parse(dadosBrutos);
 
 	return await executarTransacao(async (conn) => {
-		// 1. Verifica se usuário já existe pelo CPF ou E-mail
-		const usuarioExistenteCpf = await buscarUsuarioPorCpfTx(conn, dados.cpf);
+		const docIdentificador =
+			dados.tipoDocumento === 'CPF'
+				? dados.cpf.replace(/\D/g, '')
+				: dados.cpf.trim().toUpperCase();
+
+		// 1. Verifica se usuário já existe pelo CPF/Documento ou E-mail
+		const usuarioExistenteCpf = await buscarUsuarioPorCpfTx(conn, docIdentificador);
 		const usuarioExistenteEmail = await buscarUsuarioPorEmailTx(conn, dados.email);
 
 		let idUsuarioFinal: number;
+
+		const rotuloDoc = dados.tipoDocumento === 'CPF' ? 'CPF' : 'Documento';
 
 		if (usuarioExistenteCpf) {
 			idUsuarioFinal = usuarioExistenteCpf.id_usuario;
@@ -58,11 +65,11 @@ export async function cadastrarUsuarioNoDojo(
 			// Verifica se já está vinculado a esta academia
 			const detalheDojo = await buscarUsuarioDetalhadoNoDojo(ctx.idAcademia, idUsuarioFinal);
 			if (detalheDojo) {
-				throw new Error('Este usuário (CPF já cadastrado) já está vinculado a este dojo.');
+				throw new Error(`Este usuário (${rotuloDoc} já cadastrado) já está vinculado a este dojo.`);
 			}
 			// Se o e-mail for diferente do e-mail cadastrado
 			if (usuarioExistenteCpf.email.toLowerCase() !== dados.email.toLowerCase()) {
-				throw new Error('O CPF informado já pertence a uma conta com outro e-mail.');
+				throw new Error(`O ${rotuloDoc} informado já pertence a uma conta com outro e-mail.`);
 			}
 		} else if (usuarioExistenteEmail) {
 			throw new Error('O e-mail informado já está em uso por outro usuário.');
@@ -71,7 +78,9 @@ export async function cadastrarUsuarioNoDojo(
 			const senhaHash = await bcrypt.hash(dados.senha, 12);
 			idUsuarioFinal = await inserirUsuarioTx(conn, {
 				nome: dados.nome,
-				cpf: dados.cpf,
+				tipoDocumento: dados.tipoDocumento,
+				cpf: docIdentificador,
+				paisOrigem: dados.paisOrigem,
 				dataNascimento: dados.dataNascimento,
 				genero: dados.genero,
 				email: dados.email,

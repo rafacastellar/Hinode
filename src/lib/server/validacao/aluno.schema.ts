@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validarCpfOficial } from '#lib/dominio/validacao';
 
 const regexData = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -34,7 +35,8 @@ export const alunoSchema = z.object({
 		.string()
 		.trim()
 		.transform((val) => apenasDigitos(val))
-		.refine((val) => val.length === 11, { message: 'CPF deve conter exatamente 11 dígitos' }),
+		.refine((val) => val.length === 11, { message: 'CPF deve conter exatamente 11 dígitos' })
+		.refine(validarCpfOficial, { message: 'CPF inválido. Verifique os dígitos informados.' }),
 	dataNascimento: z
 		.string()
 		.trim()
@@ -112,7 +114,10 @@ export const alunoSchema = z.object({
 		.string()
 		.trim()
 		.nullish()
-		.transform((val) => apenasDigitos(val)),
+		.transform((val) => (val ? apenasDigitos(val) : ''))
+		.refine((val) => !val || (val.length === 11 && validarCpfOficial(val)), {
+			message: 'CPF do responsável legal inválido. Verifique os dígitos informados.'
+		}),
 	responsavelEmail: z
 		.string()
 		.trim()

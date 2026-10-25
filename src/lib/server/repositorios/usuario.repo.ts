@@ -1,11 +1,14 @@
 import type { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 import { getDbPool, executarTransacao } from '../db/pool';
 import { verificarSenha, gerarHashSenha } from '../auth/criptografia';
+import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
 
 export interface UsuarioAutenticavel {
 	id_usuario: number;
 	nome: string;
+	tipo_documento?: 'CPF' | 'ESTRANGEIRO';
 	cpf: string;
+	pais_origem?: string;
 	data_nascimento: string;
 	genero: 'M' | 'F';
 	email: string;
@@ -27,7 +30,10 @@ export interface PerfilItem {
 export interface UsuarioResumoDojo {
 	id_usuario: number;
 	nome: string;
+	tipo_documento?: 'CPF' | 'ESTRANGEIRO';
+	cpf: string;
 	cpf_mascarado: string;
+	pais_origem?: string;
 	email: string;
 	data_nascimento: string;
 	genero: 'M' | 'F';
@@ -53,8 +59,10 @@ export interface EnderecoUsuario {
 export interface UsuarioDetalhadoDojo {
 	id_usuario: number;
 	nome: string;
+	tipo_documento: 'CPF' | 'ESTRANGEIRO';
 	cpf: string;
 	cpf_mascarado: string;
+	pais_origem: string;
 	email: string;
 	data_nascimento: string;
 	genero: 'M' | 'F';
@@ -110,8 +118,10 @@ export interface UsuarioDetalhadoDojo {
 export interface PerfilCompletoUsuario {
 	id_usuario: number;
 	nome: string;
+	tipo_documento?: 'CPF' | 'ESTRANGEIRO';
 	cpf: string;
 	cpf_mascarado: string;
+	pais_origem?: string;
 	email: string;
 	data_nascimento: string;
 	data_nascimento_br: string;
@@ -161,12 +171,19 @@ export interface DadosEdicaoProprioPerfil {
 }
 
 /**
- * Função utilitária para mascaramento de CPF no padrão LGPD (ex: 123.***.***-00).
+ * Função utilitária para mascaramento de documentos (CPF ou Internacional) no padrão LGPD.
+ * Para CPF (11 dígitos): exibe 123.***.***-00.
+ * Para estrangeiro: exibe PA****56.
  */
-export function mascararCpf(cpfPuro: string): string {
-	const limpo = cpfPuro.replace(/\D/g, '');
-	if (limpo.length !== 11) return '***.***.***-**';
-	return `${limpo.slice(0, 3)}.***.***-${limpo.slice(9, 11)}`;
+export function mascararCpf(cpfPuro: string, tipo?: 'CPF' | 'ESTRANGEIRO'): string {
+	if (!cpfPuro) return '***';
+	const limpo = cpfPuro.trim();
+	const digitos = limpo.replace(/\D/g, '');
+	if (digitos.length === 11 && (tipo === 'CPF' || !tipo)) {
+		return `${digitos.slice(0, 3)}.***.***-${digitos.slice(9, 11)}`;
+	}
+	if (limpo.length <= 4) return '***';
+	return `${limpo.slice(0, 2)}${'*'.repeat(Math.max(3, limpo.length - 4))}${limpo.slice(-2)}`;
 }
 
 /**
@@ -279,7 +296,9 @@ export async function listarUsuariosDoDojo(
 		SELECT 
 			u.id_usuario,
 			u.nome,
+			u.tipo_documento,
 			u.cpf,
+			u.pais_origem,
 			u.email,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			u.genero,
@@ -343,7 +362,10 @@ export async function listarUsuariosDoDojo(
 		return {
 			id_usuario: idUser,
 			nome: String(u.nome),
-			cpf_mascarado: mascararCpf(String(u.cpf)),
+			tipo_documento: (u.tipo_documento as 'CPF' | 'ESTRANGEIRO') || 'CPF',
+			cpf: String(u.cpf),
+			cpf_mascarado: mascararCpf(String(u.cpf), u.tipo_documento),
+			pais_origem: String(u.pais_origem || 'Brasil'),
 			email: String(u.email),
 			data_nascimento: String(u.data_nascimento),
 			genero: (u.genero || 'M') as 'M' | 'F',
@@ -374,7 +396,9 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		`SELECT 
 			u.id_usuario,
 			u.nome,
+			u.tipo_documento,
 			u.cpf,
+			u.pais_origem,
 			u.email,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
 			u.genero,
@@ -524,8 +548,10 @@ export async function buscarUsuarioDetalhadoNoDojo(
 	return {
 		id_usuario: Number(u.id_usuario),
 		nome: String(u.nome),
+		tipo_documento: (u.tipo_documento as 'CPF' | 'ESTRANGEIRO') || 'CPF',
 		cpf: String(u.cpf),
-		cpf_mascarado: mascararCpf(String(u.cpf)),
+		cpf_mascarado: mascararCpf(String(u.cpf), u.tipo_documento),
+		pais_origem: String(u.pais_origem || 'Brasil'),
 		email: String(u.email),
 		data_nascimento: String(u.data_nascimento),
 		genero: (u.genero || 'M') as 'M' | 'F',
@@ -602,7 +628,9 @@ export async function inserirUsuarioTx(
 	conn: PoolConnection,
 	dados: {
 		nome: string;
+		tipoDocumento?: 'CPF' | 'ESTRANGEIRO';
 		cpf: string;
+		paisOrigem?: string;
 		dataNascimento: string;
 		genero: 'M' | 'F';
 		email: string;
@@ -611,11 +639,13 @@ export async function inserirUsuarioTx(
 	}
 ): Promise<number> {
 	const [res] = await conn.query<ResultSetHeader>(
-		`INSERT INTO Usuario (nome, cpf, data_nascimento, genero, email, senha_hash, telefone)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO Usuario (nome, tipo_documento, cpf, pais_origem, data_nascimento, genero, email, senha_hash, telefone)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			dados.nome,
+			dados.tipoDocumento || 'CPF',
 			dados.cpf,
+			dados.paisOrigem || 'Brasil',
 			dados.dataNascimento,
 			dados.genero,
 			dados.email.toLowerCase().trim(),
@@ -1097,7 +1127,7 @@ export async function atualizarDadosProprioPerfilTx(
 	idAcademia: number,
 	idUsuario: number,
 	dados: DadosEdicaoProprioPerfil
-): Promise<void> {
+): Promise<{ novaCategoria?: string | null }> {
 	return await executarTransacao(async (conn) => {
 		// 1. Valida se o usuário pertence à academia logada
 		const [vinculo] = await conn.execute<RowDataPacket[]>(
@@ -1129,19 +1159,60 @@ export async function atualizarDadosProprioPerfilTx(
 			await salvarEnderecoUsuarioTx(conn, idUsuario, dados.endereco);
 		}
 
-		// 5. Se o usuário for Aluno, atualiza o peso
+		// 5. Se o usuário for Aluno, atualiza o peso e recalcula a categoria oficial (CBJ/FPJ)
+		let novaCategoriaCalculada: string | null = null;
 		if (dados.peso !== undefined) {
-			const [eAluno] = await conn.execute<RowDataPacket[]>(
-				`SELECT 1 FROM Aluno WHERE id_usuario = ? LIMIT 1`,
+			const [alunoRows] = await conn.execute<RowDataPacket[]>(
+				`SELECT a.graduacao_atual, a.categoria, a.peso, u.genero, DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento
+				 FROM Aluno a
+				 INNER JOIN Usuario u ON u.id_usuario = a.id_usuario
+				 WHERE a.id_usuario = ? LIMIT 1`,
 				[idUsuario]
 			);
-			if (eAluno.length > 0) {
+			if (alunoRows.length > 0) {
+				const row = alunoRows[0];
+				const pesoAntigo = row.peso !== null ? Number(row.peso) : null;
+				const categoriaAntiga = row.categoria ? String(row.categoria) : null;
+				let novaDivisao: string | null = null;
+
+				if (row.data_nascimento && dados.peso !== null) {
+					const classif = obterClassificacaoJudo({
+						dataNascimento: String(row.data_nascimento),
+						genero: (row.genero === 'F' ? 'F' : 'M') as 'M' | 'F',
+						peso: dados.peso,
+						graduacao: String(row.graduacao_atual || 'Branca')
+					});
+					novaCategoriaCalculada = classif.categoriaCompleta;
+					novaDivisao = classif.divisao;
+				}
+
 				await conn.execute(
-					`UPDATE Aluno SET peso = ? WHERE id_usuario = ?`,
-					[dados.peso, idUsuario]
+					`UPDATE Aluno 
+					 SET peso = ?, 
+					     categoria = COALESCE(?, categoria), 
+					     grupo_especial_aspirante = COALESCE(?, grupo_especial_aspirante)
+					 WHERE id_usuario = ?`,
+					[dados.peso, novaCategoriaCalculada, novaDivisao, idUsuario]
 				);
+
+				// Registra no Log_Auditoria para o Sensei responsável acompanhar a mudança de peso/categoria
+				if (pesoAntigo !== dados.peso || (categoriaAntiga && novaCategoriaCalculada && categoriaAntiga !== novaCategoriaCalculada)) {
+					await conn.execute(
+						`INSERT INTO Log_Auditoria (id_academia, id_usuario, acao, entidade, id_entidade, dados_antes, dados_depois)
+						 VALUES (?, ?, 'MUDANCA_PESO_CATEGORIA', 'Aluno', ?, ?, ?)`,
+						[
+							idAcademia,
+							idUsuario,
+							String(idUsuario),
+							JSON.stringify({ peso: pesoAntigo, categoria: categoriaAntiga }),
+							JSON.stringify({ peso: dados.peso, categoria: novaCategoriaCalculada })
+						]
+					);
+				}
 			}
 		}
+
+		return { novaCategoria: novaCategoriaCalculada };
 	});
 }
 

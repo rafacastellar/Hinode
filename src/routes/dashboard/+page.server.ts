@@ -1,4 +1,4 @@
-import type { PageServerLoad } from './$types';
+import type { PageServerLoad, Actions } from './$types';
 import {
 	obterMetricasDoDojo,
 	obterPainelJudoca,
@@ -7,7 +7,8 @@ import {
 	obterAniversariantesDaSemana,
 	obterPendenciasTecnicasDojo
 } from '#lib/server/repositorios/dashboard.repo';
-import { temPermissao } from '#lib/server/auth/rbac';
+import { temPermissao, exigirPermissao } from '#lib/server/auth/rbac';
+import { recalcularCategoriasDojo } from '#lib/server/servicos/aluno.service';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const idAcademia = locals.idAcademia!;
@@ -109,4 +110,20 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		podeVerUsuarios: temPermissao(perfis, 'USUARIOS_VER'),
 		podeConfigurarAcademia: temPermissao(perfis, 'ACADEMIA_CONFIGURAR')
 	};
+};
+
+export const actions: Actions = {
+	recalcularCategorias: async ({ locals }) => {
+		const perfis = locals.perfis || [];
+		exigirPermissao(perfis, 'ALUNOS_EDITAR');
+
+		const idAcademia = locals.idAcademia!;
+		const resultado = await recalcularCategoriasDojo(idAcademia);
+
+		return {
+			sucesso: true,
+			tipo: 'recalcularCategorias',
+			mensagem: `${resultado.totalAtualizados} de ${resultado.totalAlunos} judocas tiveram suas categorias e divisões atualizadas para a temporada oficial vigente (Regulamento CBJ/FPJ).`
+		};
+	}
 };

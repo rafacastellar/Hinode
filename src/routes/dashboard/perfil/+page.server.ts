@@ -25,10 +25,19 @@ const perfilEdicaoSchema = z.object({
 	})
 });
 
+import { REGEX_SENHA_FORTE } from '#lib/dominio/validacao';
+
 const alterarPropriaSenhaSchema = z
 	.object({
 		senhaAtual: z.string().min(1, 'Informe a senha atual'),
-		novaSenha: z.string().min(6, 'A nova senha deve ter no mínimo 6 caracteres').max(100),
+		novaSenha: z
+			.string()
+			.min(8, 'A nova senha deve ter no mínimo 8 caracteres')
+			.max(100, 'A nova senha não pode exceder 100 caracteres')
+			.regex(
+				REGEX_SENHA_FORTE,
+				'A nova senha deve conter ao menos: 1 letra maiúscula, 1 minúscula, 1 número e 1 caractere especial (@$!%*?&#)'
+			),
 		confirmacaoNovaSenha: z.string().min(1, 'Confirme a nova senha')
 	})
 	.refine((dados) => dados.novaSenha === dados.confirmacaoNovaSenha, {
@@ -117,7 +126,7 @@ export const actions: Actions = {
 		const dadosValidos = resultadoValidacao.data;
 
 		try {
-			await atualizarDadosProprioPerfilTx(idAcademia, idUsuario, {
+			const resultado = await atualizarDadosProprioPerfilTx(idAcademia, idUsuario, {
 				email: dadosValidos.email,
 				telefone: dadosValidos.telefone,
 				peso: dadosValidos.peso,
@@ -125,7 +134,9 @@ export const actions: Actions = {
 			});
 
 			return {
-				sucessoDados: 'Dados cadastrais, contato e endereço atualizados com sucesso!'
+				sucessoDados: resultado?.novaCategoria
+					? `Dados cadastrais e pesagem atualizados com sucesso! Sua categoria oficial no dojo agora é ${resultado.novaCategoria}.`
+					: 'Dados cadastrais, contato e endereço atualizados com sucesso!'
 			};
 		} catch (err: any) {
 			return fail(400, {
