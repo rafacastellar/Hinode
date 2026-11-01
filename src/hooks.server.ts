@@ -33,11 +33,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 					const novaExpiraEm = new Date(agora + TEMPO_INATIVIDADE_MS);
 					await renovarSessao(sessao.id_sessao, novaExpiraEm);
 
+					const cookieSeguro =
+						event.url.protocol === 'https:' ||
+						event.request.headers.get('x-forwarded-proto') === 'https' ||
+						process.env.COOKIE_SECURE === 'true';
+
 					event.cookies.set('hinode_session', tokenSessao, {
 						path: '/',
 						httpOnly: true,
 						sameSite: 'lax',
-						secure: process.env.NODE_ENV === 'production',
+						secure: cookieSeguro,
 						maxAge: Math.floor(TEMPO_INATIVIDADE_MS / 1000)
 					});
 				}

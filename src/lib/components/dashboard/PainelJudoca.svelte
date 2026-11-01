@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PainelJudocaDados } from '#lib/server/repositorios/dashboard.repo';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import PassaporteJudoca from '#lib/components/ui/PassaporteJudoca.svelte';
 	import {
 		Award,
 		Trophy,
@@ -213,6 +214,20 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- ========================================================================= -->
+	<!-- 1.5 PASSAPORTE DIGITAL DO JUDOCA & TERMÔMETRO DE CARÊNCIA DE FAIXA        -->
+	<!-- ========================================================================= -->
+	<PassaporteJudoca
+		nome={painel.judoca.nome}
+		matricula={painel.judoca.matricula}
+		faixaAtual={painel.judoca.graduacao_atual}
+		categoria={painel.judoca.categoria}
+		peso={painel.judoca.peso}
+		nomeSensei={painel.judoca.nome_professor_responsavel}
+		nomeAcademia={nomeDojo}
+		dataReferenciaGraduacao={painel.judoca.data_ultima_graduacao_br}
+	/>
 
 	<!-- ========================================================================= -->
 	<!-- CENTRAL DE AÇÕES PENDENTES DO JUDOCA (EM POSIÇÃO DE DESTAQUE)             -->

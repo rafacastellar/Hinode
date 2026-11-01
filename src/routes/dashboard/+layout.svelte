@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { LayoutProps } from './$types';
 	import BadgePerfil from '#lib/components/ui/BadgePerfil.svelte';
+	import ToastContainer from '#lib/components/ui/ToastContainer.svelte';
+	import hinodeEmblema from '#lib/assets/hinode-emblema.svg';
 	import {
 		LayoutDashboard,
 		Users,
@@ -85,11 +87,13 @@
 				<div class="flex items-center justify-between gap-3">
 					<a href="/dashboard" class="flex items-center gap-3 group min-w-0">
 						<div
-							class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-zinc-700 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.2)]"
+							class="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.25)]"
 						>
-							<span
-								class="w-3.5 h-3.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.9)]"
-							></span>
+							<img
+								src={hinodeEmblema}
+								alt="Emblema Judô Hinodê"
+								class="w-8 h-8 object-contain transition-transform duration-300 group-hover:scale-110"
+							/>
 						</div>
 						<div class="min-w-0 flex-1">
 							<span
@@ -97,8 +101,8 @@
 							>
 								HINODÊ
 							</span>
-							<span class="text-[10px] font-mono tracking-widest text-zinc-500 uppercase block mt-1">
-								SaaS de Dojos
+							<span class="text-[10px] font-mono tracking-widest text-amber-400/90 uppercase block mt-1">
+								日の出 • SaaS de Dojos
 							</span>
 						</div>
 					</a>
@@ -115,14 +119,14 @@
 				</div>
 
 				<!-- Card Informativo do Dojo (Tenant Ativo) -->
-				<div class="mt-5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80">
-					<div class="flex items-center gap-2 mb-1">
+				<div class="mt-5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80 relative overflow-hidden">
+					<div class="flex items-center gap-2 mb-1 relative z-10">
 						<Building2 class="w-3.5 h-3.5 text-red-500 shrink-0" />
 						<span class="text-xs font-semibold text-zinc-200 truncate block">
 							{data.nomeAcademia || 'Dojo Principal'}
 						</span>
 					</div>
-					<div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+					<div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono relative z-10">
 						<span>Isolamento Tenant</span>
 						<span class="text-zinc-400 font-bold">#{data.idAcademia}</span>
 					</div>
@@ -131,11 +135,13 @@
 				<div class="flex flex-col items-center gap-3">
 					<a href="/dashboard" class="group flex flex-col items-center" title="{data.nomeAcademia || 'Judô Hinodê'} - Início">
 						<div
-							class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-zinc-700 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.2)]"
+							class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.2)]"
 						>
-							<span
-								class="w-3.5 h-3.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.9)]"
-							></span>
+							<img
+								src={hinodeEmblema}
+								alt="Emblema Judô Hinodê"
+								class="w-7 h-7 object-contain"
+							/>
 						</div>
 					</a>
 
@@ -442,4 +448,7 @@
 			{@render children()}
 		</div>
 	</main>
+
+	<!-- Notificações Flutuantes Globais (Toasts) -->
+	<ToastContainer />
 </div>

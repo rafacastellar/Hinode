@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
+	import hinodeEmblema from '#lib/assets/hinode-emblema.svg';
 	import { Lock, Mail, Building2, AlertCircle, ArrowRight, ShieldCheck, Clock, Eye, EyeOff } from '@lucide/svelte';
 
 	interface FormState {
@@ -32,34 +33,44 @@
 	<title>Entrar no Dojo - Judô Hinodê</title>
 </svelte:head>
 
-<div class="min-h-screen bg-black text-zinc-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-	<div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
-		<!-- Emblema Institucional -->
-		<a href="/" class="inline-flex items-center gap-3 mb-6 group">
-			<div class="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-zinc-700">
-				<div class="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-				<span class="w-4 h-4 rounded-full bg-red-600 shadow-[0_0_16px_rgba(220,38,38,0.8)]"></span>
+<div class="min-h-screen bg-black text-zinc-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+	<!-- Glow de fundo sutil Hinodê (Sol Nascente) -->
+	<div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] bg-red-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+	<div class="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10">
+		<!-- Emblema Institucional 3D Metálico & Vetorial -->
+		<a href="/" class="inline-flex flex-col items-center gap-3 mb-6 group">
+			<div class="w-20 h-20 rounded-2xl bg-zinc-950 border border-zinc-800/90 flex items-center justify-center relative overflow-hidden transition-all duration-300 group-hover:border-red-600/70 shadow-[0_0_30px_rgba(220,38,38,0.25)]">
+				<img
+					src="/img/hinode-3d.jpg"
+					alt="Emblema 3D Judô Hinodê"
+					class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+					onerror={(e) => {
+						const target = e.currentTarget as HTMLImageElement;
+						target.src = hinodeEmblema;
+					}}
+				/>
 			</div>
-			<div class="text-left">
+			<div class="text-center">
 				<span class="font-display font-extrabold text-2xl tracking-tight text-white block leading-none">
-					HINODÊ
+					JUDÔ HINODÊ
 				</span>
-				<span class="text-[10px] tracking-widest text-zinc-500 font-mono uppercase block mt-1">
-					Gestão de Dojos
+				<span class="text-[10px] tracking-widest text-amber-400/90 font-mono uppercase block mt-1.5">
+					日の出 • Gestão Oficial de Dojos
 				</span>
 			</div>
 		</a>
 
 		<h2 class="text-2xl font-bold tracking-tight text-white font-display">
-			Acesso ao Sistema
+			Acesso ao Tatame Digital
 		</h2>
 		<p class="mt-2 text-sm text-zinc-400">
-			Informe suas credenciais para entrar na área administrativa
+			Informe suas credenciais para entrar na plataforma do seu dojo
 		</p>
 	</div>
 
-	<div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-		<div class="bg-zinc-950 py-8 px-6 sm:px-10 border border-zinc-900 rounded-2xl shadow-2xl">
+	<div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0 relative z-10">
+		<div class="bg-zinc-950/90 backdrop-blur-md py-8 px-6 sm:px-10 border border-zinc-800/80 rounded-2xl shadow-2xl">
 			<!-- Alerta de Sessão Expirada por Inatividade -->
 			{#if data?.expirada && !form?.erro}
 				<div class="mb-6 p-4 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-200 text-sm flex items-start gap-3">

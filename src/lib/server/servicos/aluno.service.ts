@@ -464,3 +464,85 @@ export async function recalcularCategoriasDojo(
 		totalAlunos: alunos.length
 	};
 }
+
+/**
+ * Registra uma Pesagem Rápida no Tatame para um judoca, recalculando
+ * instantaneamente sua categoria CBJ/FPJ e gravando trilha de auditoria.
+ */
+export async function registrarPesagemRapidaAluno(
+	idAcademia: number,
+	idUsuarioExecutor: number,
+	idAluno: number,
+	novoPeso: number
+): Promise<{ sucesso: boolean; mensagem: string; novaCategoria: string }> {
+	if (!Number.isFinite(novoPeso) || novoPeso < 10 || novoPeso > 300) {
+		throw error(400, { message: 'Informe um peso válido entre 10,0 kg e 300,0 kg.' });
+	}
+
+	return await executarTransacao(async (conn) => {
+		const [rows] = await conn.execute<RowDataPacket[]>(
+			`SELECT 
+				a.id_usuario,
+				u.nome,
+				u.genero,
+				DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+				a.peso,
+				a.categoria,
+				a.graduacao_atual,
+				a.grupo_especial_aspirante
+			 FROM Aluno a
+			 INNER JOIN Usuario u ON a.id_usuario = u.id_usuario
+			 INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
+			 WHERE a.id_usuario = ? AND ua.id_academia = ?
+			 LIMIT 1`,
+			[idAluno, idAcademia]
+		);
+
+		if (rows.length === 0) {
+			throw error(404, { message: 'Judoca não encontrado nesta academia.' });
+		}
+
+		const aluno = rows[0];
+		const pesoAnterior = aluno.peso !== null ? Number(aluno.peso) : null;
+		const categoriaAnterior = aluno.categoria ? String(aluno.categoria) : null;
+
+		const classif = obterClassificacaoJudo({
+			dataNascimento: String(aluno.data_nascimento),
+			genero: aluno.genero === 'F' ? 'F' : 'M',
+			peso: novoPeso,
+			graduacao: String(aluno.graduacao_atual || 'Branca')
+		});
+
+		const novaCategoria = classif.categoriaCompleta;
+		const novaDivisao = classif.divisao;
+
+		await conn.execute(
+			`UPDATE Aluno 
+			 SET peso = ?, categoria = ?, grupo_especial_aspirante = ? 
+			 WHERE id_usuario = ?`,
+			[novoPeso, novaCategoria, novaDivisao, idAluno]
+		);
+
+		await conn.execute(
+			`INSERT INTO Log_Auditoria (id_academia, id_usuario_executor, acao, entidade, id_entidade, dados_antes, dados_depois)
+			 VALUES (?, ?, 'MUDANCA_PESO_CATEGORIA', 'Aluno', ?, ?, ?)`,
+			[
+				idAcademia,
+				idUsuarioExecutor,
+				String(idAluno),
+				JSON.stringify({ peso: pesoAnterior, categoria: categoriaAnterior }),
+				JSON.stringify({
+					peso: novoPeso,
+					categoria: novaCategoria,
+					origem: 'Pesagem Rápida no Tatame'
+				})
+			]
+		);
+
+		return {
+			sucesso: true,
+			novaCategoria,
+			mensagem: `Peso de ${aluno.nome} atualizado para ${novoPeso.toFixed(1)} kg (${novaCategoria}).`
+		};
+	});
+}

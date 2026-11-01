@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+	<title>Judô Hinodê - Emblema Oficial</title>
+	<defs>
+		<radialGradient id="hinodeSun" cx="50%" cy="50%" r="50%">
+			<stop offset="0%" stop-color="#f87171" />
+			<stop offset="55%" stop-color="#dc2626" />
+			<stop offset="100%" stop-color="#991b1b" />
+		</radialGradient>
+		<linearGradient id="hinodeGold" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#fef08a" />
+			<stop offset="50%" stop-color="#eab308" />
+			<stop offset="100%" stop-color="#854d0e" />
+		</linearGradient>
+	</defs>
+	<circle cx="64" cy="64" r="58" fill="#09090b" stroke="#27272a" stroke-width="3" />
+	<circle cx="64" cy="64" r="50" stroke="url(#hinodeGold)" stroke-width="2" stroke-opacity="0.8" />
+	<circle cx="64" cy="64" r="44" stroke="#3f3f46" stroke-width="1" stroke-dasharray="4 3" />
+	<circle cx="64" cy="64" r="30" fill="url(#hinodeSun)" />
+	<path d="M30 78 H98" stroke="#09090b" stroke-width="4" stroke-linecap="round" />
+	<path d="M40 86 H88" stroke="#09090b" stroke-width="3.5" stroke-linecap="round" />
+</svg>
+

@@ -247,7 +247,7 @@
 		</div>
 
 		{#if distribuicaoOrdenada.length > 0}
-			<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
 				{#each distribuicaoOrdenada as item}
 					{@const pct = totalGeralJudocasCenso > 0 ? Math.round((item.total / totalGeralJudocasCenso) * 100) : 0}
 					<div
@@ -269,6 +269,14 @@
 
 						<div class="flex items-center justify-center py-1">
 							<BadgeFaixa faixa={item.faixa} size="sm" />
+						</div>
+
+						<!-- Barra Gráfica Proporcional do Censo -->
+						<div class="w-full h-1.5 rounded-full bg-zinc-950 border border-zinc-800/80 overflow-hidden">
+							<div
+								class="h-full rounded-full bg-gradient-to-r from-red-600 to-amber-500 transition-all duration-500"
+								style="width: {Math.max(4, pct)}%"
+							></div>
 						</div>
 					</div>
 				{/each}

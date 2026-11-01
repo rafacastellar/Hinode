@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, getClientAddress }) => {
+	default: async ({ request, cookies, getClientAddress, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const senha = formData.get('senha');
@@ -55,13 +55,20 @@ export const actions: Actions = {
 			}
 
 			// Sessão autenticada: emite o cookie httpOnly seguro
+			// Em HTTP local (IP da VM) secure deve ser false para o navegador aceitar o cookie;
+			// Em HTTPS (Túnel Cloudflare / Produção AWS) secure é ativado automaticamente.
+			const cookieSeguro =
+				url.protocol === 'https:' ||
+				request.headers.get('x-forwarded-proto') === 'https' ||
+				process.env.COOKIE_SECURE === 'true';
+
 			if (resultado.lembrar) {
 				// Persistência longa (7 dias) solicitada explicitamente pelo usuário
 				cookies.set('hinode_session', resultado.tokenPuro, {
 					path: '/',
 					httpOnly: true,
 					sameSite: 'lax',
-					secure: process.env.NODE_ENV === 'production',
+					secure: cookieSeguro,
 					expires: resultado.expiraEm
 				});
 			} else {
@@ -70,7 +77,7 @@ export const actions: Actions = {
 					path: '/',
 					httpOnly: true,
 					sameSite: 'lax',
-					secure: process.env.NODE_ENV === 'production',
+					secure: cookieSeguro,
 					maxAge: 2 * 60 * 60
 				});
 			}

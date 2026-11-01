@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData, ActionData } from './$types';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import TermometroElegibilidade from '#lib/components/ui/TermometroElegibilidade.svelte';
 	import {
 		Award,
 		User,
@@ -173,6 +174,12 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Termômetro de Elegibilidade Pedagógica para Próxima Faixa -->
+	<TermometroElegibilidade
+		faixaAtual={aluno.graduacao_atual}
+		dataInicioOuUltimaGraduacao={aluno.data_primeira_graduacao || aluno.data_inicio}
+	/>
 
 	<!-- ========================================================================= -->
 	<!-- NOTIFICAÇÕES DE FEEDBACK -->
