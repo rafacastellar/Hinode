@@ -2,6 +2,7 @@
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import ModalPesagemRapida from '#lib/components/alunos/ModalPesagemRapida.svelte';
 	import {
 		Users,
 		UserPlus,
@@ -16,6 +17,7 @@
 		ArrowUpDown,
 		Filter,
 		LayoutList,
+		LayoutGrid,
 		AlignJustify,
 		ArrowUp,
 		ArrowDown,
@@ -34,11 +36,12 @@
 
 	let termoBusca = $state('');
 	let recalculando = $state(false);
+	let alunoParaPesagem = $state<any>(null);
 
 	// Estados de controle: minimização (accordion), ordenação e densidade
 	let listaExpandida = $state(true);
 	let historicoExpandido = $state(false);
-	let modoDensidade = $state<'detalhada' | 'compacta'>('compacta');
+	let modoDensidade = $state<'detalhada' | 'compacta' | 'cards'>('compacta');
 	let campoOrdenacao = $state<CampoOrdenacaoAtleta>('nome');
 	let direcaoOrdenacao = $state<DirecaoOrdenacao>('asc');
 	let filtroChip = $state<'TODOS' | 'MENORES' | 'ADULTOS' | 'ASPIRANTES' | 'ESPECIAIS'>('TODOS');
@@ -389,12 +392,12 @@
 							</button>
 						</div>
 
-						<!-- Alternador de Densidade (Detalhada vs Compacta) -->
+						<!-- Alternador de Densidade (Detalhada vs Compacta vs Cards Tatame) -->
 						<div class="p-1 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center">
 							<button
 								type="button"
 								onclick={() => (modoDensidade = 'detalhada')}
-								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {modoDensidade ===
+								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer {modoDensidade ===
 								'detalhada'
 									? 'bg-zinc-800 text-white font-bold shadow-sm'
 									: 'text-zinc-500 hover:text-zinc-300'}"
@@ -406,7 +409,7 @@
 							<button
 								type="button"
 								onclick={() => (modoDensidade = 'compacta')}
-								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 {modoDensidade ===
+								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer {modoDensidade ===
 								'compacta'
 									? 'bg-zinc-800 text-white font-bold shadow-sm'
 									: 'text-zinc-500 hover:text-zinc-300'}"
@@ -415,12 +418,98 @@
 								<AlignJustify class="w-3.5 h-3.5" />
 								<span>Compacta</span>
 							</button>
+							<button
+								type="button"
+								onclick={() => (modoDensidade = 'cards')}
+								class="px-2.5 py-1 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer {modoDensidade ===
+								'cards'
+									? 'bg-red-950/60 border border-red-800/70 text-red-200 font-bold shadow-sm'
+									: 'text-zinc-500 hover:text-zinc-300'}"
+								title="Modo Tatame (Cards Móveis Táteis para Tablet/Smartphone)"
+							>
+								<LayoutGrid class="w-3.5 h-3.5 text-red-400" />
+								<span>Modo Tatame</span>
+							</button>
 						</div>
 					</div>
 				</div>
 
-				<!-- Tabela de Alunos (Detalhada ou Compacta) -->
+				<!-- Visualização de Alunos (Tabela vs Modo Tatame Cards) -->
 				{#if alunosOrdenados.length > 0}
+					{#if modoDensidade === 'cards'}
+						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+							{#each alunosOrdenados as aluno}
+								<div
+									class="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700 transition-all flex flex-col justify-between gap-4 shadow-sm"
+								>
+									<div class="space-y-3">
+										<div class="flex items-start justify-between gap-3">
+											<div class="flex items-center gap-3 min-w-0">
+												<div
+													class="w-11 h-11 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-sm font-bold font-mono text-red-400 shrink-0"
+												>
+													{aluno.nome.charAt(0).toUpperCase()}
+												</div>
+												<div class="min-w-0">
+													{#if aluno.matricula}
+														<span class="text-[10px] font-mono text-zinc-400 block">
+															#{aluno.matricula}
+														</span>
+													{/if}
+													<a
+														href="/dashboard/alunos/{aluno.id_usuario}"
+														class="text-sm font-bold text-white hover:text-red-400 transition-colors truncate block"
+													>
+														{aluno.nome}
+													</a>
+													<span class="text-[11px] font-mono text-zinc-400">
+														{aluno.idade} anos • Sensei {aluno.nome_professor_responsavel}
+													</span>
+												</div>
+											</div>
+										</div>
+
+										<div class="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60">
+											<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+											<div class="text-right">
+												<span class="text-xs font-mono font-bold text-zinc-200 block">
+													{aluno.peso ? `${aluno.peso} kg` : 'Sem peso'}
+												</span>
+												<span class="text-[10px] font-mono text-amber-300/90 truncate block max-w-[140px]">
+													{aluno.categoria || 'Sem categoria'}
+												</span>
+											</div>
+										</div>
+									</div>
+
+									<div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60">
+										{#if data.podeEditarAluno}
+											<button
+												type="button"
+												onclick={() => (alunoParaPesagem = aluno)}
+												class="min-h-[42px] px-3 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-amber-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+											>
+												<Scale class="w-4 h-4 text-amber-400" />
+												<span>Aferir Peso</span>
+											</button>
+										{/if}
+										<a
+											href="/dashboard/alunos/{aluno.id_usuario}"
+											class="min-h-[42px] {data.podeEditarAluno ? '' : 'col-span-2'} px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition-colors"
+										>
+											{#if data.podeEditarAluno}
+												<Pencil class="w-3.5 h-3.5 text-zinc-300" />
+												<span>Ficha Completa</span>
+											{:else}
+												<Eye class="w-3.5 h-3.5 text-zinc-300" />
+												<span>Ver Ficha</span>
+											{/if}
+										</a>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else}
 					<div
 						class="overflow-hidden rounded-2xl border border-zinc-900 {modoDensidade === 'compacta'
 							? 'max-h-[520px] overflow-y-auto'
@@ -579,21 +668,34 @@
 
 											<!-- Ações -->
 											<td class="{modoDensidade === 'compacta' ? 'px-4 py-2' : 'px-6 py-4'} text-right">
-												<a
-													href="/dashboard/alunos/{aluno.id_usuario}"
-													class="inline-flex items-center gap-1.5 {modoDensidade === 'compacta' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 hover:text-white transition-colors"
-													title={data.podeEditarAluno
-														? 'Visualizar e editar dados do judoca'
-														: 'Visualizar dados do judoca'}
-												>
+												<div class="inline-flex items-center justify-end gap-1.5">
 													{#if data.podeEditarAluno}
-														<Pencil class="w-3.5 h-3.5 text-zinc-400" />
-														<span>Editar</span>
-													{:else}
-														<Eye class="w-3.5 h-3.5 text-zinc-400" />
-														<span>Ver</span>
+														<button
+															type="button"
+															onclick={() => (alunoParaPesagem = aluno)}
+															class="inline-flex items-center gap-1 {modoDensidade === 'compacta' ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'} rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
+															title="Pesagem Rápida no Tatame"
+														>
+															<Scale class="w-3.5 h-3.5 text-amber-400" />
+															<span class="hidden sm:inline">Peso</span>
+														</button>
 													{/if}
-												</a>
+													<a
+														href="/dashboard/alunos/{aluno.id_usuario}"
+														class="inline-flex items-center gap-1.5 {modoDensidade === 'compacta' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 hover:text-white transition-colors"
+														title={data.podeEditarAluno
+															? 'Visualizar e editar dados do judoca'
+															: 'Visualizar dados do judoca'}
+													>
+														{#if data.podeEditarAluno}
+															<Pencil class="w-3.5 h-3.5 text-zinc-400" />
+															<span>Editar</span>
+														{:else}
+															<Eye class="w-3.5 h-3.5 text-zinc-400" />
+															<span>Ver</span>
+														{/if}
+													</a>
+												</div>
 											</td>
 										</tr>
 									{/each}
@@ -601,6 +703,7 @@
 							</table>
 						</div>
 					</div>
+					{/if}
 				{:else}
 					<div class="p-8 text-center text-xs text-zinc-500 font-mono">
 						Nenhum atleta encontrado para o filtro selecionado.
@@ -804,4 +907,7 @@
 			</div>
 		{/if}
 	</section>
+
+	<!-- Modal de Pesagem Rápida no Tatame -->
+	<ModalPesagemRapida aluno={alunoParaPesagem} onFechar={() => (alunoParaPesagem = null)} />
 </div>

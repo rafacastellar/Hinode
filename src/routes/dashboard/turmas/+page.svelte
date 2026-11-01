@@ -117,6 +117,7 @@
 						{#if turmasDoDia.length > 0}
 							<div class="space-y-3 flex-1">
 								{#each turmasDoDia as turma}
+									{@const pctOcupacao = Math.min(100, Math.round((turma.total_alunos / 25) * 100))}
 									<a
 										href="/dashboard/turmas/{turma.id_treino}"
 										class="group block p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700 transition-all"
@@ -147,16 +148,28 @@
 											</div>
 										{/if}
 
-										<!-- Rodapé do Card com Ocupação -->
-										<div class="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
-											<div class="inline-flex items-center gap-1.5 text-zinc-400">
-												<Users class="w-3.5 h-3.5 text-zinc-500" />
-												<span class="font-mono">{turma.total_alunos} atletas</span>
+										<!-- Rodapé do Card com Ocupação e Barra de Lotação de Tatame -->
+										<div class="pt-2.5 border-t border-zinc-800/60 space-y-2">
+											<div class="flex items-center justify-between text-xs">
+												<div class="inline-flex items-center gap-1.5 text-zinc-300">
+													<Users class="w-3.5 h-3.5 text-red-400" />
+													<span class="font-mono font-semibold">{turma.total_alunos}/25 vagas</span>
+												</div>
+												<span class="text-[11px] text-zinc-500 group-hover:text-white transition-colors flex items-center gap-1">
+													<span>Ver chamada</span>
+													<ArrowRight class="w-3 h-3" />
+												</span>
 											</div>
-											<span class="text-[11px] text-zinc-500 group-hover:text-white transition-colors flex items-center gap-1">
-												<span>Ver chamada</span>
-												<ArrowRight class="w-3 h-3" />
-											</span>
+											<div class="w-full h-1.5 rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
+												<div
+													class="h-full rounded-full transition-all duration-300 {pctOcupacao >= 90
+														? 'bg-red-500'
+														: pctOcupacao >= 60
+															? 'bg-amber-500'
+															: 'bg-emerald-500'}"
+													style="width: {Math.max(5, pctOcupacao)}%"
+												></div>
+											</div>
 										</div>
 									</a>
 								{/each}

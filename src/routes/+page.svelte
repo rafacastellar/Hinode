@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import hinodeEmblema from '#lib/assets/hinode-emblema.svg';
 	import {
 		Shield,
 		Users,
@@ -33,16 +34,19 @@
 		<div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
 			<div class="flex items-center gap-3">
 				<!-- Emblema do Judô Hinodê -->
-				<div class="w-10 h-10 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center relative overflow-hidden group">
-					<div class="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-					<span class="w-3.5 h-3.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.7)]"></span>
+				<div class="w-11 h-11 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center relative overflow-hidden group shadow-[0_0_20px_rgba(220,38,38,0.2)]">
+					<img
+						src={hinodeEmblema}
+						alt="Emblema Judô Hinodê"
+						class="w-8 h-8 object-contain transition-transform duration-300 group-hover:scale-110"
+					/>
 				</div>
 				<div>
 					<span class="font-display font-extrabold text-xl tracking-tight text-white block leading-none">
 						HINODÊ
 					</span>
-					<span class="text-[10px] tracking-widest text-zinc-400 font-mono uppercase block mt-1">
-						SaaS de Gestão de Dojos
+					<span class="text-[10px] tracking-widest text-amber-400/90 font-mono uppercase block mt-1">
+						日の出 • SaaS de Gestão de Dojos
 					</span>
 				</div>
 			</div>
@@ -50,7 +54,7 @@
 			<nav class="flex items-center gap-4">
 				<a
 					href="/login"
-					class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-95 transition-all shadow-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+					class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-95 transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)] focus:ring-2 focus:ring-red-500 focus:outline-none"
 				>
 					<span>Acessar Dojo</span>
 					<ArrowRight class="w-4 h-4" />
@@ -60,21 +64,43 @@
 	</header>
 
 	<!-- Hero Section -->
-	<section class="max-w-7xl mx-auto px-6 py-16 lg:py-24 flex-1 flex flex-col justify-center">
-		<div class="max-w-3xl mb-12">
-			<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-300 mb-6">
-				<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-				<span>Sistema Oficial de Gestão para Dojos de Judô</span>
+	<section class="max-w-7xl mx-auto px-6 py-16 lg:py-24 flex-1 flex flex-col justify-center relative">
+		<div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center mb-16">
+			<div class="lg:col-span-8">
+				<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-300 mb-6">
+					<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+					<span>Sistema Oficial de Gestão para Dojos de Judô</span>
+				</div>
+
+				<h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1] mb-6 font-display">
+					A disciplina do tatame refletida na gestão da sua <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500">academia</span>.
+				</h1>
+
+				<p class="text-lg sm:text-xl text-zinc-400 font-normal leading-relaxed max-w-2xl">
+					Plataforma SaaS multi-tenant desenvolvida para federações e academias de Judô de alto rendimento.
+					Controle de atletas, graduações imutáveis, turmas e competições esportivas com isolamento total de dados.
+				</p>
 			</div>
 
-			<h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1] mb-6 font-display">
-				A disciplina do tatame refletida na gestão da sua <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-600">academia</span>.
-			</h1>
-
-			<p class="text-lg sm:text-xl text-zinc-400 font-normal leading-relaxed">
-				Plataforma SaaS multi-tenant desenvolvida para federações e academias de Judô de alto rendimento.
-				Controle de atletas, graduações imutáveis, turmas e competições esportivas com isolamento total de dados.
-			</p>
+			<!-- Showcase Metálico 3D da Marca Hinodê -->
+			<div class="lg:col-span-4 flex justify-center lg:justify-end">
+				<div class="relative w-56 h-56 sm:w-64 sm:h-64 rounded-3xl bg-zinc-950 border border-zinc-800/80 p-3 shadow-[0_0_50px_rgba(220,38,38,0.2)] group overflow-hidden">
+					<img
+						src="/img/hinode-3d.jpg"
+						alt="Emblema Metálico 3D Judô Hinodê"
+						class="w-full h-full object-cover rounded-2xl transition-transform duration-700 group-hover:scale-105"
+						onerror={(e) => {
+							const target = e.currentTarget as HTMLImageElement;
+							target.src = hinodeEmblema;
+						}}
+					/>
+					<div class="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-center">
+						<span class="text-[10px] font-mono uppercase tracking-widest text-amber-300 font-bold">
+							Tradição • Honra • Disciplina
+						</span>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<!-- Grid de Módulos e Demonstração do Design System -->
