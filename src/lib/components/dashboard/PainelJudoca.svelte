@@ -2,6 +2,7 @@
 	import type { PainelJudocaDados } from '#lib/server/repositorios/dashboard.repo';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import PassaporteJudoca from '#lib/components/ui/PassaporteJudoca.svelte';
+	import CalendarioTatameMensal from '#lib/components/ui/CalendarioTatameMensal.svelte';
 	import {
 		Award,
 		Trophy,
@@ -786,6 +787,135 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- ========================================================================= -->
+	<!-- 4.5. MINHA JORNADA DE PRESENÇA NO TATAME & CALENDÁRIO MENSAL              -->
+	<!-- ========================================================================= -->
+	{#if painel.metricasPresenca}
+		{@const mp = painel.metricasPresenca}
+		<section class="space-y-5">
+			<div class="p-5 sm:p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800 space-y-5">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800/80">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-600/40 flex items-center justify-center text-amber-400 shrink-0">
+							<Flame class="w-5 h-5" />
+						</div>
+						<div>
+							<h2 class="text-base sm:text-lg font-extrabold text-white font-display">
+								Minha Constância no Tatame
+							</h2>
+							<p class="text-xs text-zinc-400">
+								Sua disciplina diária rumo à próxima graduação (suporta múltiplos treinos realizados no mesmo dia)
+							</p>
+						</div>
+					</div>
+
+					<div class="flex items-center gap-2 flex-wrap">
+						<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-xs font-bold text-amber-300">
+							<Flame class="w-4 h-4 text-amber-400" />
+							<span>{mp.streak_atual} {mp.streak_atual === 1 ? 'treino consecutivo' : 'treinos consecutivos'}</span>
+						</span>
+						{#if mp.maior_streak > 0}
+							<span class="px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-400">
+								Recorde: <strong class="text-white">{mp.maior_streak}</strong>
+							</span>
+						{/if}
+					</div>
+				</div>
+
+				<!-- KPIs de Presença do Judoca -->
+				<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+					<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-1">
+						<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block">
+							Aulas Concluídas
+						</span>
+						<div class="flex items-baseline gap-2">
+							<span class="text-2xl font-extrabold text-emerald-400 font-display">
+								{mp.total_presentes}
+							</span>
+							<span class="text-xs text-zinc-500">de {mp.total_aulas} chamadas</span>
+						</div>
+						<p class="text-[11px] text-zinc-400">
+							Em <strong class="text-white">{mp.dias_distintos_treinados}</strong> dia(s) distintos
+						</p>
+					</div>
+
+					<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-1">
+						<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block">
+							Taxa de Presença Geral
+						</span>
+						<div class="flex items-baseline gap-2">
+							<span class="text-2xl font-extrabold text-white font-display">
+								{mp.percentual_presenca}%
+							</span>
+						</div>
+						<div class="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
+							<div
+								class="h-full rounded-full bg-emerald-500"
+								style="width: {Math.min(100, mp.percentual_presenca)}%"
+							></div>
+						</div>
+					</div>
+
+					<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-1">
+						<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block">
+							Frequência neste Mês
+						</span>
+						<div class="flex items-baseline gap-2">
+							<span class="text-2xl font-extrabold text-amber-400 font-display">
+								{mp.percentual_mes_atual}%
+							</span>
+							<span class="text-xs text-zinc-500">
+								({mp.presentes_mes_atual}/{mp.aulas_mes_atual})
+							</span>
+						</div>
+						<p class="text-[11px] text-zinc-400">
+							Justificadas: <strong class="text-sky-400">{mp.total_justificadas}</strong> • Faltas: <strong class="text-red-400">{mp.total_faltas}</strong>
+						</p>
+					</div>
+
+					<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-1">
+						<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block">
+							Meta Próxima Graduação
+						</span>
+						{#if mp.proximo_exame_meta && (mp.proximo_exame_meta.qtd_minima_aulas > 0 || mp.proximo_exame_meta.percentual_minimo > 0)}
+							{@const meta = mp.proximo_exame_meta}
+							<div class="flex items-center gap-1.5">
+								{#if meta.apto_frequencia}
+									<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-bold text-emerald-300">
+										Meta Atingida ✓
+									</span>
+								{:else}
+									<span class="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-300">
+										Em Progresso
+									</span>
+								{/if}
+							</div>
+							<p class="text-[11px] text-zinc-300 truncate" title={meta.nome_evento}>
+								{meta.qtd_minima_aulas > 0 ? `${mp.total_presentes}/${meta.qtd_minima_aulas} aulas` : ''}
+								{meta.percentual_minimo > 0 ? ` • Min. ${meta.percentual_minimo}%` : ''}
+							</p>
+						{:else}
+							<span class="text-sm font-bold text-zinc-200 block pt-0.5">
+								Constância Livre
+							</span>
+							<p class="text-[11px] text-zinc-500">
+								Mantenha acima de 80% de presença
+							</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Calendário Mensal Tradicional do Judoca -->
+				<CalendarioTatameMensal
+					sessoes={painel.presencas || []}
+					turmasMatriculadas={painel.treinosInscritos || []}
+					titulo="Meu Calendário Mensal de Treinos"
+					subtitulo="Visualize todos os treinos realizados em cada dia do mês, seus horários e as observações do Sensei"
+				/>
+			</div>
+		</section>
+	{/if}
 
 	<!-- ========================================================================= -->
 	<!-- 5. PRINCÍPIOS FUNDAMENTAIS DO JUDÔ (DOJO KUN & FILOSOFIA)                 -->

@@ -6,6 +6,7 @@ import {
 	atualizarPesoAlunoDoResponsavel,
 	atualizarContatoAlunoDoResponsavel
 } from '#lib/server/repositorios/responsavel.repo';
+import { registrarAvisoAusenciaPeloResponsavel } from '#lib/server/repositorios/presenca.repo';
 
 const pesoSchema = z.object({
 	idAluno: z.coerce.number().positive('ID de aluno inválido'),
@@ -138,6 +139,58 @@ export const actions: Actions = {
 			return fail(403, {
 				erroContato: err.message || 'Não foi possível atualizar os contatos do aluno.',
 				idAlunoErro: validacao.data.idAluno
+			});
+		}
+	},
+
+	avisarAusencia: async ({ request, locals }) => {
+		const idAcademia = locals.idAcademia;
+		const idUsuario = locals.usuario?.id;
+
+		if (!idAcademia || !idUsuario) {
+			throw redirect(303, '/auth/login');
+		}
+
+		const formData = await request.formData();
+		const idAluno = Number(formData.get('idAluno'));
+		const dataTreino = String(formData.get('dataTreino') || '').trim();
+		const motivo = String(formData.get('motivo') || '').trim();
+		const idsTreinosRaw = formData.getAll('idTreino').map((v) => Number(v)).filter((n) => !isNaN(n) && n > 0);
+
+		if (isNaN(idAluno) || idAluno <= 0) {
+			return fail(400, { erroAusencia: 'Judoca inválido.', idAlunoErro: idAluno });
+		}
+
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(dataTreino)) {
+			return fail(400, { erroAusencia: 'Selecione uma data válida para o aviso de ausência.', idAlunoErro: idAluno });
+		}
+
+		if (idsTreinosRaw.length === 0) {
+			return fail(400, { erroAusencia: 'Selecione ao menos um treino/turma do dia.', idAlunoErro: idAluno });
+		}
+
+		if (motivo.length < 3) {
+			return fail(400, { erroAusencia: 'Informe um breve motivo para a ausência (mín. 3 caracteres).', idAlunoErro: idAluno });
+		}
+
+		try {
+			await registrarAvisoAusenciaPeloResponsavel(
+				idAcademia,
+				idUsuario,
+				idAluno,
+				idsTreinosRaw,
+				dataTreino,
+				motivo
+			);
+
+			return {
+				sucessoAusencia: 'Aviso prévio de ausência registrado com sucesso! O Sensei verá a justificativa na chamada.',
+				idAlunoAtualizado: idAluno
+			};
+		} catch (err: any) {
+			return fail(400, {
+				erroAusencia: err.message || 'Não foi possível registrar o aviso de ausência.',
+				idAlunoErro: idAluno
 			});
 		}
 	}

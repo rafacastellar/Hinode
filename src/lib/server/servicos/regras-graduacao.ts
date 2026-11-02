@@ -107,6 +107,10 @@ export interface ValidacaoElegibilidadeGraduacaoInput {
 	dataPrimeiraGraduacaoAtleta?: string | null;
 	tempoMinimoJudoMeses?: number | null;
 	tempoMinimoUltimaGraduacaoMeses?: number | null;
+	percentualMinimoPresenca?: number | null;
+	qtdMinimaAulasPresentes?: number | null;
+	percentualPresencaAtleta?: number | null;
+	aulasPresentesAtleta?: number | null;
 	dataEventoIso: string;
 }
 
@@ -116,6 +120,8 @@ export interface ResultadoElegibilidadeGraduacao {
 	proximaFaixa: string;
 	mesesJudo: number;
 	mesesUltimaGraduacao: number;
+	percentualPresenca?: number;
+	aulasPresentes?: number;
 }
 
 /**
@@ -179,11 +185,43 @@ export function validarElegibilidadeGraduacao(
 		};
 	}
 
+	// 4. Critério de Presença no Tatame (% mínimo)
+	const pctMinimo = Number(dados.percentualMinimoPresenca || 0);
+	const pctAtleta = Number(dados.percentualPresencaAtleta || 0);
+	if (pctMinimo > 0 && pctAtleta < pctMinimo) {
+		return {
+			elegivel: false,
+			motivo: `Frequência de tatame insuficiente: exige ${pctMinimo}% de presença (atleta possui ${pctAtleta}%).`,
+			proximaFaixa,
+			mesesJudo,
+			mesesUltimaGraduacao: mesesUltimaGrad,
+			percentualPresenca: pctAtleta,
+			aulasPresentes: Number(dados.aulasPresentesAtleta || 0)
+		};
+	}
+
+	// 5. Critério de Presença no Tatame (Qtd mínima de aulas presentes)
+	const aulasMinimas = Number(dados.qtdMinimaAulasPresentes || 0);
+	const aulasAtleta = Number(dados.aulasPresentesAtleta || 0);
+	if (aulasMinimas > 0 && aulasAtleta < aulasMinimas) {
+		return {
+			elegivel: false,
+			motivo: `Quantidade de treinos insuficiente: exige no mínimo ${aulasMinimas} aulas presentes (atleta compareceu a ${aulasAtleta} ${aulasAtleta === 1 ? 'aula' : 'aulas'}).`,
+			proximaFaixa,
+			mesesJudo,
+			mesesUltimaGraduacao: mesesUltimaGrad,
+			percentualPresenca: pctAtleta,
+			aulasPresentes: aulasAtleta
+		};
+	}
+
 	return {
 		elegivel: true,
 		proximaFaixa,
 		mesesJudo,
-		mesesUltimaGraduacao: mesesUltimaGrad
+		mesesUltimaGraduacao: mesesUltimaGrad,
+		percentualPresenca: pctAtleta,
+		aulasPresentes: aulasAtleta
 	};
 }
 

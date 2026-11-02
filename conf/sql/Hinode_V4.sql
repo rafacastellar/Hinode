@@ -193,6 +193,7 @@ CREATE TABLE Treino_Turma (
     horario_inicio TIME,
     horario_fim TIME,
     dia_semana VARCHAR(50),
+    capacidade_maxima INT NOT NULL DEFAULT 25,
     FOREIGN KEY (id_academia) REFERENCES Academia(id_academia) ON DELETE CASCADE
 );
 
@@ -212,6 +213,30 @@ CREATE TABLE Aluno_Treino (
     PRIMARY KEY (id_aluno, id_treino),
     FOREIGN KEY (id_aluno) REFERENCES Aluno(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_treino) REFERENCES Treino_Turma(id_treino) ON DELETE CASCADE
+);
+
+-- N:M:Data - Registro de Presença Diária nos Treinos (Chamada Multi-Tenant)
+CREATE TABLE Presenca_Treino (
+    id_presenca BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id_academia INT NOT NULL,
+    id_treino INT NOT NULL,
+    id_aluno INT NOT NULL,
+    data_treino DATE NOT NULL,
+    status_presenca ENUM('Presente', 'Falta', 'Justificada') NOT NULL DEFAULT 'Presente',
+    observacao VARCHAR(255) NULL,
+    id_usuario_registro INT NOT NULL,
+    atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_presenca_treino_aluno_data (id_treino, id_aluno, data_treino),
+    KEY idx_presenca_academia_data (id_academia, data_treino),
+    KEY idx_presenca_aluno_academia (id_aluno, id_academia),
+    CONSTRAINT fk_presenca_academia
+        FOREIGN KEY (id_academia) REFERENCES Academia(id_academia) ON DELETE CASCADE,
+    CONSTRAINT fk_presenca_treino
+        FOREIGN KEY (id_treino) REFERENCES Treino_Turma(id_treino) ON DELETE CASCADE,
+    CONSTRAINT fk_presenca_aluno
+        FOREIGN KEY (id_aluno) REFERENCES Aluno(id_usuario) ON DELETE CASCADE,
+    CONSTRAINT fk_presenca_registrador
+        FOREIGN KEY (id_usuario_registro) REFERENCES Usuario(id_usuario) ON DELETE RESTRICT
 );
 
 -- =======================================================
@@ -308,6 +333,8 @@ CREATE TABLE Graduacao_Evento (
     faixa_fim VARCHAR(50) NOT NULL DEFAULT 'Marrom',
     tempo_minimo_judo_meses INT NULL DEFAULT 0,
     tempo_minimo_ultima_graduacao_meses INT NULL DEFAULT 0,
+    percentual_minimo_presenca INT NULL DEFAULT 0,
+    qtd_minima_aulas_presentes INT NULL DEFAULT 0,
     taxa_graduacao DECIMAL(10,2) NULL DEFAULT 0.00,
     data_inicio_inscricao DATE NULL,
     data_fim_inscricao DATE NULL,

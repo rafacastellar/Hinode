@@ -248,7 +248,7 @@
 	{/if}
 
 	<!-- CARDS DE REGRAS E ESTATÍSTICAS DO EXAME -->
-	<div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+	<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
 		<!-- Intervalo de Faixas -->
 		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
 			<span class="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">
@@ -288,6 +288,27 @@
 			</span>
 		</div>
 
+		<!-- Presença Mínima no Tatame -->
+		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
+			<span class="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">
+				Presença no Tatame
+			</span>
+			<span class="text-sm sm:text-base font-extrabold text-red-400 font-mono block">
+				{#if data.evento.percentual_minimo_presenca > 0 && data.evento.qtd_minima_aulas_presentes > 0}
+					{data.evento.percentual_minimo_presenca}% ({data.evento.qtd_minima_aulas_presentes} aulas)
+				{:else if data.evento.percentual_minimo_presenca > 0}
+					{data.evento.percentual_minimo_presenca}% presenças
+				{:else if data.evento.qtd_minima_aulas_presentes > 0}
+					{data.evento.qtd_minima_aulas_presentes} aulas mín.
+				{:else}
+					Livre
+				{/if}
+			</span>
+			<span class="text-[11px] text-zinc-400 block font-mono">
+				Critério de chamada
+			</span>
+		</div>
+
 		<!-- Taxa -->
 		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
 			<span class="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">
@@ -302,7 +323,7 @@
 		</div>
 
 		<!-- Inscritos e Homologados -->
-		<div class="col-span-2 sm:col-span-2 lg:col-span-1 p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
+		<div class="col-span-2 sm:col-span-1 lg:col-span-1 p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
 			<span class="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">
 				Inscrições & Homologação
 			</span>
@@ -700,6 +721,7 @@
 								<th class="px-5 py-3.5">Próxima Sugerida</th>
 								<th class="px-5 py-3.5">Carência no Judô</th>
 								<th class="px-5 py-3.5">Tempo na Faixa</th>
+								<th class="px-5 py-3.5">Presença no Tatame</th>
 								<th class="px-5 py-3.5">Status / Elegibilidade</th>
 								<th class="px-5 py-3.5 text-right">Inscrição</th>
 							</tr>
@@ -737,6 +759,21 @@
 										<span class="block">{cand.meses_ultima_graduacao} {cand.meses_ultima_graduacao === 1 ? 'mês' : 'meses'}</span>
 										{#if cand.data_ultima_graduacao_br}
 											<span class="text-[10px] text-zinc-500 block">Graduado em {cand.data_ultima_graduacao_br}</span>
+										{/if}
+									</td>
+
+									<td class="px-5 py-3.5 font-mono">
+										{#if cand.total_aulas_presenca !== undefined && cand.total_aulas_presenca > 0}
+											<div class="flex flex-col">
+												<span class="font-bold text-xs {cand.percentual_presenca! >= (data.evento.percentual_minimo_presenca || 0) ? 'text-emerald-400' : 'text-amber-400'}">
+													{cand.percentual_presenca}% frequência
+												</span>
+												<span class="text-[10px] text-zinc-500">
+													{cand.total_aulas_presentes} de {cand.total_aulas_presenca} aulas
+												</span>
+											</div>
+										{:else}
+											<span class="text-xs text-zinc-600 italic">Sem registros</span>
 										{/if}
 									</td>
 

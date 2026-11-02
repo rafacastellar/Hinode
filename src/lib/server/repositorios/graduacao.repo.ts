@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/prom
 import { getDbPool } from '../db/pool';
 import type { EventoGraduacaoInput, HomologacaoEventoInput } from '../validacao/graduacao.schema';
 import { validarElegibilidadeGraduacao } from '../servicos/regras-graduacao';
+import { obterFrequenciasAlunos } from './presenca.repo';
 import { obterIndiceFaixa } from '#lib/dominio/campeonato';
 import { extrairNumeroDan } from '#lib/dominio/ordenacao-atletas';
 
@@ -47,6 +48,8 @@ export interface EventoGraduacaoResumo {
 	faixa_fim: string;
 	tempo_minimo_judo_meses: number;
 	tempo_minimo_ultima_graduacao_meses: number;
+	percentual_minimo_presenca: number;
+	qtd_minima_aulas_presentes: number;
 	taxa_graduacao: number;
 	requisitos: string | null;
 	cidade: string;
@@ -71,6 +74,8 @@ export interface EventoGraduacaoDetalhado {
 	faixa_fim: string;
 	tempo_minimo_judo_meses: number;
 	tempo_minimo_ultima_graduacao_meses: number;
+	percentual_minimo_presenca: number;
+	qtd_minima_aulas_presentes: number;
 	taxa_graduacao: number;
 	requisitos: string | null;
 	logradouro: string;
@@ -93,6 +98,9 @@ export interface CandidatoGraduacaoItem {
 	data_ultima_graduacao_br: string | null;
 	meses_judo: number;
 	meses_ultima_graduacao: number;
+	total_aulas_presenca?: number;
+	total_aulas_presentes?: number;
+	percentual_presenca?: number;
 	elegivel: boolean;
 	motivo_inaptidao: string | null;
 	proxima_faixa_sugerida: string;
@@ -143,6 +151,8 @@ export async function listarEventosGraduacaoDoDojo(
 			COALESCE(ge.faixa_fim, 'Marrom') AS faixa_fim,
 			COALESCE(ge.tempo_minimo_judo_meses, 0) AS tempo_minimo_judo_meses,
 			COALESCE(ge.tempo_minimo_ultima_graduacao_meses, 0) AS tempo_minimo_ultima_graduacao_meses,
+			COALESCE(ge.percentual_minimo_presenca, 0) AS percentual_minimo_presenca,
+			COALESCE(ge.qtd_minima_aulas_presentes, 0) AS qtd_minima_aulas_presentes,
 			COALESCE(ge.taxa_graduacao, 0.00) AS taxa_graduacao,
 			ge.requisitos,
 			COALESCE(ee.cidade, 'São Paulo') AS cidade,
@@ -164,7 +174,21 @@ export async function listarEventosGraduacaoDoDojo(
 		ORDER BY e.data_inicio DESC, e.id_evento DESC
 	`;
 
-	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia]);
+	let linhas: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sql, [idAcademia]);
+		linhas = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = sql
+				.replace('COALESCE(ge.percentual_minimo_presenca, 0) AS percentual_minimo_presenca,', '0 AS percentual_minimo_presenca,')
+				.replace('COALESCE(ge.qtd_minima_aulas_presentes, 0) AS qtd_minima_aulas_presentes,', '0 AS qtd_minima_aulas_presentes,');
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idAcademia]);
+			linhas = res;
+		} else {
+			throw err;
+		}
+	}
 
 	return linhas.map((linha) => ({
 		id_evento: Number(linha.id_evento),
@@ -180,6 +204,8 @@ export async function listarEventosGraduacaoDoDojo(
 		faixa_fim: String(linha.faixa_fim),
 		tempo_minimo_judo_meses: Number(linha.tempo_minimo_judo_meses || 0),
 		tempo_minimo_ultima_graduacao_meses: Number(linha.tempo_minimo_ultima_graduacao_meses || 0),
+		percentual_minimo_presenca: Number(linha.percentual_minimo_presenca || 0),
+		qtd_minima_aulas_presentes: Number(linha.qtd_minima_aulas_presentes || 0),
 		taxa_graduacao: Number(linha.taxa_graduacao || 0),
 		requisitos: linha.requisitos ? String(linha.requisitos) : null,
 		cidade: String(linha.cidade),
@@ -215,6 +241,8 @@ export async function buscarEventoGraduacaoPorId(
 			COALESCE(ge.faixa_fim, 'Marrom') AS faixa_fim,
 			COALESCE(ge.tempo_minimo_judo_meses, 0) AS tempo_minimo_judo_meses,
 			COALESCE(ge.tempo_minimo_ultima_graduacao_meses, 0) AS tempo_minimo_ultima_graduacao_meses,
+			COALESCE(ge.percentual_minimo_presenca, 0) AS percentual_minimo_presenca,
+			COALESCE(ge.qtd_minima_aulas_presentes, 0) AS qtd_minima_aulas_presentes,
 			COALESCE(ge.taxa_graduacao, 0.00) AS taxa_graduacao,
 			ge.requisitos,
 			COALESCE(ee.logradouro, 'Dojo Central') AS logradouro,
@@ -231,7 +259,21 @@ export async function buscarEventoGraduacaoPorId(
 		LIMIT 1
 	`;
 
-	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idEvento, idAcademia]);
+	let linhas: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sql, [idEvento, idAcademia]);
+		linhas = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = sql
+				.replace('COALESCE(ge.percentual_minimo_presenca, 0) AS percentual_minimo_presenca,', '0 AS percentual_minimo_presenca,')
+				.replace('COALESCE(ge.qtd_minima_aulas_presentes, 0) AS qtd_minima_aulas_presentes,', '0 AS qtd_minima_aulas_presentes,');
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idEvento, idAcademia]);
+			linhas = res;
+		} else {
+			throw err;
+		}
+	}
 	if (linhas.length === 0) return null;
 
 	const linha = linhas[0];
@@ -251,6 +293,8 @@ export async function buscarEventoGraduacaoPorId(
 		faixa_fim: String(linha.faixa_fim),
 		tempo_minimo_judo_meses: Number(linha.tempo_minimo_judo_meses || 0),
 		tempo_minimo_ultima_graduacao_meses: Number(linha.tempo_minimo_ultima_graduacao_meses || 0),
+		percentual_minimo_presenca: Number(linha.percentual_minimo_presenca || 0),
+		qtd_minima_aulas_presentes: Number(linha.qtd_minima_aulas_presentes || 0),
 		taxa_graduacao: Number(linha.taxa_graduacao || 0),
 		requisitos: linha.requisitos ? String(linha.requisitos) : null,
 		logradouro: String(linha.logradouro),
@@ -296,33 +340,71 @@ export async function inserirEventoGraduacaoEmTransacao(
 	);
 
 	// 3. Inserir subtipo Graduacao_Evento
-	await conn.execute(
-		`INSERT INTO Graduacao_Evento (
-			id_evento,
-			tipo_graduacao,
-			status,
-			faixa_inicio,
-			faixa_fim,
-			tempo_minimo_judo_meses,
-			tempo_minimo_ultima_graduacao_meses,
-			taxa_graduacao,
-			data_inicio_inscricao,
-			data_fim_inscricao,
-			requisitos
-		) VALUES (?, ?, 'Agendado', ?, ?, ?, ?, ?, ?, ?, ?)`,
-		[
-			idEvento,
-			dados.tipoGraduacao || 'Troca de Faixa',
-			dados.faixaInicio || 'Branca',
-			dados.faixaFim || 'Marrom',
-			dados.tempoMinimoJudoMeses || 0,
-			dados.tempoMinimoUltimaGraduacaoMeses || 0,
-			dados.taxaGraduacao || 0,
-			dados.dataInicioInscricao || null,
-			dados.dataFimInscricao || null,
-			dados.requisitos || null
-		]
-	);
+	try {
+		await conn.execute(
+			`INSERT INTO Graduacao_Evento (
+				id_evento,
+				tipo_graduacao,
+				status,
+				faixa_inicio,
+				faixa_fim,
+				tempo_minimo_judo_meses,
+				tempo_minimo_ultima_graduacao_meses,
+				percentual_minimo_presenca,
+				qtd_minima_aulas_presentes,
+				taxa_graduacao,
+				data_inicio_inscricao,
+				data_fim_inscricao,
+				requisitos
+			) VALUES (?, ?, 'Agendado', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			[
+				idEvento,
+				dados.tipoGraduacao || 'Troca de Faixa',
+				dados.faixaInicio || 'Branca',
+				dados.faixaFim || 'Marrom',
+				dados.tempoMinimoJudoMeses || 0,
+				dados.tempoMinimoUltimaGraduacaoMeses || 0,
+				dados.percentualMinimoPresenca || 0,
+				dados.qtdMinimaAulasPresentes || 0,
+				dados.taxaGraduacao || 0,
+				dados.dataInicioInscricao || null,
+				dados.dataFimInscricao || null,
+				dados.requisitos || null
+			]
+		);
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			await conn.execute(
+				`INSERT INTO Graduacao_Evento (
+					id_evento,
+					tipo_graduacao,
+					status,
+					faixa_inicio,
+					faixa_fim,
+					tempo_minimo_judo_meses,
+					tempo_minimo_ultima_graduacao_meses,
+					taxa_graduacao,
+					data_inicio_inscricao,
+					data_fim_inscricao,
+					requisitos
+				) VALUES (?, ?, 'Agendado', ?, ?, ?, ?, ?, ?, ?, ?)`,
+				[
+					idEvento,
+					dados.tipoGraduacao || 'Troca de Faixa',
+					dados.faixaInicio || 'Branca',
+					dados.faixaFim || 'Marrom',
+					dados.tempoMinimoJudoMeses || 0,
+					dados.tempoMinimoUltimaGraduacaoMeses || 0,
+					dados.taxaGraduacao || 0,
+					dados.dataInicioInscricao || null,
+					dados.dataFimInscricao || null,
+					dados.requisitos || null
+				]
+			);
+		} else {
+			throw err;
+		}
+	}
 
 	return idEvento;
 }
@@ -378,31 +460,67 @@ export async function atualizarEventoGraduacaoEmTransacao(
 	);
 
 	// 4. Atualizar Graduacao_Evento
-	await conn.execute(
-		`UPDATE Graduacao_Evento
-		 SET tipo_graduacao = ?,
-		     faixa_inicio = ?,
-		     faixa_fim = ?,
-		     tempo_minimo_judo_meses = ?,
-		     tempo_minimo_ultima_graduacao_meses = ?,
-		     taxa_graduacao = ?,
-		     data_inicio_inscricao = ?,
-		     data_fim_inscricao = ?,
-		     requisitos = ?
-		 WHERE id_evento = ?`,
-		[
-			dados.tipoGraduacao || 'Troca de Faixa',
-			dados.faixaInicio || 'Branca',
-			dados.faixaFim || 'Marrom',
-			dados.tempoMinimoJudoMeses || 0,
-			dados.tempoMinimoUltimaGraduacaoMeses || 0,
-			dados.taxaGraduacao || 0,
-			dados.dataInicioInscricao || null,
-			dados.dataFimInscricao || null,
-			dados.requisitos || null,
-			idEvento
-		]
-	);
+	try {
+		await conn.execute(
+			`UPDATE Graduacao_Evento
+			 SET tipo_graduacao = ?,
+			     faixa_inicio = ?,
+			     faixa_fim = ?,
+			     tempo_minimo_judo_meses = ?,
+			     tempo_minimo_ultima_graduacao_meses = ?,
+			     percentual_minimo_presenca = ?,
+			     qtd_minima_aulas_presentes = ?,
+			     taxa_graduacao = ?,
+			     data_inicio_inscricao = ?,
+			     data_fim_inscricao = ?,
+			     requisitos = ?
+			 WHERE id_evento = ?`,
+			[
+				dados.tipoGraduacao || 'Troca de Faixa',
+				dados.faixaInicio || 'Branca',
+				dados.faixaFim || 'Marrom',
+				dados.tempoMinimoJudoMeses || 0,
+				dados.tempoMinimoUltimaGraduacaoMeses || 0,
+				dados.percentualMinimoPresenca || 0,
+				dados.qtdMinimaAulasPresentes || 0,
+				dados.taxaGraduacao || 0,
+				dados.dataInicioInscricao || null,
+				dados.dataFimInscricao || null,
+				dados.requisitos || null,
+				idEvento
+			]
+		);
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			await conn.execute(
+				`UPDATE Graduacao_Evento
+				 SET tipo_graduacao = ?,
+				     faixa_inicio = ?,
+				     faixa_fim = ?,
+				     tempo_minimo_judo_meses = ?,
+				     tempo_minimo_ultima_graduacao_meses = ?,
+				     taxa_graduacao = ?,
+				     data_inicio_inscricao = ?,
+				     data_fim_inscricao = ?,
+				     requisitos = ?
+				 WHERE id_evento = ?`,
+				[
+					dados.tipoGraduacao || 'Troca de Faixa',
+					dados.faixaInicio || 'Branca',
+					dados.faixaFim || 'Marrom',
+					dados.tempoMinimoJudoMeses || 0,
+					dados.tempoMinimoUltimaGraduacaoMeses || 0,
+					dados.taxaGraduacao || 0,
+					dados.dataInicioInscricao || null,
+					dados.dataFimInscricao || null,
+					dados.requisitos || null,
+					idEvento
+				]
+			);
+		} else {
+			throw err;
+		}
+	}
 }
 
 /**
@@ -510,7 +628,11 @@ export async function listarCandidatosDoDojoComElegibilidade(
 		idAcademia
 	]);
 
+	const frequencias = await obterFrequenciasAlunos(idAcademia);
+
 	return linhas.map((linha) => {
+		const idAluno = Number(linha.id_aluno);
+		const freq = frequencias.get(idAluno);
 		const faixaAtual = String(linha.faixa_atual);
 		const dataInicioIso = linha.data_inicio_judo_iso ? String(linha.data_inicio_judo_iso) : null;
 		const dataUltimaGradIso = linha.data_ultima_graduacao_iso ? String(linha.data_ultima_graduacao_iso) : null;
@@ -525,11 +647,15 @@ export async function listarCandidatosDoDojoComElegibilidade(
 			dataPrimeiraGraduacaoAtleta: dataPrimeiraGradIso,
 			tempoMinimoJudoMeses: evento.tempo_minimo_judo_meses,
 			tempoMinimoUltimaGraduacaoMeses: evento.tempo_minimo_ultima_graduacao_meses,
+			percentualMinimoPresenca: evento.percentual_minimo_presenca,
+			qtdMinimaAulasPresentes: evento.qtd_minima_aulas_presentes,
+			percentualPresencaAtleta: freq?.percentual_presenca || 0,
+			aulasPresentesAtleta: freq?.total_presentes || 0,
 			dataEventoIso: evento.data_inicio_iso
 		});
 
 		return {
-			id_aluno: Number(linha.id_aluno),
+			id_aluno: idAluno,
 			nome_aluno: String(linha.nome_aluno),
 			matricula_aluno: linha.matricula_aluno ? String(linha.matricula_aluno) : null,
 			faixa_atual: faixaAtual,
@@ -539,6 +665,9 @@ export async function listarCandidatosDoDojoComElegibilidade(
 			data_ultima_graduacao_br: linha.data_ultima_graduacao_br ? String(linha.data_ultima_graduacao_br) : null,
 			meses_judo: resElegibilidade.mesesJudo,
 			meses_ultima_graduacao: resElegibilidade.mesesUltimaGraduacao,
+			total_aulas_presenca: freq?.total_aulas || 0,
+			total_aulas_presentes: freq?.total_presentes || 0,
+			percentual_presenca: freq?.percentual_presenca || 0,
 			elegivel: resElegibilidade.elegivel,
 			motivo_inaptidao: resElegibilidade.motivo || null,
 			proxima_faixa_sugerida: resElegibilidade.proximaFaixa,
@@ -838,7 +967,21 @@ export async function obterDistribuicaoFaixasDoDojo(
 		ORDER BY total DESC
 	`;
 
-	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia]);
+	let linhas: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sql, [idAcademia]);
+		linhas = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = sql
+				.replace('COALESCE(ge.percentual_minimo_presenca, 0) AS percentual_minimo_presenca,', '0 AS percentual_minimo_presenca,')
+				.replace('COALESCE(ge.qtd_minima_aulas_presentes, 0) AS qtd_minima_aulas_presentes,', '0 AS qtd_minima_aulas_presentes,');
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idAcademia]);
+			linhas = res;
+		} else {
+			throw err;
+		}
+	}
 
 	const itens = linhas.map((linha) => ({
 		faixa: String(linha.faixa),

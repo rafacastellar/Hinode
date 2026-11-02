@@ -143,7 +143,7 @@
 				</div>
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 				<div>
 					<label for="horarioInicio" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
 						Horário de Início *
@@ -170,6 +170,27 @@
 						value={(form?.valores?.horarioFim as string) || '19:30'}
 						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 					/>
+				</div>
+
+				<div>
+					<label for="capacidadeMaxima" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						Capacidade Máxima *
+					</label>
+					<div class="relative">
+						<input
+							type="number"
+							id="capacidadeMaxima"
+							name="capacidadeMaxima"
+							min="1"
+							max="500"
+							required
+							value={(form?.valores?.capacidadeMaxima as string) || '25'}
+							class="w-full px-4 py-2.5 pr-14 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+						<span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-xs text-zinc-500">
+							vagas
+						</span>
+					</div>
 				</div>
 			</div>
 		</div>

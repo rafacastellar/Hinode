@@ -344,6 +344,63 @@
 					<p class="text-[10px] text-zinc-500">Certificado e faixa nova</p>
 				</div>
 			</div>
+
+			<!-- Critérios de Frequência e Presença no Tatame -->
+			<div class="pt-4 border-t border-zinc-900">
+				<div class="mb-3">
+					<h3 class="text-xs font-semibold uppercase font-mono tracking-wider text-red-400">
+						Critérios de Presença e Frequência no Tatame
+					</h3>
+					<p class="text-[11px] text-zinc-500">
+						Defina o comparecimento obrigatório nos treinos para que o judoca seja considerado apto ao exame
+					</p>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div class="space-y-1.5">
+						<label for="percentualMinimoPresenca" class="block text-xs font-medium text-zinc-300">
+							% Mínimo de Presença nos Treinos (%)
+						</label>
+						<div class="relative">
+							<input
+								type="number"
+								id="percentualMinimoPresenca"
+								name="percentualMinimoPresenca"
+								min="0"
+								max="100"
+								value={form?.valores?.percentualMinimoPresenca ?? data.evento.percentual_minimo_presenca}
+								placeholder="0 = Sem percentual mínimo"
+								class="w-full px-3.5 py-2.5 pr-12 rounded-xl bg-zinc-900/60 border border-zinc-800 text-sm text-white focus:outline-none focus:border-red-500 transition-colors font-mono"
+							/>
+							<span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-xs text-zinc-500 font-mono">
+								%
+							</span>
+						</div>
+						<p class="text-[10px] text-zinc-500">Ex: 75% de comparecimento total (0 para desativar)</p>
+					</div>
+
+					<div class="space-y-1.5">
+						<label for="qtdMinimaAulasPresentes" class="block text-xs font-medium text-zinc-300">
+							Qtd. Mínima de Aulas Presentes (treinos)
+						</label>
+						<div class="relative">
+							<input
+								type="number"
+								id="qtdMinimaAulasPresentes"
+								name="qtdMinimaAulasPresentes"
+								min="0"
+								value={form?.valores?.qtdMinimaAulasPresentes ?? data.evento.qtd_minima_aulas_presentes}
+								placeholder="0 = Sem quantidade mínima"
+								class="w-full px-3.5 py-2.5 pr-14 rounded-xl bg-zinc-900/60 border border-zinc-800 text-sm text-white focus:outline-none focus:border-red-500 transition-colors font-mono"
+							/>
+							<span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-xs text-zinc-500 font-mono">
+								aulas
+							</span>
+						</div>
+						<p class="text-[10px] text-zinc-500">Ex: ao menos 20 presenças registradas no sistema</p>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<!-- 4. ENDEREÇO DO EXAME (COM VIACEP AUTOMÁTICO) -->

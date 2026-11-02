@@ -37,6 +37,7 @@ export const actions: Actions = {
 			diaSemana: diaSemanaTexto,
 			horarioInicio: formData.get('horarioInicio'),
 			horarioFim: formData.get('horarioFim'),
+			capacidadeMaxima: formData.get('capacidadeMaxima') || undefined,
 			professoresIds: formData.getAll('professoresIds')
 		};
 

@@ -2,6 +2,7 @@
 	import type { PageData, ActionData } from './$types';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import BadgePerfil from '#lib/components/ui/BadgePerfil.svelte';
+	import CalendarioTatameMensal from '#lib/components/ui/CalendarioTatameMensal.svelte';
 	import {
 		HeartHandshake,
 		User,
@@ -16,6 +17,7 @@
 		ShieldCheck,
 		AlertCircle,
 		CheckCircle2,
+		XCircle,
 		Sparkles,
 		Flame,
 		Building2,
@@ -23,7 +25,9 @@
 		Users,
 		Save,
 		TrendingUp,
-		GraduationCap
+		GraduationCap,
+		BellPlus,
+		Send
 	} from '@lucide/svelte';
 
 	interface Props {
@@ -50,12 +54,62 @@
 	let salvandoPeso = $state(false);
 	let salvandoContato = $state(false);
 
+	// Estados para o Aviso Prévio de Ausência pelo Responsável (suporta múltiplos treinos no dia)
+	const hojeIso = new Date().toISOString().slice(0, 10);
+	let mostrarFormAusencia = $state(false);
+	let dataAusencia = $state(hojeIso);
+	let motivoAusencia = $state('');
+	let treinosAusenciaSelecionados = $state<number[]>([]);
+	let salvandoAusencia = $state(false);
+
+	const motivosSugeridos = [
+		'Consulta médica / odontológica',
+		'Prova ou compromisso escolar',
+		'Indisposição / repouso em casa',
+		'Viagem ou compromisso familiar'
+	];
+
+	function alternarTreinoAusencia(idTreino: number) {
+		if (treinosAusenciaSelecionados.includes(idTreino)) {
+			treinosAusenciaSelecionados = treinosAusenciaSelecionados.filter((id) => id !== idTreino);
+		} else {
+			treinosAusenciaSelecionados = [...treinosAusenciaSelecionados, idTreino];
+		}
+	}
+
+	function selecionarTodosTreinosDoAluno() {
+		if (!alunoAtivo) return;
+		treinosAusenciaSelecionados = alunoAtivo.treinosInscritos.map((t) => t.id_treino);
+	}
+
+	// Sessões de hoje ou do último dia com treino registrado para o card em tempo real
+	const resumoUltimoDiaTreino = $derived.by(() => {
+		if (!alunoAtivo || !alunoAtivo.presencas || alunoAtivo.presencas.length === 0) {
+			return null;
+		}
+		const deHoje = alunoAtivo.presencas.filter((p) => p.data_treino === hojeIso);
+		if (deHoje.length > 0) {
+			return {
+				ehHoje: true,
+				data: hojeIso,
+				sessoes: deHoje
+			};
+		}
+		const ultimaData = alunoAtivo.presencas[0].data_treino;
+		return {
+			ehHoje: false,
+			data: ultimaData,
+			sessoes: alunoAtivo.presencas.filter((p) => p.data_treino === ultimaData)
+		};
+	});
+
 	// Sincroniza formulários quando o aluno selecionado muda
 	$effect(() => {
 		if (alunoAtivo) {
 			pesoInput = alunoAtivo.peso !== null && alunoAtivo.peso !== undefined ? String(alunoAtivo.peso) : '';
 			telefoneInput = alunoAtivo.telefone || '';
 			emailInput = alunoAtivo.email || '';
+			treinosAusenciaSelecionados = alunoAtivo.treinosInscritos.map((t) => t.id_treino);
 		}
 	});
 
@@ -63,6 +117,11 @@
 		if (form) {
 			salvandoPeso = false;
 			salvandoContato = false;
+			salvandoAusencia = false;
+			if ((form as any).sucessoAusencia) {
+				motivoAusencia = '';
+				mostrarFormAusencia = false;
+			}
 		}
 	});
 </script>
@@ -734,6 +793,306 @@
 							{/each}
 						</div>
 					{/if}
+				</div>
+			</div>
+
+			<!-- ================================================================= -->
+			<!-- PRESENÇA NO TATAME, AVISO PRÉVIO DE AUSÊNCIA & CALENDÁRIO MENSAL  -->
+			<!-- ================================================================= -->
+			<div class="mt-6 space-y-6">
+				<div class="p-5 sm:p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800 space-y-5">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800/80">
+						<div class="flex items-center gap-3">
+							<div class="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-700/50 flex items-center justify-center text-emerald-400 shrink-0">
+								<ShieldCheck class="w-5 h-5" />
+							</div>
+							<div>
+								<h3 class="text-sm sm:text-base font-extrabold text-white font-display">
+									Acompanhamento Familiar de Presença — {alunoAtivo.nome}
+								</h3>
+								<p class="text-xs text-zinc-400">
+									Visualize todos os treinos realizados no dia, observações do Sensei e avise ausências antecipadamente
+								</p>
+							</div>
+						</div>
+
+						{#if alunoAtivo.treinosInscritos.length > 0}
+							<button
+								type="button"
+								onclick={() => (mostrarFormAusencia = !mostrarFormAusencia)}
+								class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer {mostrarFormAusencia
+									? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
+									: 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-950/50'}"
+							>
+								<BellPlus class="w-4 h-4" />
+								<span>{mostrarFormAusencia ? 'Fechar Aviso de Ausência' : 'Avisar Ausência / Justificar Falta'}</span>
+							</button>
+						{/if}
+					</div>
+
+					<!-- Feedback de Aviso Prévio -->
+					{#if (form as any)?.sucessoAusencia && (form as any)?.idAlunoAtualizado === alunoAtivo.id_usuario}
+						<div class="p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-800/80 flex items-center gap-2.5 text-xs text-emerald-300">
+							<CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
+							<span>{(form as any).sucessoAusencia}</span>
+						</div>
+					{/if}
+
+					{#if (form as any)?.erroAusencia && (form as any)?.idAlunoErro === alunoAtivo.id_usuario}
+						<div class="p-3.5 rounded-xl bg-red-950/50 border border-red-800/80 flex items-center gap-2.5 text-xs text-red-300">
+							<AlertCircle class="w-4 h-4 text-red-400 shrink-0" />
+							<span>{(form as any).erroAusencia}</span>
+						</div>
+					{/if}
+
+					<!-- Formulário de Aviso Prévio de Ausência pelo Responsável (Suporta 1 ou mais treinos no dia) -->
+					{#if mostrarFormAusencia}
+						<form
+							method="POST"
+							action="?/avisarAusencia"
+							onsubmit={() => (salvandoAusencia = true)}
+							class="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-sky-500/30 space-y-4 animate-in fade-in duration-200"
+						>
+							<input type="hidden" name="idAluno" value={alunoAtivo.id_usuario} />
+
+							<div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+								<div>
+									<h4 class="text-xs sm:text-sm font-bold text-sky-400 flex items-center gap-2">
+										<BellPlus class="w-4 h-4" />
+										<span>Registrar Aviso Prévio de Ausência para {alunoAtivo.nome}</span>
+									</h4>
+									<p class="text-[11px] text-zinc-400 mt-0.5">
+										O Sensei verá automaticamente a justificativa na chamada da(s) turma(s) selecionada(s).
+									</p>
+								</div>
+							</div>
+
+							<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<div>
+									<label for="data-ausencia-{alunoAtivo.id_usuario}" class="block text-[11px] font-semibold text-zinc-300 mb-1.5">
+										Data da Ausência
+									</label>
+									<input
+										id="data-ausencia-{alunoAtivo.id_usuario}"
+										type="date"
+										name="dataTreino"
+										bind:value={dataAusencia}
+										required
+										class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white focus:outline-none focus:border-sky-500"
+									/>
+								</div>
+
+								<div class="md:col-span-2">
+									<div class="flex items-center justify-between mb-1.5">
+										<span class="block text-[11px] font-semibold text-zinc-300">
+											Treino(s) do Dia (você pode marcar 1 ou mais treinos)
+										</span>
+										<button
+											type="button"
+											onclick={selecionarTodosTreinosDoAluno}
+											class="text-[10px] font-semibold text-sky-400 hover:text-sky-300"
+										>
+											Marcar todas as turmas
+										</button>
+									</div>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+										{#each alunoAtivo.treinosInscritos as treino}
+											{@const marcado = treinosAusenciaSelecionados.includes(treino.id_treino)}
+											<label
+												class="flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all {marcado
+													? 'bg-sky-950/40 border-sky-500/60 text-white'
+													: 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'}"
+											>
+												<input
+													type="checkbox"
+													name="idTreino"
+													value={treino.id_treino}
+													checked={marcado}
+													onchange={() => alternarTreinoAusencia(treino.id_treino)}
+													class="rounded border-zinc-700 text-sky-500 focus:ring-sky-500"
+												/>
+												<div class="min-w-0">
+													<span class="font-bold block truncate">{treino.descricao}</span>
+													<span class="text-[10px] text-zinc-400 font-mono">
+														{treino.dia_semana} • {treino.horario_inicio} às {treino.horario_fim}
+													</span>
+												</div>
+											</label>
+										{/each}
+									</div>
+								</div>
+							</div>
+
+							<div class="space-y-2">
+								<label for="motivo-ausencia-{alunoAtivo.id_usuario}" class="block text-[11px] font-semibold text-zinc-300">
+									Motivo da Ausência / Justificativa para o Sensei
+								</label>
+								<div class="flex flex-wrap gap-1.5">
+									{#each motivosSugeridos as sugestao}
+										<button
+											type="button"
+											onclick={() => (motivoAusencia = sugestao)}
+											class="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition"
+										>
+											+ {sugestao}
+										</button>
+									{/each}
+								</div>
+								<input
+									id="motivo-ausencia-{alunoAtivo.id_usuario}"
+									type="text"
+									name="motivo"
+									bind:value={motivoAusencia}
+									required
+									maxlength="200"
+									placeholder="Ex: Consulta médica às 18h30 / Prova na escola..."
+									class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-sky-500"
+								/>
+							</div>
+
+							<div class="flex items-center justify-end gap-2 pt-2">
+								<button
+									type="button"
+									onclick={() => (mostrarFormAusencia = false)}
+									class="px-3.5 py-2 rounded-xl border border-zinc-800 text-xs font-medium text-zinc-400 hover:text-white"
+								>
+									Cancelar
+								</button>
+								<button
+									type="submit"
+									disabled={salvandoAusencia || treinosAusenciaSelecionados.length === 0}
+									class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-xs font-bold text-white cursor-pointer"
+								>
+									<Send class="w-3.5 h-3.5" />
+									<span>{salvandoAusencia ? 'Registrando...' : 'Confirmar Aviso de Ausência'}</span>
+								</button>
+							</div>
+						</form>
+					{/if}
+
+					<!-- Cards de Resumo de Frequência e Último Dia de Treino -->
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<!-- 1. Status do Último Dia de Treino / Hoje (suporta múltiplos treinos no dia) -->
+						<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-2.5">
+							<div class="flex items-center justify-between">
+								<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">
+									{resumoUltimoDiaTreino?.ehHoje ? 'Treino(s) de Hoje' : 'Último Dia Registrado'}
+								</span>
+								{#if resumoUltimoDiaTreino}
+									<span class="text-[11px] font-mono text-amber-400">
+										{resumoUltimoDiaTreino.data.split('-').reverse().join('/')}
+									</span>
+								{/if}
+							</div>
+
+							{#if !resumoUltimoDiaTreino}
+								<p class="text-xs text-zinc-500 py-2">
+									Nenhuma chamada registrada ainda para {alunoAtivo.nome}.
+								</p>
+							{:else}
+								<div class="space-y-1.5">
+									{#each resumoUltimoDiaTreino.sessoes as sessao}
+										<div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-zinc-900/90 border border-zinc-800/80 text-xs">
+											<div class="min-w-0">
+												<span class="font-bold text-zinc-200 block truncate">
+													{sessao.horario_inicio} • {sessao.descricao_turma}
+												</span>
+												{#if sessao.observacao}
+													<span class="text-[10px] text-zinc-400 block truncate" title={sessao.observacao}>
+														{sessao.observacao}
+													</span>
+												{/if}
+											</div>
+											{#if sessao.status_presenca === 'Presente'}
+												<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 shrink-0">
+													Presente
+												</span>
+											{:else if sessao.status_presenca === 'Falta'}
+												<span class="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-[10px] font-bold text-red-300 shrink-0">
+													Falta
+												</span>
+											{:else}
+												<span class="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/30 text-[10px] font-bold text-sky-300 shrink-0">
+													Justificada
+												</span>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+
+						<!-- 2. Termômetro de Assiduidade Mensal -->
+						<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-2.5">
+							<div class="flex items-center justify-between">
+								<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">
+									Assiduidade no Mês Atual
+								</span>
+								<span class="text-sm font-extrabold font-mono text-emerald-400">
+									{alunoAtivo.metricasPresenca.percentual_mes_atual}%
+								</span>
+							</div>
+							<div class="w-full h-2.5 rounded-full bg-zinc-900 overflow-hidden border border-zinc-800">
+								<div
+									class="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-500"
+									style="width: {Math.min(100, alunoAtivo.metricasPresenca.percentual_mes_atual)}%"
+								></div>
+							</div>
+							<div class="flex items-center justify-between text-[11px] text-zinc-400">
+								<span>
+									<strong class="text-white">{alunoAtivo.metricasPresenca.presentes_mes_atual}</strong> de
+									<strong class="text-white">{alunoAtivo.metricasPresenca.aulas_mes_atual}</strong> treinos no mês
+								</span>
+								<span>
+									Total geral: <strong class="text-zinc-200">{alunoAtivo.metricasPresenca.total_presentes}</strong> aulas
+								</span>
+							</div>
+						</div>
+
+						<!-- 3. Constância & Meta da Próxima Faixa -->
+						<div class="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/90 space-y-2.5">
+							<div class="flex items-center justify-between">
+								<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">
+									Constância & Graduação
+								</span>
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-300">
+									<Flame class="w-3.5 h-3.5 text-amber-400" />
+									{alunoAtivo.metricasPresenca.streak_atual} seguida(s)
+								</span>
+							</div>
+
+							{#if alunoAtivo.metricasPresenca.proximo_exame_meta && (alunoAtivo.metricasPresenca.proximo_exame_meta.qtd_minima_aulas > 0 || alunoAtivo.metricasPresenca.proximo_exame_meta.percentual_minimo > 0)}
+								{@const meta = alunoAtivo.metricasPresenca.proximo_exame_meta}
+								<p class="text-xs text-zinc-300">
+									Exame: <strong class="text-white">{meta.nome_evento}</strong>
+								</p>
+								<div class="flex flex-wrap items-center gap-2 text-[11px]">
+									{#if meta.qtd_minima_aulas > 0}
+										<span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300">
+											Aulas: <strong>{alunoAtivo.metricasPresenca.total_presentes}/{meta.qtd_minima_aulas}</strong>
+										</span>
+									{/if}
+									{#if meta.percentual_minimo > 0}
+										<span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300">
+											Frequência: <strong>{alunoAtivo.metricasPresenca.percentual_presenca}%/{meta.percentual_minimo}%</strong>
+										</span>
+									{/if}
+								</div>
+							{:else}
+								<p class="text-xs text-zinc-400">
+									<strong class="text-white">{alunoAtivo.metricasPresenca.dias_distintos_treinados}</strong> dias distintos treinados no tatame • Taxa global de <strong class="text-emerald-400">{alunoAtivo.metricasPresenca.percentual_presenca}%</strong>.
+								</p>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Calendário Mensal Tradicional do Dependente -->
+					<CalendarioTatameMensal
+						sessoes={alunoAtivo.presencas}
+						turmasMatriculadas={alunoAtivo.treinosInscritos}
+						titulo="Calendário Mensal de Presenças — {alunoAtivo.nome}"
+						subtitulo="Clique em qualquer dia do mês para ver todos os treinos realizados, horários e anotações do Sensei"
+					/>
 				</div>
 			</div>
 		</section>

@@ -6,6 +6,11 @@ import {
 	atualizarDadosProprioPerfilTx,
 	alterarPropriaSenhaUsuario
 } from '#lib/server/repositorios/usuario.repo';
+import {
+	listarHistoricoPresencasAluno,
+	obterMetricasDetalhadasPresencaAluno,
+	listarTurmasMatriculadasDoAluno
+} from '#lib/server/repositorios/presenca.repo';
 
 const perfilEdicaoSchema = z.object({
 	email: z.string().email('E-mail em formato inválido').max(255).trim().toLowerCase(),
@@ -64,10 +69,26 @@ export const load: PageServerLoad = async ({ locals }) => {
 		});
 	}
 
+	const ehAluno = Boolean(perfil.dados_aluno);
+	let presencas: Awaited<ReturnType<typeof listarHistoricoPresencasAluno>> = [];
+	let metricasPresenca: Awaited<ReturnType<typeof obterMetricasDetalhadasPresencaAluno>> | null = null;
+	let turmasMatriculadas: Awaited<ReturnType<typeof listarTurmasMatriculadasDoAluno>> = [];
+
+	if (ehAluno) {
+		[presencas, metricasPresenca, turmasMatriculadas] = await Promise.all([
+			listarHistoricoPresencasAluno(idAcademia, idUsuario, 180),
+			obterMetricasDetalhadasPresencaAluno(idAcademia, idUsuario),
+			listarTurmasMatriculadasDoAluno(idAcademia, idUsuario)
+		]);
+	}
+
 	return {
 		perfil,
 		nomeAcademia: locals.nomeAcademia,
-		ehAluno: Boolean(perfil.dados_aluno)
+		ehAluno,
+		presencas,
+		metricasPresenca,
+		turmasMatriculadas
 	};
 };
 

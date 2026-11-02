@@ -2,6 +2,7 @@
 	import type { PageData, ActionData } from './$types';
 	import BadgePerfil from '#lib/components/ui/BadgePerfil.svelte';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import CalendarioTatameMensal from '#lib/components/ui/CalendarioTatameMensal.svelte';
 	import {
 		User,
 		Mail,
@@ -1045,4 +1046,15 @@
 			</div>
 		</form>
 	</section>
+
+	{#if data.ehAluno && data.metricasPresenca}
+		<section class="space-y-4">
+			<CalendarioTatameMensal
+				sessoes={data.presencas || []}
+				turmasMatriculadas={data.turmasMatriculadas || []}
+				titulo="Meu Histórico Mensal de Presença no Tatame"
+				subtitulo="Acompanhe seus dias de treino realizados no dojo ({data.metricasPresenca.total_presentes} presenças em {data.metricasPresenca.dias_distintos_treinados} dias • {data.metricasPresenca.percentual_presenca}% de frequência)"
+			/>
+		</section>
+	{/if}
 </div>

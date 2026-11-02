@@ -2,6 +2,12 @@ import type { RowDataPacket } from 'mysql2';
 import { getDbPool } from '../db/pool';
 import { buscarAlunoPorId } from './aluno.repo';
 import { buscarHistoricoDoAluno, type HistoricoAlunoItem } from './graduacao.repo';
+import {
+	listarHistoricoPresencasAluno,
+	obterMetricasDetalhadasPresencaAluno,
+	type SessaoTreinoDia,
+	type MetricasDetalhadasPresencaAluno
+} from './presenca.repo';
 import { validarElegibilidadeGraduacao } from '../servicos/regras-graduacao';
 import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
 
@@ -109,6 +115,8 @@ export interface PainelJudocaDados {
 	graduacoes: HistoricoAlunoItem[];
 	proximosEventos: MetricasDojo['proximosEventos'];
 	pendencias: PendenciaJudoca[];
+	presencas: SessaoTreinoDia[];
+	metricasPresenca: MetricasDetalhadasPresencaAluno;
 }
 
 export interface AniversarianteItem {
@@ -743,6 +751,11 @@ export async function obterPainelJudoca(
 		return 0;
 	});
 
+	const [presencas, metricasPresenca] = await Promise.all([
+		listarHistoricoPresencasAluno(idAcademia, idUsuario, 180),
+		obterMetricasDetalhadasPresencaAluno(idAcademia, idUsuario)
+	]);
+
 	return {
 		judoca: {
 			id_usuario: aluno.id_usuario,
@@ -784,7 +797,9 @@ export async function obterPainelJudoca(
 		conquistas,
 		graduacoes,
 		proximosEventos: metricasDojoGeral.proximosEventos,
-		pendencias
+		pendencias,
+		presencas,
+		metricasPresenca
 	};
 }
 

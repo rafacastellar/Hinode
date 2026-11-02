@@ -5,14 +5,19 @@ import { buscarTurmaPorId } from '#lib/server/repositorios/turma.repo';
 import { listarAlunos } from '#lib/server/repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
 import {
+	buscarChamadaTurmaPorData,
+	salvarChamadaTurmaEmLote,
+	listarHistoricoChamadasDaTurma
+} from '#lib/server/repositorios/presenca.repo';
+import {
 	adicionarAlunoNaTurma,
 	removerAlunoDaTurma,
 	atualizarTurma,
 	removerTurma
 } from '#lib/server/servicos/turma.service';
-import { turmaSchema } from '#lib/server/validacao/turma.schema';
+import { turmaSchema, itemChamadaSchema } from '#lib/server/validacao/turma.schema';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const perfis = locals.perfis || [];
 	exigirPermissao(perfis, 'TURMAS_VER');
 
@@ -42,10 +47,33 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		professoresDojo = await listarProfessoresDoDojo(idAcademia);
 	}
 
+	// Data da chamada no tatame (parâmetro de URL ou data corrente) — restrito a admin, professor e recepção
+	const hoje = new Date().toISOString().split('T')[0];
+	const dataChamada = url.searchParams.get('dataChamada') || hoje;
+
+	let chamadaResultado: Awaited<ReturnType<typeof buscarChamadaTurmaPorData>> = {
+		chamada: [],
+		jaRegistrada: false
+	};
+	let historicoChamadas: Awaited<ReturnType<typeof listarHistoricoChamadasDaTurma>> = [];
+
+	if (podeGerenciar) {
+		[chamadaResultado, historicoChamadas] = await Promise.all([
+			buscarChamadaTurmaPorData(idAcademia, idTreino, dataChamada),
+			listarHistoricoChamadasDaTurma(idAcademia, idTreino)
+		]);
+	}
+
 	return {
 		turma,
 		alunosDisponiveis,
 		professoresDojo,
+		chamadaInfo: {
+			dataChamada,
+			lista: chamadaResultado.chamada,
+			jaRegistrada: chamadaResultado.jaRegistrada
+		},
+		historicoChamadas,
 		podeGerenciar,
 		podeVerAlunos
 	};
@@ -72,6 +100,7 @@ export const actions: Actions = {
 			diaSemana: diaSemanaTexto,
 			horarioInicio: formData.get('horarioInicio'),
 			horarioFim: formData.get('horarioFim'),
+			capacidadeMaxima: formData.get('capacidadeMaxima') || undefined,
 			professoresIds: formData.getAll('professoresIds')
 		};
 
@@ -96,6 +125,49 @@ export const actions: Actions = {
 		}
 
 		return { sucessoEdicao: true };
+	},
+
+	salvarChamada: async ({ request, params, locals }) => {
+		const perfis = locals.perfis || [];
+		exigirPermissao(perfis, 'TURMAS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia!;
+		const idTreino = Number(params.id);
+		const idUsuarioExecutor = locals.usuario?.id || 1;
+		const formData = await request.formData();
+
+		const dataTreino = String(formData.get('dataTreino') || '').trim();
+		const itensJson = String(formData.get('itens') || '');
+
+		if (!dataTreino || !/^\d{4}-\d{2}-\d{2}$/.test(dataTreino)) {
+			return fail(400, { erroChamada: 'Data do treino inválida (formato AAAA-MM-DD).' });
+		}
+
+		let itensBrutos: any[];
+		try {
+			itensBrutos = JSON.parse(itensJson);
+		} catch {
+			return fail(400, { erroChamada: 'Formato inválido para os registros de presença.' });
+		}
+
+		const validacao = itemChamadaSchema.array().safeParse(itensBrutos);
+		if (!validacao.success) {
+			const primeiroErro = validacao.error.issues?.[0]?.message || 'Lista de presença inválida.';
+			return fail(400, { erroChamada: primeiroErro });
+		}
+
+		try {
+			await salvarChamadaTurmaEmLote(
+				idAcademia,
+				idTreino,
+				dataTreino,
+				idUsuarioExecutor,
+				validacao.data
+			);
+			return { sucessoChamada: true, dataTreino };
+		} catch (err: any) {
+			return fail(400, { erroChamada: err.message || 'Falha ao salvar chamada no tatame.' });
+		}
 	},
 
 	matricular: async ({ request, params, locals }) => {

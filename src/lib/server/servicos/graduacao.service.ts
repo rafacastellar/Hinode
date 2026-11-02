@@ -15,6 +15,7 @@ import {
 } from '../repositorios/graduacao.repo';
 import { buscarAlunoPorId } from '../repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '../repositorios/professor.repo';
+import { obterFrequenciaAluno } from '../repositorios/presenca.repo';
 import {
 	validarElegibilidadeGraduacao,
 	validarPeriodoInscricaoGraduacao
@@ -105,7 +106,9 @@ export async function inscreverAlunoNoExame(
 		throw error(404, { message: 'Judoca não encontrado nesta academia.' });
 	}
 
-	// 4. Validação de elegibilidade pedagógica
+	// 4. Validação de elegibilidade pedagógica e presença
+	const frequencia = await obterFrequenciaAluno(idAcademia, dados.idAluno);
+
 	const checagem = validarElegibilidadeGraduacao({
 		faixaAtleta: aluno.graduacao_atual || 'Branca',
 		faixaInicioEvento: evento.faixa_inicio,
@@ -115,6 +118,10 @@ export async function inscreverAlunoNoExame(
 		dataPrimeiraGraduacaoAtleta: aluno.data_primeira_graduacao,
 		tempoMinimoJudoMeses: evento.tempo_minimo_judo_meses,
 		tempoMinimoUltimaGraduacaoMeses: evento.tempo_minimo_ultima_graduacao_meses,
+		percentualMinimoPresenca: evento.percentual_minimo_presenca,
+		qtdMinimaAulasPresentes: evento.qtd_minima_aulas_presentes,
+		percentualPresencaAtleta: frequencia.percentual_presenca,
+		aulasPresentesAtleta: frequencia.total_presentes,
 		dataEventoIso: evento.data_inicio_iso
 	});
 

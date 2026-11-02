@@ -26,6 +26,7 @@ export interface TurmaResumo {
 	dia_semana: string;
 	horario_inicio: string;
 	horario_fim: string;
+	capacidade_maxima: number;
 	professores: ProfessorTurma[];
 	total_alunos: number;
 }
@@ -36,6 +37,7 @@ export interface TurmaDetalhada {
 	dia_semana: string;
 	horario_inicio: string;
 	horario_fim: string;
+	capacidade_maxima: number;
 	professores: ProfessorTurma[];
 	alunos_matriculados: AlunoMatriculadoTurma[];
 }
@@ -53,6 +55,7 @@ export async function listarTurmasDoDojo(idAcademia: number): Promise<TurmaResum
 			id_treino,
 			descricao,
 			dia_semana,
+			COALESCE(capacidade_maxima, 25) AS capacidade_maxima,
 			TIME_FORMAT(horario_inicio, '%H:%i') AS horario_inicio,
 			TIME_FORMAT(horario_fim, '%H:%i') AS horario_fim
 		FROM Treino_Turma
@@ -60,7 +63,22 @@ export async function listarTurmasDoDojo(idAcademia: number): Promise<TurmaResum
 		ORDER BY horario_inicio ASC, id_treino ASC
 	`;
 
-	const [linhasTurmas] = await pool.execute<RowDataPacket[]>(sqlTurmas, [idAcademia]);
+	let linhasTurmas: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sqlTurmas, [idAcademia]);
+		linhasTurmas = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = sqlTurmas.replace(
+				'COALESCE(capacidade_maxima, 25) AS capacidade_maxima,',
+				'25 AS capacidade_maxima,'
+			);
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idAcademia]);
+			linhasTurmas = res;
+		} else {
+			throw err;
+		}
+	}
 	if (linhasTurmas.length === 0) return [];
 
 	const idsTreino = linhasTurmas.map((t) => Number(t.id_treino));
@@ -122,6 +140,7 @@ export async function listarTurmasDoDojo(idAcademia: number): Promise<TurmaResum
 			dia_semana: String(lt.dia_semana),
 			horario_inicio: String(lt.horario_inicio),
 			horario_fim: String(lt.horario_fim),
+			capacidade_maxima: Number(lt.capacidade_maxima ?? 25),
 			professores: mapaProfs.get(id) || [],
 			total_alunos: mapaContagem.get(id) || 0
 		};
@@ -143,6 +162,7 @@ export async function buscarTurmaPorId(
 			id_treino,
 			descricao,
 			dia_semana,
+			COALESCE(capacidade_maxima, 25) AS capacidade_maxima,
 			TIME_FORMAT(horario_inicio, '%H:%i') AS horario_inicio,
 			TIME_FORMAT(horario_fim, '%H:%i') AS horario_fim
 		FROM Treino_Turma
@@ -150,7 +170,22 @@ export async function buscarTurmaPorId(
 		LIMIT 1
 	`;
 
-	const [linhasTurma] = await pool.execute<RowDataPacket[]>(sqlTurma, [idTreino, idAcademia]);
+	let linhasTurma: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sqlTurma, [idTreino, idAcademia]);
+		linhasTurma = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = sqlTurma.replace(
+				'COALESCE(capacidade_maxima, 25) AS capacidade_maxima,',
+				'25 AS capacidade_maxima,'
+			);
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idTreino, idAcademia]);
+			linhasTurma = res;
+		} else {
+			throw err;
+		}
+	}
 	if (linhasTurma.length === 0) return null;
 
 	const turma = linhasTurma[0];
@@ -208,6 +243,7 @@ export async function buscarTurmaPorId(
 		dia_semana: String(turma.dia_semana),
 		horario_inicio: String(turma.horario_inicio),
 		horario_fim: String(turma.horario_fim),
+		capacidade_maxima: Number(turma.capacidade_maxima ?? 25),
 		professores: linhasProfs.map((lp) => ({
 			id_professor: Number(lp.id_professor),
 			nome: String(lp.nome),
@@ -226,19 +262,39 @@ export async function inserirTurmaEmTransacao(
 	dados: TurmaInput
 ): Promise<number> {
 	const sqlInsert = `
-		INSERT INTO Treino_Turma (id_academia, descricao, horario_inicio, horario_fim, dia_semana)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO Treino_Turma (id_academia, descricao, horario_inicio, horario_fim, dia_semana, capacidade_maxima)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`;
 
-	const [res] = await conn.execute<ResultSetHeader>(sqlInsert, [
-		idAcademia,
-		dados.descricao,
-		dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
-		dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
-		dados.diaSemana
-	]);
-
-	const idTreino = res.insertId;
+	let idTreino: number;
+	try {
+		const [res] = await conn.execute<ResultSetHeader>(sqlInsert, [
+			idAcademia,
+			dados.descricao,
+			dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
+			dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
+			dados.diaSemana,
+			dados.capacidadeMaxima || 25
+		]);
+		idTreino = res.insertId;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = `
+				INSERT INTO Treino_Turma (id_academia, descricao, horario_inicio, horario_fim, dia_semana)
+				VALUES (?, ?, ?, ?, ?)
+			`;
+			const [res] = await conn.execute<ResultSetHeader>(sqlFallback, [
+				idAcademia,
+				dados.descricao,
+				dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
+				dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
+				dados.diaSemana
+			]);
+			idTreino = res.insertId;
+		} else {
+			throw err;
+		}
+	}
 
 	// Aloca os professores na turma
 	for (const idProfessor of dados.professoresIds) {
@@ -252,7 +308,7 @@ export async function inserirTurmaEmTransacao(
 }
 
 /**
- * Matricula um aluno na turma garantindo isolamento multi-tenant.
+ * Matricula um aluno na turma garantindo isolamento multi-tenant e respeitando a capacidade máxima.
  */
 export async function matricularAlunoEmTurma(
 	idAcademia: number,
@@ -261,22 +317,62 @@ export async function matricularAlunoEmTurma(
 ): Promise<void> {
 	const pool = getDbPool();
 
-	// Verifica se a turma e o aluno pertencem à mesma academia
+	// Verifica se a turma e o aluno pertencem à mesma academia e busca a capacidade
 	const sqlValida = `
-		SELECT 1 
+		SELECT t.id_treino, COALESCE(t.capacidade_maxima, 25) AS capacidade_maxima,
+		       (SELECT COUNT(*) FROM Aluno_Treino WHERE id_treino = t.id_treino) AS total_matriculados
 		FROM Treino_Turma t
 		INNER JOIN Usuario_Academia ua ON ua.id_academia = t.id_academia
 		WHERE t.id_treino = ? AND t.id_academia = ? AND ua.id_usuario = ?
 		LIMIT 1
 	`;
-	const [valido] = await pool.execute<RowDataPacket[]>(sqlValida, [
-		idTreino,
-		idAcademia,
-		idAluno
-	]);
+
+	let valido: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sqlValida, [
+			idTreino,
+			idAcademia,
+			idAluno
+		]);
+		valido = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = `
+				SELECT t.id_treino, 25 AS capacidade_maxima,
+				       (SELECT COUNT(*) FROM Aluno_Treino WHERE id_treino = t.id_treino) AS total_matriculados
+				FROM Treino_Turma t
+				INNER JOIN Usuario_Academia ua ON ua.id_academia = t.id_academia
+				WHERE t.id_treino = ? AND t.id_academia = ? AND ua.id_usuario = ?
+				LIMIT 1
+			`;
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [
+				idTreino,
+				idAcademia,
+				idAluno
+			]);
+			valido = res;
+		} else {
+			throw err;
+		}
+	}
 
 	if (valido.length === 0) {
 		throw new Error('Aluno ou turma não pertencem a esta academia.');
+	}
+
+	const capacidadeMaxima = Number(valido[0].capacidade_maxima);
+	const totalMatriculados = Number(valido[0].total_matriculados);
+
+	// Verifica se já está matriculado
+	const [jaMatriculado] = await pool.execute<RowDataPacket[]>(
+		'SELECT 1 FROM Aluno_Treino WHERE id_aluno = ? AND id_treino = ? LIMIT 1',
+		[idAluno, idTreino]
+	);
+
+	if (jaMatriculado.length === 0 && totalMatriculados >= capacidadeMaxima) {
+		throw new Error(
+			`A turma já atingiu sua capacidade máxima de lotação no tatame (${capacidadeMaxima} judocas).`
+		);
 	}
 
 	await pool.execute(
@@ -326,18 +422,46 @@ export async function atualizarTurmaEmTransacao(
 		SET descricao = ?,
 		    horario_inicio = ?,
 		    horario_fim = ?,
-		    dia_semana = ?
+		    dia_semana = ?,
+		    capacidade_maxima = ?
 		WHERE id_treino = ? AND id_academia = ?
 	`;
 
-	const [res] = await conn.execute<ResultSetHeader>(sqlUpdate, [
-		dados.descricao,
-		dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
-		dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
-		dados.diaSemana,
-		idTreino,
-		idAcademia
-	]);
+	let res: ResultSetHeader;
+	try {
+		const [resultado] = await conn.execute<ResultSetHeader>(sqlUpdate, [
+			dados.descricao,
+			dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
+			dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
+			dados.diaSemana,
+			dados.capacidadeMaxima || 25,
+			idTreino,
+			idAcademia
+		]);
+		res = resultado;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const sqlFallback = `
+				UPDATE Treino_Turma
+				SET descricao = ?,
+				    horario_inicio = ?,
+				    horario_fim = ?,
+				    dia_semana = ?
+				WHERE id_treino = ? AND id_academia = ?
+			`;
+			const [resultado] = await conn.execute<ResultSetHeader>(sqlFallback, [
+				dados.descricao,
+				dados.horarioInicio.length === 5 ? `${dados.horarioInicio}:00` : dados.horarioInicio,
+				dados.horarioFim.length === 5 ? `${dados.horarioFim}:00` : dados.horarioFim,
+				dados.diaSemana,
+				idTreino,
+				idAcademia
+			]);
+			res = resultado;
+		} else {
+			throw err;
+		}
+	}
 
 	if (res.affectedRows === 0) {
 		throw new Error('Turma não encontrada para esta academia.');
