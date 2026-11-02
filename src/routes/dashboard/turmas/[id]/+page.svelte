@@ -45,9 +45,7 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	// Aba ativa: 'alunos' | 'chamada' | 'historico' | 'editar'
-	let abaAtiva = $state<"alunos" | "chamada" | "historico" | "editar">(
-		data.podeGerenciar ? "chamada" : "alunos",
-	);
+	let abaAtiva = $state<'alunos' | 'chamada' | 'historico' | 'editar'>('chamada');
 
 	// Estados de formulário e modal
 	let carregandoMatricula = $state(false);
