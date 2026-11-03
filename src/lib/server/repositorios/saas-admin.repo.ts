@@ -37,10 +37,11 @@ export interface TelemetriaBanco {
 
 export interface SessaoMonitoradaItem {
 	id_sessao: number;
+	tipo: 'academia' | 'saas';
 	id_usuario: number;
 	nome_usuario: string;
 	email_usuario: string;
-	id_academia: number;
+	id_academia: number | null;
 	nome_academia: string;
 	ip: string | null;
 	user_agent: string | null;
@@ -154,13 +155,16 @@ export async function obterTelemetriaBanco(): Promise<TelemetriaBanco> {
 }
 
 /**
- * Lista todas as sessões ativas no momento em toda a plataforma (Radar ao Vivo)
+ * Lista todas as sessões ativas no momento em toda a plataforma (Radar ao Vivo - Academias e SaaS)
  */
 export async function listarSessoesAtivasPlataforma(): Promise<SessaoMonitoradaItem[]> {
 	const pool = getDbPool();
-	const sql = `
+	
+	// 1. Sessões de Academias (Tenant Plane)
+	const sqlAcademias = `
 		SELECT 
 			s.id_sessao,
+			'academia' AS tipo,
 			s.id_usuario,
 			u.nome AS nome_usuario,
 			u.email AS email_usuario,
@@ -179,31 +183,67 @@ export async function listarSessoesAtivasPlataforma(): Promise<SessaoMonitoradaI
 		ORDER BY s.expira_em ASC
 	`;
 
-	const [linhas] = await pool.query<RowDataPacket[]>(sql);
-	return linhas.map((l) => ({
+	// 2. Sessões da Plataforma SaaS (Control Plane - Super Admins)
+	const sqlSaas = `
+		SELECT 
+			ss.id_sessao_saas AS id_sessao,
+			'saas' AS tipo,
+			ss.id_usuario,
+			u.nome AS nome_usuario,
+			u.email AS email_usuario,
+			NULL AS id_academia,
+			'Plataforma SaaS (Control Plane)' AS nome_academia,
+			ss.ip,
+			ss.user_agent,
+			DATE_FORMAT(ss.criado_em, '%d/%m/%Y %H:%i') AS criado_em,
+			DATE_FORMAT(ss.expira_em, '%d/%m/%Y %H:%i') AS expira_em,
+			TIMESTAMPDIFF(MINUTE, NOW(), ss.expira_em) AS minutos_restantes
+		FROM Sessao_Saas ss
+		INNER JOIN Usuario u ON ss.id_usuario = u.id_usuario
+		WHERE ss.expira_em > NOW()
+		  AND ss.revogada_em IS NULL
+		ORDER BY ss.expira_em ASC
+	`;
+
+	const [[linhasAcademias], [linhasSaas]] = await Promise.all([
+		pool.query<RowDataPacket[]>(sqlAcademias),
+		pool.query<RowDataPacket[]>(sqlSaas)
+	]);
+
+	const mapear = (l: RowDataPacket): SessaoMonitoradaItem => ({
 		id_sessao: Number(l.id_sessao),
+		tipo: l.tipo === 'saas' ? 'saas' : 'academia',
 		id_usuario: Number(l.id_usuario),
 		nome_usuario: String(l.nome_usuario),
 		email_usuario: String(l.email_usuario),
-		id_academia: Number(l.id_academia),
+		id_academia: l.id_academia !== null ? Number(l.id_academia) : null,
 		nome_academia: String(l.nome_academia),
 		ip: l.ip ? String(l.ip) : null,
 		user_agent: l.user_agent ? String(l.user_agent) : null,
 		criado_em: String(l.criado_em),
 		expira_em: String(l.expira_em),
 		minutos_restantes: Math.max(0, Number(l.minutos_restantes || 0))
-	}));
+	});
+
+	return [...linhasSaas.map(mapear), ...linhasAcademias.map(mapear)];
 }
 
 /**
- * Encerra imediatamente uma sessão específica do radar (Kick)
+ * Encerra imediatamente uma sessão específica do radar (Kick) quer seja de academia ou do SaaS
  */
-export async function encerrarSessaoPeloAdminSaas(idSessao: number): Promise<void> {
+export async function encerrarSessaoPeloAdminSaas(idSessao: number, tipo: 'academia' | 'saas' = 'academia'): Promise<void> {
 	const pool = getDbPool();
-	await pool.execute(
-		`UPDATE Sessao SET revogada_em = NOW() WHERE id_sessao = ? AND revogada_em IS NULL`,
-		[idSessao]
-	);
+	if (tipo === 'saas') {
+		await pool.execute(
+			`UPDATE Sessao_Saas SET revogada_em = NOW() WHERE id_sessao_saas = ? AND revogada_em IS NULL`,
+			[idSessao]
+		);
+	} else {
+		await pool.execute(
+			`UPDATE Sessao SET revogada_em = NOW() WHERE id_sessao = ? AND revogada_em IS NULL`,
+			[idSessao]
+		);
+	}
 }
 
 /**
@@ -613,39 +653,377 @@ export async function alternarBloqueioGlobalUsuario(
 /**
  * Vincula um usuário como Administrador de uma academia existente
  */
-export async function vincularAdminEmAcademiaExistente(
+export interface PerfilOpcao {
+	id_perfil: number;
+	role: string;
+}
+
+export interface UsuarioDetalheSaas {
+	id_usuario: number;
+	nome: string;
+	tipo_documento: 'CPF' | 'ESTRANGEIRO';
+	cpf: string;
+	pais_origem: string;
+	data_nascimento: string;
+	genero: 'M' | 'F';
+	email: string;
+	telefone: string | null;
+	is_super_admin: boolean;
+	ativo: boolean;
+	motivo_bloqueio_global: string | null;
+	bloqueado_global_em: string | null;
+	vinculos: Array<{
+		id_academia: number;
+		nome_academia: string;
+		ativo: boolean;
+		ids_perfis: number[];
+		perfis: string[];
+	}>;
+}
+
+/**
+ * Retorna todos os perfis cadastrados no sistema
+ */
+export async function listarPerfisSaas(): Promise<PerfilOpcao[]> {
+	const pool = getDbPool();
+	const [perfis] = await pool.query<RowDataPacket[]>('SELECT id_perfil, role FROM Perfil ORDER BY id_perfil ASC');
+	return perfis.map((p) => ({
+		id_perfil: Number(p.id_perfil),
+		role: String(p.role)
+	}));
+}
+
+/**
+ * Busca detalhes completos de um usuário para a página de edição do SaaS Admin
+ */
+export async function obterUsuarioParaEdicaoSaas(idUsuario: number): Promise<UsuarioDetalheSaas | null> {
+	const pool = getDbPool();
+	const [linhasUser] = await pool.execute<RowDataPacket[]>(
+		`SELECT 
+			id_usuario, nome, tipo_documento, cpf, pais_origem, 
+			DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			genero, email, telefone, is_super_admin, ativo,
+			motivo_bloqueio_global,
+			DATE_FORMAT(bloqueado_global_em, '%d/%m/%Y %H:%i') AS bloqueado_global_em
+		 FROM Usuario
+		 WHERE id_usuario = ? LIMIT 1`,
+		[idUsuario]
+	);
+
+	if (linhasUser.length === 0) return null;
+	const u = linhasUser[0];
+
+	// Busca vínculos de academias e perfis associados
+	const [linhasVinculos] = await pool.execute<RowDataPacket[]>(
+		`SELECT 
+			ua.id_academia,
+			a.nome AS nome_academia,
+			COALESCE(ua.ativo, 1) AS ativo,
+			GROUP_CONCAT(p.id_perfil) AS ids_perfis,
+			GROUP_CONCAT(p.role SEPARATOR ', ') AS perfis
+		 FROM Usuario_Academia ua
+		 INNER JOIN Academia a ON ua.id_academia = a.id_academia
+		 LEFT JOIN Usuario_Academia_Perfil uap ON uap.id_usuario = ua.id_usuario AND uap.id_academia = ua.id_academia
+		 LEFT JOIN Perfil p ON p.id_perfil = uap.id_perfil
+		 WHERE ua.id_usuario = ?
+		 GROUP BY ua.id_academia, a.nome, ua.ativo
+		 ORDER BY a.nome ASC`,
+		[idUsuario]
+	);
+
+	const vinculos = linhasVinculos.map((v) => ({
+		id_academia: Number(v.id_academia),
+		nome_academia: String(v.nome_academia),
+		ativo: Boolean(v.ativo),
+		ids_perfis: v.ids_perfis ? String(v.ids_perfis).split(',').map((id) => Number(id)) : [],
+		perfis: v.perfis ? String(v.perfis).split(', ') : []
+	}));
+
+	return {
+		id_usuario: Number(u.id_usuario),
+		nome: String(u.nome),
+		tipo_documento: (u.tipo_documento as 'CPF' | 'ESTRANGEIRO') || 'CPF',
+		cpf: String(u.cpf),
+		pais_origem: String(u.pais_origem || 'Brasil'),
+		data_nascimento: String(u.data_nascimento),
+		genero: (u.genero as 'M' | 'F') || 'M',
+		email: String(u.email),
+		telefone: u.telefone ? String(u.telefone) : null,
+		is_super_admin: Boolean(u.is_super_admin),
+		ativo: Boolean(u.ativo),
+		motivo_bloqueio_global: u.motivo_bloqueio_global ? String(u.motivo_bloqueio_global) : null,
+		bloqueado_global_em: u.bloqueado_global_em ? String(u.bloqueado_global_em) : null,
+		vinculos
+	};
+}
+
+export interface CriarUsuarioSaasDTO {
+	nome: string;
+	tipoDocumento: 'CPF' | 'ESTRANGEIRO';
+	cpf: string;
+	paisOrigem?: string;
+	dataNascimento: string;
+	genero: 'M' | 'F';
+	email: string;
+	senha: string;
+	telefone?: string | null;
+	isSuperAdmin: boolean;
+	idAcademia?: number | null;
+	idsPerfis?: number[];
+}
+
+/**
+ * Cria um novo usuário pelo Backoffice SaaS com opção de Super Admin e/ou vinculação à academia
+ */
+export async function criarUsuarioSaas(
+	dados: CriarUsuarioSaasDTO,
+	idSuperAdminOperador: number,
+	ipOperador?: string | null
+): Promise<number> {
+	return await executarTransacao(async (conn) => {
+		const docIdentificador =
+			dados.tipoDocumento === 'CPF'
+				? dados.cpf.replace(/\D/g, '')
+				: dados.cpf.trim().toUpperCase();
+
+		// Valida unicidade
+		const [userDoc] = await conn.execute<RowDataPacket[]>(
+			'SELECT id_usuario FROM Usuario WHERE cpf = ? LIMIT 1',
+			[docIdentificador]
+		);
+		if (userDoc.length > 0) {
+			throw new Error('Já existe um usuário cadastrado com este Documento / CPF.');
+		}
+
+		const [userEmail] = await conn.execute<RowDataPacket[]>(
+			'SELECT id_usuario FROM Usuario WHERE email = ? LIMIT 1',
+			[dados.email.toLowerCase().trim()]
+		);
+		if (userEmail.length > 0) {
+			throw new Error('Já existe um usuário cadastrado com este E-mail.');
+		}
+
+		const senhaHash = await bcrypt.hash(dados.senha, 12);
+
+		const [resUser] = await conn.execute<ResultSetHeader>(
+			`INSERT INTO Usuario (
+				nome, tipo_documento, cpf, pais_origem, data_nascimento,
+				genero, email, senha_hash, telefone, is_super_admin, ativo
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+			[
+				dados.nome.trim(),
+				dados.tipoDocumento,
+				docIdentificador,
+				dados.paisOrigem?.trim() || 'Brasil',
+				dados.dataNascimento,
+				dados.genero,
+				dados.email.toLowerCase().trim(),
+				senhaHash,
+				dados.telefone?.trim() || null,
+				dados.isSuperAdmin ? 1 : 0
+			]
+		);
+
+		const idNovoUsuario = resUser.insertId;
+
+		// Vinculação com academia inicial se fornecida
+		if (dados.idAcademia) {
+			await conn.execute(
+				`INSERT INTO Usuario_Academia (id_usuario, id_academia, ativo) VALUES (?, ?, 1)`,
+				[idNovoUsuario, dados.idAcademia]
+			);
+
+			if (dados.idsPerfis && dados.idsPerfis.length > 0) {
+				for (const idPerfil of dados.idsPerfis) {
+					await conn.execute(
+						`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)`,
+						[idNovoUsuario, dados.idAcademia, idPerfil]
+					);
+				}
+			}
+		}
+
+		// Auditoria
+		await conn.execute(
+			`INSERT INTO Log_Auditoria (id_academia, id_usuario, acao, entidade, id_entidade, dados_depois, ip)
+			 VALUES (?, ?, 'SAAS_CRIAR_USUARIO', 'Usuario', ?, ?, ?)`,
+			[
+				dados.idAcademia || null,
+				idSuperAdminOperador,
+				String(idNovoUsuario),
+				JSON.stringify({
+					nome: dados.nome,
+					email: dados.email,
+					is_super_admin: dados.isSuperAdmin,
+					id_academia: dados.idAcademia || null,
+					ids_perfis: dados.idsPerfis || []
+				}),
+				ipOperador || null
+			]
+		);
+
+		return idNovoUsuario;
+	});
+}
+
+export interface AtualizarUsuarioSaasDTO {
+	nome: string;
+	tipoDocumento: 'CPF' | 'ESTRANGEIRO';
+	cpf: string;
+	paisOrigem?: string;
+	dataNascimento: string;
+	genero: 'M' | 'F';
+	email: string;
+	telefone?: string | null;
+	novaSenha?: string | null;
+	isSuperAdmin: boolean;
+	ativo: boolean;
+	motivoBloqueio?: string | null;
+	vinculosAcademias?: Array<{
+		idAcademia: number;
+		ativo: boolean;
+		idsPerfis: number[];
+	}>;
+}
+
+/**
+ * Atualiza todos os dados de um usuário pelo Backoffice SaaS
+ */
+export async function atualizarUsuarioSaas(
 	idUsuario: number,
-	idAcademia: number,
+	dados: AtualizarUsuarioSaasDTO,
 	idSuperAdminOperador: number,
 	ipOperador?: string | null
 ): Promise<void> {
 	await executarTransacao(async (conn) => {
-		const [perfis] = await conn.query<RowDataPacket[]>('SELECT id_perfil FROM Perfil WHERE LOWER(role) = "admin" LIMIT 1');
-		if (perfis.length === 0) throw new Error('Perfil Admin não localizado no sistema.');
-		const idPerfilAdmin = Number(perfis[0].id_perfil);
+		// Proteção contra auto-desativação ou remoção do próprio status de Super Admin
+		if (idUsuario === idSuperAdminOperador) {
+			if (!dados.isSuperAdmin) {
+				throw new Error('Você não pode remover seu próprio privilégio de Super Admin.');
+			}
+			if (!dados.ativo) {
+				throw new Error('Você não pode desativar seu próprio usuário.');
+			}
+		}
 
+		const docIdentificador =
+			dados.tipoDocumento === 'CPF'
+				? dados.cpf.replace(/\D/g, '')
+				: dados.cpf.trim().toUpperCase();
+
+		// Valida se o documento ou email já estão sendo usados por outro usuário
+		const [userDoc] = await conn.execute<RowDataPacket[]>(
+			'SELECT id_usuario FROM Usuario WHERE cpf = ? AND id_usuario != ? LIMIT 1',
+			[docIdentificador, idUsuario]
+		);
+		if (userDoc.length > 0) {
+			throw new Error('Outro usuário já utiliza este Documento / CPF.');
+		}
+
+		const [userEmail] = await conn.execute<RowDataPacket[]>(
+			'SELECT id_usuario FROM Usuario WHERE email = ? AND id_usuario != ? LIMIT 1',
+			[dados.email.toLowerCase().trim(), idUsuario]
+		);
+		if (userEmail.length > 0) {
+			throw new Error('Outro usuário já utiliza este E-mail.');
+		}
+
+		// Atualiza dados cadastrais
 		await conn.execute(
-			`INSERT INTO Usuario_Academia (id_usuario, id_academia, ativo) VALUES (?, ?, 1)
-			 ON DUPLICATE KEY UPDATE ativo = 1`,
-			[idUsuario, idAcademia]
+			`UPDATE Usuario SET
+				nome = ?,
+				tipo_documento = ?,
+				cpf = ?,
+				pais_origem = ?,
+				data_nascimento = ?,
+				genero = ?,
+				email = ?,
+				telefone = ?,
+				is_super_admin = ?,
+				ativo = ?,
+				motivo_bloqueio_global = ?,
+				bloqueado_global_em = CASE WHEN ? = 0 THEN COALESCE(bloqueado_global_em, NOW()) ELSE NULL END
+			 WHERE id_usuario = ?`,
+			[
+				dados.nome.trim(),
+				dados.tipoDocumento,
+				docIdentificador,
+				dados.paisOrigem?.trim() || 'Brasil',
+				dados.dataNascimento,
+				dados.genero,
+				dados.email.toLowerCase().trim(),
+				dados.telefone?.trim() || null,
+				dados.isSuperAdmin ? 1 : 0,
+				dados.ativo ? 1 : 0,
+				dados.ativo ? null : (dados.motivoBloqueio?.trim() || 'Suspenso pelo Super Admin'),
+				dados.ativo ? 1 : 0,
+				idUsuario
+			]
 		);
 
-		await conn.execute(
-			`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)`,
-			[idUsuario, idAcademia, idPerfilAdmin]
-		);
+		// Se fornecida nova senha, atualiza o hash
+		if (dados.novaSenha && dados.novaSenha.trim()) {
+			const novaSenhaHash = await bcrypt.hash(dados.novaSenha.trim(), 12);
+			await conn.execute('UPDATE Usuario SET senha_hash = ? WHERE id_usuario = ?', [
+				novaSenhaHash,
+				idUsuario
+			]);
+		}
 
+		// Se o usuário foi inativado, derruba todas as sessões
+		if (!dados.ativo) {
+			await conn.execute(
+				`UPDATE Sessao SET revogada_em = NOW() WHERE id_usuario = ? AND revogada_em IS NULL`,
+				[idUsuario]
+			);
+			await conn.execute(
+				`UPDATE Sessao_Saas SET revogada_em = NOW() WHERE id_usuario = ? AND revogada_em IS NULL`,
+				[idUsuario]
+			);
+		}
+
+		// Atualiza vínculos de academias se especificado
+		if (dados.vinculosAcademias) {
+			for (const v of dados.vinculosAcademias) {
+				await conn.execute(
+					`INSERT INTO Usuario_Academia (id_usuario, id_academia, ativo) VALUES (?, ?, ?)
+					 ON DUPLICATE KEY UPDATE ativo = ?`,
+					[idUsuario, v.idAcademia, v.ativo ? 1 : 0, v.ativo ? 1 : 0]
+				);
+
+				// Limpa perfis antigos e reinsere os selecionados
+				await conn.execute(
+					`DELETE FROM Usuario_Academia_Perfil WHERE id_usuario = ? AND id_academia = ?`,
+					[idUsuario, v.idAcademia]
+				);
+
+				for (const idPerfil of v.idsPerfis) {
+					await conn.execute(
+						`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)`,
+						[idUsuario, v.idAcademia, idPerfil]
+					);
+				}
+			}
+		}
+
+		// Log de auditoria
 		await conn.execute(
 			`INSERT INTO Log_Auditoria (id_academia, id_usuario, acao, entidade, id_entidade, dados_depois, ip)
-			 VALUES (?, ?, 'SAAS_DESIGNAR_ADMIN_ACADEMIA', 'Usuario', ?, ?, ?)`,
+			 VALUES (NULL, ?, 'SAAS_ATUALIZAR_USUARIO', 'Usuario', ?, ?, ?)`,
 			[
-				idAcademia,
 				idSuperAdminOperador,
 				String(idUsuario),
-				JSON.stringify({ id_academia: idAcademia, role: 'Admin' }),
+				JSON.stringify({
+					nome: dados.nome,
+					email: dados.email,
+					is_super_admin: dados.isSuperAdmin,
+					ativo: dados.ativo,
+					senha_alterada: Boolean(dados.novaSenha && dados.novaSenha.trim())
+				}),
 				ipOperador || null
 			]
 		);
 	});
 }
+
 
