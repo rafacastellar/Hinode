@@ -19,7 +19,9 @@
 		Check,
 		Globe,
 		ShieldCheck,
-		Printer
+		Printer,
+		Ban,
+		CheckCircle
 	} from '@lucide/svelte';
 	import ModalImpressaoDocumento from '#lib/components/documentos/ModalImpressaoDocumento.svelte';
 	import DocumentoUsuariosImpressao from '#lib/components/documentos/DocumentoUsuariosImpressao.svelte';
@@ -49,6 +51,23 @@
 
 	let modalExcluirAberto = $state(false);
 	let usuarioExcluirModal = $state<{ id: number; nome: string } | null>(null);
+
+	// Modal Bloqueio/Desbloqueio no Dojo
+	let modalBloqueioAberto = $state(false);
+	let usuarioBloqueioModal = $state<{ id: number; nome: string; bloquear: boolean } | null>(null);
+	let motivoBloqueioValor = $state('');
+
+	function abrirModalBloqueio(id: number, nome: string, bloquear: boolean) {
+		usuarioBloqueioModal = { id, nome, bloquear };
+		motivoBloqueioValor = bloquear ? 'Acesso temporariamente suspenso pela administração do dojo' : '';
+		modalBloqueioAberto = true;
+	}
+
+	function fecharModalBloqueio() {
+		modalBloqueioAberto = false;
+		usuarioBloqueioModal = null;
+		motivoBloqueioValor = '';
+	}
 
 	function abrirModalSenha(id: number, nome: string) {
 		usuarioSenhaModal = { id, nome };
@@ -213,6 +232,7 @@
 					<thead class="bg-zinc-900/60 border-b border-zinc-900 text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
 						<tr>
 							<th class="px-5 py-3">Operador / Usuário</th>
+							<th class="px-5 py-3">Status</th>
 							<th class="px-5 py-3">CPF (LGPD)</th>
 							<th class="px-5 py-3">Idade / Nasc.</th>
 							<th class="px-5 py-3">Perfis Acumulativos</th>
@@ -238,6 +258,21 @@
 											</span>
 										</div>
 									</div>
+								</td>
+
+								<!-- Status no Dojo -->
+								<td class="px-5 py-4 whitespace-nowrap">
+									{#if usuario.ativo_no_dojo}
+										<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-950/60 border border-emerald-800/80 text-emerald-300">
+											<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+											Ativo
+										</span>
+									{:else}
+										<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-red-950/60 border border-red-800/80 text-red-300" title={usuario.motivo_bloqueio_dojo || 'Acesso bloqueado'}>
+											<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+											Bloqueado
+										</span>
+									{/if}
 								</td>
 
 								<!-- CPF Mascarado -->
@@ -311,6 +346,20 @@
 											title="Redefinir senha"
 										>
 											<KeyRound class="w-3.5 h-3.5" />
+										</button>
+
+										<!-- Bloquear / Reativar no Dojo -->
+										<button
+											type="button"
+											onclick={() => abrirModalBloqueio(usuario.id_usuario, usuario.nome, usuario.ativo_no_dojo)}
+											class="p-2 rounded-lg bg-zinc-900 transition-colors border border-zinc-800/80 cursor-pointer {usuario.ativo_no_dojo ? 'hover:bg-amber-950/60 text-zinc-400 hover:text-amber-400' : 'hover:bg-emerald-950/60 text-zinc-400 hover:text-emerald-400'}"
+											title={usuario.ativo_no_dojo ? 'Suspender/bloquear acesso do usuário a este dojo' : 'Reativar acesso do usuário a este dojo'}
+										>
+											{#if usuario.ativo_no_dojo}
+												<Ban class="w-3.5 h-3.5" />
+											{:else}
+												<CheckCircle class="w-3.5 h-3.5" />
+											{/if}
 										</button>
 
 										<!-- Desvincular -->
@@ -524,6 +573,89 @@
 				>
 					Confirmar Remoção
 				</button>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- ========================================================================= -->
+<!-- MODAL: ALTERNAR BLOQUEIO / ACESSO NO DOJO -->
+<!-- ========================================================================= -->
+{#if modalBloqueioAberto && usuarioBloqueioModal}
+	<div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+		<div class="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative space-y-4">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2 text-white font-bold text-sm">
+					{#if usuarioBloqueioModal.bloquear}
+						<Ban class="w-4 h-4 text-amber-500" />
+						<span>Bloquear Acesso ao Dojo</span>
+					{:else}
+						<CheckCircle class="w-4 h-4 text-emerald-500" />
+						<span>Reativar Acesso ao Dojo</span>
+					{/if}
+				</div>
+				<button
+					type="button"
+					onclick={fecharModalBloqueio}
+					class="text-zinc-500 hover:text-zinc-200 transition-colors"
+				>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<p class="text-xs text-zinc-400 leading-relaxed">
+				{#if usuarioBloqueioModal.bloquear}
+					Deseja suspender temporariamente o acesso de <strong class="text-white">{usuarioBloqueioModal.nome}</strong> a este dojo? Todas as sessões ativas desta pessoa na academia serão revogadas instantaneamente, mas seu histórico de graduações e frequências permanecerá preservado.
+				{:else}
+					Deseja restabelecer o acesso de <strong class="text-white">{usuarioBloqueioModal.nome}</strong> a este dojo? A pessoa poderá voltar a fazer login na academia imediatamente.
+				{/if}
+			</p>
+
+			<form
+				method="POST"
+				action="?/alternarBloqueio"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						fecharModalBloqueio();
+					};
+				}}
+				class="space-y-4 pt-1"
+			>
+				<input type="hidden" name="idUsuario" value={usuarioBloqueioModal.id} />
+				<input type="hidden" name="acao" value={usuarioBloqueioModal.bloquear ? 'bloquear' : 'reativar'} />
+
+				{#if usuarioBloqueioModal.bloquear}
+					<div>
+						<label for="motivoBloqueio" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+							Motivo da Suspensão (Opcional)
+						</label>
+						<input
+							type="text"
+							id="motivoBloqueio"
+							name="motivo"
+							bind:value={motivoBloqueioValor}
+							placeholder="Ex: Mensalidade pendente, licença temporária, etc."
+							class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
+						/>
+					</div>
+				{/if}
+
+				<div class="flex items-center justify-end gap-2 pt-2">
+					<button
+						type="button"
+						onclick={fecharModalBloqueio}
+						class="px-4 py-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white text-xs font-medium transition-colors"
+					>
+						Cancelar
+					</button>
+					<button
+						type="submit"
+						class="px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-lg text-white {usuarioBloqueioModal.bloquear ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'}"
+					>
+						{usuarioBloqueioModal.bloquear ? 'Confirmar Bloqueio' : 'Confirmar Reativação'}
+					</button>
+				</div>
 			</form>
 		</div>
 	</div>

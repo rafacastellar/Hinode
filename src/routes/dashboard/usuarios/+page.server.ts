@@ -7,7 +7,8 @@ import {
 } from '#lib/server/repositorios/usuario.repo';
 import {
 	desvincularUsuarioDoDojo,
-	redefinirSenhaUsuarioNoDojo
+	redefinirSenhaUsuarioNoDojo,
+	alternarBloqueioUsuarioNoDojo
 } from '#lib/server/servicos/usuario.service';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -96,6 +97,47 @@ export const actions: Actions = {
 			return { sucesso: true, mensagem: 'Senha redefinida com sucesso. Sessões ativas foram encerradas.' };
 		} catch (erro: any) {
 			return fail(400, { erro: erro?.message || 'Falha ao redefinir senha.' });
+		}
+	},
+
+	alternarBloqueio: async ({ request, locals, getClientAddress }) => {
+		exigirPermissao(locals.perfis, 'USUARIOS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia;
+		if (!idAcademia || !locals.usuario) {
+			throw error(401, 'Sessão inválida');
+		}
+
+		const formData = await request.formData();
+		const idUsuario = Number(formData.get('idUsuario'));
+		const acao = String(formData.get('acao') || '');
+		const motivo = String(formData.get('motivo') || '');
+
+		if (!idUsuario) {
+			return fail(400, { erro: 'ID do usuário não fornecido.' });
+		}
+
+		const bloquear = acao === 'bloquear';
+
+		try {
+			await alternarBloqueioUsuarioNoDojo(
+				{
+					idAcademia,
+					idUsuarioOperador: locals.usuario.id,
+					ip: getClientAddress()
+				},
+				idUsuario,
+				bloquear,
+				motivo
+			);
+			return {
+				sucesso: true,
+				mensagem: bloquear
+					? 'Acesso do usuário a este dojo foi bloqueado e suas sessões foram encerradas.'
+					: 'Acesso do usuário a este dojo foi reativado com sucesso.'
+			};
+		} catch (erro: any) {
+			return fail(400, { erro: erro?.message || 'Falha ao alterar status de acesso do usuário.' });
 		}
 	}
 };
