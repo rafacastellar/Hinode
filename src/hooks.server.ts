@@ -23,6 +23,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.usuario = null;
 	event.locals.idAcademia = null;
 	event.locals.nomeAcademia = null;
+	event.locals.logoAcademia = null;
 	event.locals.perfis = [];
 	event.locals.superAdmin = null;
 
@@ -110,6 +111,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			};
 			event.locals.idAcademia = sessao.id_academia;
 			event.locals.nomeAcademia = sessao.nome_academia;
+			event.locals.logoAcademia = sessao.logo_academia;
 			event.locals.perfis = perfis;
 		} else {
 			// Sessão inválida ou expirada no banco: limpa o cookie obsoleto

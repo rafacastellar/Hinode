@@ -20,6 +20,8 @@ export type ResultadoLogin =
 			expiraEm: Date;
 			lembrar: boolean;
 			idAcademia: number;
+			nomeAcademia: string;
+			logoAcademia: string | null;
 			usuario: { id: number; nome: string; email: string };
 	  }
 	| {
@@ -144,12 +146,16 @@ export async function autenticarUsuario(
 		userAgent: meta.userAgent
 	});
 
+	const academiaAlvo = academias.find((a) => a.id_academia === academiaSelecionadaId) || academias[0];
+
 	return {
 		sucesso: true,
 		tokenPuro,
 		expiraEm,
 		lembrar: !!dados.lembrar,
 		idAcademia: academiaSelecionadaId,
+		nomeAcademia: academiaAlvo.nome_fantasia || academiaAlvo.nome,
+		logoAcademia: academiaAlvo.logo_url || null,
 		usuario: {
 			id: usuario.id_usuario,
 			nome: usuario.nome,

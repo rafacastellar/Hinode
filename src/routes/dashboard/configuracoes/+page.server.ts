@@ -20,6 +20,9 @@ const academiaEdicaoSchema = z.object({
 		.regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$|^\d{14}$/, 'CNPJ deve conter 14 dígitos numéricos válidos'),
 	inscr_est: z.string().max(50).trim().nullable().optional(),
 	telefone: z.string().max(20).trim().nullable().optional(),
+	logo_url: z.string().nullable().optional(),
+	slug: z.string().max(100).trim().nullable().optional(),
+	dominio_customizado: z.string().max(255).trim().nullable().optional(),
 	endereco: z.object({
 		cep: z
 			.string()
@@ -92,6 +95,9 @@ export const actions: Actions = {
 			cnpj: ((formData.get('cnpj') as string) || '').trim(),
 			inscr_est: strOuNull(formData.get('inscr_est')),
 			telefone: strOuNull(formData.get('telefone')),
+			logo_url: strOuNull(formData.get('logo_url')),
+			slug: strOuNull(formData.get('slug')),
+			dominio_customizado: strOuNull(formData.get('dominio_customizado')),
 			endereco: {
 				cep: ((formData.get('cep') as string) || '').trim(),
 				logradouro: ((formData.get('logradouro') as string) || '').trim(),

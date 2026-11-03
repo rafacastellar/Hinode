@@ -73,13 +73,16 @@ export async function sincronizarSchemaBanco(): Promise<void> {
 			// Ignora caso já exista
 		}
 
-		// 5. Migration 007: Backoffice Global SaaS (SGT Manager) & Bloqueios
-		// Academia (ativa, motivo_desativacao, desativada_em, criado_em)
+		// 5. Migration 007 & 008: Backoffice Global SaaS (SGT Manager), Bloqueios, Logos e Domínios
+		// Academia (ativa, motivo_desativacao, desativada_em, criado_em, logo_url, slug, dominio_customizado)
 		const colunasAcademia = [
 			`ALTER TABLE Academia ADD COLUMN ativa TINYINT(1) NOT NULL DEFAULT 1`,
 			`ALTER TABLE Academia ADD COLUMN motivo_desativacao VARCHAR(255) NULL`,
 			`ALTER TABLE Academia ADD COLUMN desativada_em DATETIME NULL`,
-			`ALTER TABLE Academia ADD COLUMN criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`
+			`ALTER TABLE Academia ADD COLUMN criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+			`ALTER TABLE Academia ADD COLUMN logo_url MEDIUMTEXT NULL`,
+			`ALTER TABLE Academia ADD COLUMN slug VARCHAR(100) NULL`,
+			`ALTER TABLE Academia ADD COLUMN dominio_customizado VARCHAR(255) NULL`
 		];
 		for (const sql of colunasAcademia) {
 			try {
@@ -89,6 +92,19 @@ export async function sincronizarSchemaBanco(): Promise<void> {
 					// Ignora se já existir
 				}
 			}
+		}
+
+		// Garante logo e slug padrão para a Academia #1 (Judô Hinodê) caso ainda não tenham sido preenchidos
+		try {
+			await pool.execute(`
+				UPDATE Academia
+				SET 
+					logo_url = COALESCE(logo_url, '/img/hinode-3d.jpg'),
+					slug = COALESCE(slug, 'hinode')
+				WHERE id_academia = 1
+			`);
+		} catch (err: any) {
+			// Ignora se falhar
 		}
 
 		// Usuario (is_super_admin, ativo, motivo_bloqueio_global, bloqueado_global_em)

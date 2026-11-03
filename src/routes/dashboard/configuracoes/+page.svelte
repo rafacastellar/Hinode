@@ -26,7 +26,9 @@
 		Phone,
 		Mail,
 		Globe,
-		Filter
+		Filter,
+		ImagePlus,
+		Trash2
 	} from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -41,6 +43,10 @@
 	let cnpj = $state('');
 	let inscrEst = $state('');
 	let telefone = $state('');
+	let logoUrl = $state('');
+	let slug = $state('');
+	let dominioCustomizado = $state('');
+	let erroLogo = $state<string | null>(null);
 
 	let cep = $state('');
 	let logradouro = $state('');
@@ -62,6 +68,9 @@
 		cnpj = data.academia.cnpj || '';
 		inscrEst = data.academia.inscr_est || '';
 		telefone = data.academia.telefone || '';
+		logoUrl = data.academia.logo_url || '';
+		slug = data.academia.slug || '';
+		dominioCustomizado = data.academia.dominio_customizado || '';
 
 		if (data.academia.endereco) {
 			cep = data.academia.endereco.cep || '';
@@ -73,6 +82,49 @@
 			uf = data.academia.endereco.uf || 'SP';
 		}
 	});
+
+	/**
+	 * Comprime e redimensiona a imagem do Logo no navegador via Canvas (máx 256x256, WebP/JPEG leve)
+	 */
+	function processarUploadLogo(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const arquivo = input.files?.[0];
+		erroLogo = null;
+		if (!arquivo) return;
+
+		if (!arquivo.type.startsWith('image/')) {
+			erroLogo = 'Selecione um arquivo de imagem válido (PNG, JPG, WebP ou SVG).';
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const img = new Image();
+			img.onload = () => {
+				const canvas = document.createElement('canvas');
+				const maxDim = 256;
+				let w = img.width;
+				let h = img.height;
+				if (w > h && w > maxDim) {
+					h = Math.round((h * maxDim) / w);
+					w = maxDim;
+				} else if (h >= w && h > maxDim) {
+					w = Math.round((w * maxDim) / h);
+					h = maxDim;
+				}
+				canvas.width = w;
+				canvas.height = h;
+				const ctx = canvas.getContext('2d');
+				if (ctx) {
+					ctx.clearRect(0, 0, w, h);
+					ctx.drawImage(img, 0, 0, w, h);
+					logoUrl = canvas.toDataURL('image/webp', 0.86);
+				}
+			};
+			img.src = String(e.target?.result || '');
+		};
+		reader.readAsDataURL(arquivo);
+	}
 
 	$effect(() => {
 		if (form) {
@@ -647,6 +699,101 @@
 								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-sky-500 text-white text-xs uppercase font-mono text-center font-bold transition-all"
 							/>
 						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- CARD C: IDENTIDADE VISUAL (LOGO DO DOJO) & DOMÍNIO / LINK PRÓPRIO DE LOGIN -->
+		<div class="p-6 rounded-3xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2.5">
+					<div class="w-8 h-8 rounded-xl bg-amber-950/40 border border-amber-800/60 flex items-center justify-center text-amber-400">
+						<ImagePlus class="w-4 h-4" />
+					</div>
+					<div>
+						<h3 class="text-sm font-bold text-white font-display">Identidade Visual, Emblema & Domínio de Acesso</h3>
+						<p class="text-[11px] text-zinc-500">Logo oficial da academia (usado na barra lateral e na animação de login) e endereço exclusivo</p>
+					</div>
+				</div>
+				<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-amber-950/60 border border-amber-800/80 text-amber-400">
+					🎨 White-Label SGT
+				</span>
+			</div>
+
+			<input type="hidden" name="logo_url" value={logoUrl} />
+
+			<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+				<!-- Preview e Upload do Logo -->
+				<div class="lg:col-span-5 flex items-center gap-4 p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
+					<div class="w-20 h-20 rounded-2xl bg-zinc-950 border border-zinc-800 p-1.5 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+						{#if logoUrl}
+							<img src={logoUrl} alt="Preview Logo da Academia" class="w-full h-full object-contain rounded-xl" />
+						{:else}
+							<Building2 class="w-8 h-8 text-zinc-600" />
+						{/if}
+					</div>
+					<div class="space-y-2 flex-1 min-w-0">
+						<label class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold uppercase tracking-wider cursor-pointer transition-all shadow">
+							<ImagePlus class="w-3.5 h-3.5" />
+							<span>Enviar Foto do Logo</span>
+							<input type="file" accept="image/*" onchange={processarUploadLogo} class="hidden" />
+						</label>
+						{#if logoUrl}
+							<button
+								type="button"
+								onclick={() => (logoUrl = '')}
+								class="inline-flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 font-mono block cursor-pointer"
+							>
+								<Trash2 class="w-3 h-3" />
+								<span>Remover logo</span>
+							</button>
+						{/if}
+						<p class="text-[10px] text-zinc-500 leading-tight">
+							Otimizado automaticamente em alta definição para a transição de entrada do dojo.
+						</p>
+						{#if erroLogo}
+							<p class="text-[11px] text-red-400">{erroLogo}</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Slug e Domínio Próprio -->
+				<div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div class="space-y-1.5">
+						<label for="slug" class="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+							<span>Identificador Curto (Slug)</span>
+							<span class="text-[10px] text-amber-400 font-mono">/login?dojo={slug || 'sua-academia'}</span>
+						</label>
+						<input
+							id="slug"
+							name="slug"
+							type="text"
+							bind:value={slug}
+							placeholder="ex: hinode, bushido, kodokan"
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-amber-500 text-white text-xs font-mono lowercase transition-all"
+						/>
+						<span class="text-[10px] text-zinc-500 block">
+							Permite que seus alunos acessem a tela de login já personalizada com o seu logo.
+						</span>
+					</div>
+
+					<div class="space-y-1.5">
+						<label for="dominio_customizado" class="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+							<span>Domínio Próprio (Opcional)</span>
+							<Globe class="w-3.5 h-3.5 text-zinc-500" />
+						</label>
+						<input
+							id="dominio_customizado"
+							name="dominio_customizado"
+							type="text"
+							bind:value={dominioCustomizado}
+							placeholder="ex: app.sua-academia.com.br"
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-amber-500 text-white text-xs font-mono lowercase transition-all"
+						/>
+						<span class="text-[10px] text-zinc-500 block">
+							Se apontado por CNAME/Túnel, carrega automaticamente a marca da academia no login.
+						</span>
 					</div>
 				</div>
 			</div>

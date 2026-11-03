@@ -54,6 +54,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		usuario: locals.usuario,
 		idAcademia,
 		nomeAcademia: locals.nomeAcademia,
+		logoAcademia: locals.logoAcademia,
 		perfis,
 		permissoes,
 		itensMenu,

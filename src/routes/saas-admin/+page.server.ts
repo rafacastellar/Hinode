@@ -26,14 +26,15 @@ export const actions: Actions = {
 	encerrarSessao: async ({ request }) => {
 		const formData = await request.formData();
 		const idSessao = Number(formData.get('idSessao'));
+		const tipo = (formData.get('tipo') as 'academia' | 'saas') || 'academia';
 
 		if (!idSessao) {
 			return fail(400, { erro: 'ID da sessão não fornecido.' });
 		}
 
 		try {
-			await encerrarSessaoPeloAdminSaas(idSessao);
-			return { sucesso: true, mensagem: 'Sessão revogada imediatamente pelo Super Admin.' };
+			await encerrarSessaoPeloAdminSaas(idSessao, tipo);
+			return { sucesso: true, mensagem: `Sessão (${tipo === 'saas' ? 'SaaS' : 'Academia'}) revogada imediatamente pelo Super Admin.` };
 		} catch (erro: any) {
 			return fail(400, { erro: erro?.message || 'Falha ao encerrar sessão.' });
 		}
