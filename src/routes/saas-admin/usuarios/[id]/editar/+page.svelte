@@ -11,16 +11,15 @@
 		KeyRound,
 		User,
 		Plus,
-		Trash2,
-		Ban
+		Trash2
 	} from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	let tipoDocumento = $state<'CPF' | 'ESTRANGEIRO'>(data.usuario.tipo_documento);
-	let isSuperAdmin = $state(data.usuario.is_super_admin);
-	let ativo = $state(data.usuario.ativo);
-	let motivoBloqueio = $state(data.usuario.motivo_bloqueio_global || '');
+	let tipoDocumento = $state<'CPF' | 'ESTRANGEIRO'>('CPF');
+	let isSuperAdmin = $state(false);
+	let ativo = $state(true);
+	let motivoBloqueio = $state('');
 	let novaSenha = $state('');
 
 	// Estrutura de Vínculos reativa
@@ -31,18 +30,26 @@
 		idsPerfis: number[];
 	}
 
-	let vinculos = $state<VinculoLocal[]>(
-		data.usuario.vinculos.map((v) => ({
-			idAcademia: v.id_academia,
-			nomeAcademia: v.nome_academia,
-			ativo: v.ativo,
-			idsPerfis: [...v.ids_perfis]
-		}))
-	);
+	let vinculos = $state<VinculoLocal[]>([]);
+	let novaAcademiaParaAdicionar = $state<number | null>(null);
 
-	let novaAcademiaParaAdicionar = $state<number | null>(
-		data.academias.length > 0 ? data.academias[0].id_academia : null
-	);
+	$effect(() => {
+		if (data.usuario) {
+			tipoDocumento = data.usuario.tipo_documento;
+			isSuperAdmin = data.usuario.is_super_admin;
+			ativo = data.usuario.ativo;
+			motivoBloqueio = data.usuario.motivo_bloqueio_global || '';
+			vinculos = data.usuario.vinculos.map((v) => ({
+				idAcademia: v.id_academia,
+				nomeAcademia: v.nome_academia,
+				ativo: v.ativo,
+				idsPerfis: [...v.ids_perfis]
+			}));
+		}
+		if (data.academias && data.academias.length > 0 && novaAcademiaParaAdicionar === null) {
+			novaAcademiaParaAdicionar = data.academias[0].id_academia;
+		}
+	});
 
 	function adicionarVinculo() {
 		if (!novaAcademiaParaAdicionar) return;
@@ -472,4 +479,3 @@
 		</div>
 	</form>
 </div>
-
