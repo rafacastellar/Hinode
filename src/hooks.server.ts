@@ -3,11 +3,15 @@ import { redirect } from '@sveltejs/kit';
 import { calcularHashToken } from '#lib/server/auth/criptografia';
 import { buscarSessaoValidaPorHash, renovarSessao } from '#lib/server/repositorios/sessao.repo';
 import { buscarPerfisDoUsuarioNaAcademia } from '#lib/server/repositorios/usuario.repo';
+import { sincronizarSchemaBanco } from '#lib/server/db/auto-migration';
 
 const TEMPO_INATIVIDADE_MS = 2 * 60 * 60 * 1000; // 2 horas (7200 segundos)
 const INTERVALO_MINIMO_RENOVACAO_MS = 10 * 60 * 1000; // 10 minutos (evita updates desnecessários a cada requisição)
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Garante integridade do banco sem bloquear a requisição
+	sincronizarSchemaBanco().catch(() => {});
+
 	const tokenSessao = event.cookies.get('hinode_session');
 
 	// Valores padrão de segurança (não autenticado)

@@ -67,6 +67,16 @@ export const eventoGraduacaoSchema = z
 			.transform((val) => val || 'Marrom'),
 		tempoMinimoJudoMeses: z.any().transform(parseNumeroOpcional),
 		tempoMinimoUltimaGraduacaoMeses: z.any().transform(parseNumeroOpcional),
+		percentualMinimoPresenca: z.any().transform((val) => {
+			if (val === undefined || val === null || val === '') return 0;
+			const n = typeof val === 'string' ? parseInt(val, 10) : Number(val);
+			return isNaN(n) || n < 0 ? 0 : Math.min(100, n);
+		}),
+		qtdMinimaAulasPresentes: z.any().transform((val) => {
+			if (val === undefined || val === null || val === '') return 0;
+			const n = typeof val === 'string' ? parseInt(val, 10) : Number(val);
+			return isNaN(n) || n < 0 ? 0 : n;
+		}),
 		taxaGraduacao: z.any().transform(parseDecimalOpcional),
 		requisitos: z
 			.string()

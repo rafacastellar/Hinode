@@ -24,6 +24,11 @@ export const turmaSchema = z
 			.string()
 			.trim()
 			.regex(regexHora, { message: 'Horário de término inválido (utilize HH:MM)' }),
+		capacidadeMaxima: z.any().transform((val) => {
+			if (val === undefined || val === null || val === '') return 25;
+			const n = typeof val === 'string' ? parseInt(val, 10) : Number(val);
+			return isNaN(n) || n < 1 ? 25 : Math.min(500, n);
+		}),
 		professoresIds: z.any().transform((val) => {
 			if (!val) return [];
 			if (Array.isArray(val)) {
@@ -54,3 +59,20 @@ export const turmaSchema = z
 	);
 
 export type TurmaInput = z.infer<typeof turmaSchema>;
+
+export const statusPresencaEnum = z.enum(['Presente', 'Falta', 'Justificada']);
+export type StatusPresenca = z.infer<typeof statusPresencaEnum>;
+
+export const itemChamadaSchema = z.object({
+	idAluno: z.number().int().positive(),
+	status: statusPresencaEnum,
+	observacao: z.string().trim().max(255).nullish().transform((v) => v || null)
+});
+
+export const registrarChamadaSchema = z.object({
+	idTreino: z.number().int().positive(),
+	dataTreino: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data inválida (utilize AAAA-MM-DD)' }),
+	presencas: z.array(itemChamadaSchema)
+});
+
+export type RegistrarChamadaInput = z.infer<typeof registrarChamadaSchema>;

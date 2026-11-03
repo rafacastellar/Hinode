@@ -67,6 +67,7 @@ const PERMISSOES_POR_PAPEL: Record<string, readonly Permissao[]> = {
 		'ALUNOS_CRIAR',
 		'ALUNOS_EDITAR',
 		'TURMAS_VER',
+		'TURMAS_GERENCIAR',
 		'CAMPEONATOS_VER',
 		'CAMPEONATOS_INSCREVER'
 	],

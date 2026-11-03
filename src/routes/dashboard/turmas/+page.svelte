@@ -117,7 +117,7 @@
 						{#if turmasDoDia.length > 0}
 							<div class="space-y-3 flex-1">
 								{#each turmasDoDia as turma}
-									{@const pctOcupacao = Math.min(100, Math.round((turma.total_alunos / 25) * 100))}
+									{@const pctOcupacao = Math.min(100, Math.round((turma.total_alunos / (turma.capacidade_maxima || 25)) * 100))}
 									<a
 										href="/dashboard/turmas/{turma.id_treino}"
 										class="group block p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700 transition-all"
@@ -153,7 +153,7 @@
 											<div class="flex items-center justify-between text-xs">
 												<div class="inline-flex items-center gap-1.5 text-zinc-300">
 													<Users class="w-3.5 h-3.5 text-red-400" />
-													<span class="font-mono font-semibold">{turma.total_alunos}/25 vagas</span>
+													<span class="font-mono font-semibold">{turma.total_alunos}/{turma.capacidade_maxima || 25} vagas</span>
 												</div>
 												<span class="text-[11px] text-zinc-500 group-hover:text-white transition-colors flex items-center gap-1">
 													<span>Ver chamada</span>
@@ -218,7 +218,7 @@
 									</td>
 									<td class="px-6 py-4 font-mono text-zinc-200">
 										<span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
-											{turma.total_alunos} atletas
+											{turma.total_alunos} / {turma.capacidade_maxima || 25} atletas
 										</span>
 									</td>
 									<td class="px-6 py-4 text-right">

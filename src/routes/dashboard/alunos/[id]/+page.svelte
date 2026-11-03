@@ -2,6 +2,7 @@
 	import type { PageData, ActionData } from './$types';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import TermometroElegibilidade from '#lib/components/ui/TermometroElegibilidade.svelte';
+	import CalendarioTatameMensal from '#lib/components/ui/CalendarioTatameMensal.svelte';
 	import {
 		Award,
 		User,
@@ -16,7 +17,13 @@
 		ExternalLink,
 		FileText,
 		Check,
-		Info
+		Info,
+		Flame,
+		Clock,
+		XCircle,
+		AlertCircle,
+		PenLine,
+		Filter
 	} from '@lucide/svelte';
 	import { obterClassificacaoJudo } from '#lib/dominio/regras-categoria-peso';
 	import {
@@ -99,6 +106,70 @@
 	});
 
 	const faixasDisponiveis = LISTA_TODAS_FAIXAS_VALORES;
+
+	// Aba ativa: 'ficha' (Ficha Técnica) ou 'presenca' (Tatame & Presença)
+	let abaAtiva = $state<'ficha' | 'presenca'>('ficha');
+
+	// Estados para filtro e lançamento/retificação de presença pelo Sensei/Gestor
+	const hojeIso = new Date().toISOString().slice(0, 10);
+	let filtroStatusPresenca = $state<'Todos' | 'Presente' | 'Falta' | 'Justificada'>('Todos');
+	let filtroIdTreino = $state<number | 'Todos'>('Todos');
+	let buscaPresenca = $state('');
+
+	let mostrarFormLancamento = $state(false);
+	let formDataTreino = $state(hojeIso);
+	let formIdTreino = $state<number | ''>('');
+	let formStatusPresenca = $state<'Presente' | 'Falta' | 'Justificada'>('Presente');
+	let formObservacaoPresenca = $state('');
+
+	$effect(() => {
+		if (data.turmasMatriculadas && data.turmasMatriculadas.length > 0 && formIdTreino === '') {
+			formIdTreino = data.turmasMatriculadas[0].id_treino;
+		}
+	});
+
+	$effect(() => {
+		if ((form as any)?.sucessoPresenca || (form as any)?.erroPresenca) {
+			abaAtiva = 'presenca';
+			if ((form as any)?.sucessoPresenca) {
+				mostrarFormLancamento = false;
+				formObservacaoPresenca = '';
+			}
+		}
+	});
+
+	function abrirEdicaoPresenca(reg: {
+		id_treino: number;
+		data_treino: string;
+		status_presenca: 'Presente' | 'Falta' | 'Justificada';
+		observacao: string | null;
+	}) {
+		formIdTreino = reg.id_treino;
+		formDataTreino = reg.data_treino;
+		formStatusPresenca = reg.status_presenca;
+		formObservacaoPresenca = reg.observacao || '';
+		mostrarFormLancamento = true;
+	}
+
+	const presencasFiltradas = $derived.by(() => {
+		const lista = data.presencas || [];
+		return lista.filter((p) => {
+			if (filtroStatusPresenca !== 'Todos' && p.status_presenca !== filtroStatusPresenca) {
+				return false;
+			}
+			if (filtroIdTreino !== 'Todos' && p.id_treino !== filtroIdTreino) {
+				return false;
+			}
+			if (buscaPresenca.trim() !== '') {
+				const q = buscaPresenca.toLowerCase();
+				const bateTurma = p.descricao_turma.toLowerCase().includes(q);
+				const bateData = p.data_treino.includes(q);
+				const bateObs = (p.observacao || '').toLowerCase().includes(q);
+				if (!bateTurma && !bateData && !bateObs) return false;
+			}
+			return true;
+		});
+	});
 </script>
 
 <svelte:head>
@@ -298,9 +369,42 @@
 	</div>
 
 	<!-- ========================================================================= -->
+	<!-- NAVEGAÇÃO DE ABAS: FICHA TÉCNICA vs TATAME & PRESENÇA                     -->
+	<!-- ========================================================================= -->
+	<div class="flex flex-wrap items-center gap-2 border-b border-zinc-800 pb-3">
+		<button
+			type="button"
+			onclick={() => (abaAtiva = 'ficha')}
+			class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer {abaAtiva === 'ficha'
+				? 'bg-red-600 text-white shadow-lg shadow-red-950/50'
+				: 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'}"
+		>
+			<Award class="w-4 h-4" />
+			<span>Ficha Técnica & Cadastro</span>
+		</button>
+
+		<button
+			type="button"
+			onclick={() => (abaAtiva = 'presenca')}
+			class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer {abaAtiva === 'presenca'
+				? 'bg-red-600 text-white shadow-lg shadow-red-950/50'
+				: 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'}"
+		>
+			<Calendar class="w-4 h-4" />
+			<span>Tatame & Presença</span>
+			{#if data.metricasPresenca}
+				<span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-950/60 text-emerald-400 border border-emerald-500/30">
+					{data.metricasPresenca.percentual_presenca}% ({data.metricasPresenca.total_presentes} aulas)
+				</span>
+			{/if}
+		</button>
+	</div>
+
+	{#if abaAtiva === 'ficha'}
+	<!-- ========================================================================= -->
 	<!-- FORMULÁRIO DE EDIÇÃO TÉCNICA E ESPORTIVA DO JUDOCA -->
 	<!-- ========================================================================= -->
-	<form method="POST" class="space-y-6">
+	<form method="POST" action="?/atualizarDados" class="space-y-6">
 		<fieldset disabled={!data.podeEditar} class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-85">
 		<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
 			<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
@@ -575,4 +679,355 @@
 			{/if}
 		</div>
 	</form>
+	{:else}
+		<!-- ===================================================================== -->
+		<!-- ABA: TATAME & PRESENÇA (VISÃO PROFESSOR / ADMIN / RECEPÇÃO)           -->
+		<!-- ===================================================================== -->
+		{@const mp = data.metricasPresenca}
+		<div class="space-y-6 animate-in fade-in duration-200">
+			<!-- 1. KPIs Analíticos de Assiduidade do Judoca -->
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2">
+					<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+						Taxa Global de Frequência
+					</span>
+					<div class="flex items-baseline justify-between">
+						<span class="text-2xl font-extrabold font-display {mp.percentual_presenca >= 80 ? 'text-emerald-400' : mp.percentual_presenca >= 60 ? 'text-amber-400' : 'text-red-400'}">
+							{mp.percentual_presenca}%
+						</span>
+						<span class="text-xs font-mono text-zinc-400">
+							Mês atual: <strong class="text-white">{mp.percentual_mes_atual}%</strong>
+						</span>
+					</div>
+					<div class="w-full h-2 rounded-full bg-zinc-900 overflow-hidden">
+						<div
+							class="h-full rounded-full {mp.percentual_presenca >= 80 ? 'bg-emerald-500' : mp.percentual_presenca >= 60 ? 'bg-amber-500' : 'bg-red-500'}"
+							style="width: {Math.min(100, mp.percentual_presenca)}%"
+						></div>
+					</div>
+				</div>
+
+				<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+					<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+						Volume de Treinos & Dias
+					</span>
+					<div class="flex items-baseline gap-2">
+						<span class="text-2xl font-extrabold text-white font-display">
+							{mp.total_presentes}
+						</span>
+						<span class="text-xs text-zinc-400">aulas presentes (de {mp.total_aulas})</span>
+					</div>
+					<p class="text-[11px] text-zinc-400">
+						Distribuídas em <strong class="text-amber-300">{mp.dias_distintos_treinados}</strong> dia(s) distintos
+					</p>
+				</div>
+
+				<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+					<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+						Constância & Faltas
+					</span>
+					<div class="flex items-center gap-2">
+						<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-xs font-bold text-amber-300">
+							<Flame class="w-3.5 h-3.5 text-amber-400" />
+							{mp.streak_atual} seguida(s)
+						</span>
+						<span class="text-[11px] font-mono text-zinc-500">
+							Máx: {mp.maior_streak}
+						</span>
+					</div>
+					<p class="text-[11px] text-zinc-400">
+						Faltas: <strong class="text-red-400">{mp.total_faltas}</strong> • Justificadas: <strong class="text-sky-400">{mp.total_justificadas}</strong>
+					</p>
+				</div>
+
+				<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+					<span class="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+						Elegibilidade p/ Graduação
+					</span>
+					{#if mp.proximo_exame_meta && (mp.proximo_exame_meta.qtd_minima_aulas > 0 || mp.proximo_exame_meta.percentual_minimo > 0)}
+						{@const meta = mp.proximo_exame_meta}
+						<div class="flex items-center gap-1.5">
+							{#if meta.apto_frequencia}
+								<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-xs font-bold text-emerald-300">
+									Apto em Frequência ✓
+								</span>
+							{:else}
+								<span class="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-xs font-bold text-red-300">
+									Frequência Insuficiente
+								</span>
+							{/if}
+						</div>
+						<p class="text-[11px] text-zinc-400 truncate" title={meta.nome_evento}>
+							{meta.qtd_minima_aulas > 0 ? `Aulas: ${mp.total_presentes}/${meta.qtd_minima_aulas}` : ''}
+							{meta.percentual_minimo > 0 ? ` • Freq: ${mp.percentual_presenca}%/${meta.percentual_minimo}%` : ''}
+						</p>
+					{:else}
+						<span class="text-xs font-bold text-emerald-400 block pt-1">
+							Sem bloqueio de chamada
+						</span>
+						<p class="text-[11px] text-zinc-500">
+							{data.turmasMatriculadas.length} turma(s) matriculada(s)
+						</p>
+					{/if}
+				</div>
+			</div>
+
+			<!-- 2. Barra de Gestão Individual de Presença (Professor / Admin / Recepção) -->
+			{#if data.podeGerenciarPresenca}
+				<div class="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-4">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+						<div>
+							<h3 class="text-sm font-bold text-white font-display flex items-center gap-2">
+								<PenLine class="w-4 h-4 text-red-500" />
+								<span>Lançamento ou Retificação Individual de Presença</span>
+							</h3>
+							<p class="text-xs text-zinc-400">
+								Registre presença extra, justifique falta mediante atestado ou edite anotações de qualquer treino do dia
+							</p>
+						</div>
+
+						{#if data.turmasMatriculadas.length > 0}
+							<button
+								type="button"
+								onclick={() => (mostrarFormLancamento = !mostrarFormLancamento)}
+								class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {mostrarFormLancamento
+									? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
+									: 'bg-red-600 hover:bg-red-500 text-white'}"
+							>
+								{mostrarFormLancamento ? 'Fechar Formulário' : '+ Lançar / Retificar Presença'}
+							</button>
+						{/if}
+					</div>
+
+					{#if (form as any)?.sucessoPresenca}
+						<div class="p-3 rounded-xl bg-emerald-950/50 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
+							<CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
+							<span>{(form as any).sucessoPresenca}</span>
+						</div>
+					{/if}
+
+					{#if (form as any)?.erroPresenca}
+						<div class="p-3 rounded-xl bg-red-950/50 border border-red-800 text-xs text-red-300 flex items-center gap-2">
+							<AlertCircle class="w-4 h-4 text-red-400 shrink-0" />
+							<span>{(form as any).erroPresenca}</span>
+						</div>
+					{/if}
+
+					{#if mostrarFormLancamento && data.turmasMatriculadas.length > 0}
+						<form method="POST" action="?/lancarPresenca" class="p-4 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-4">
+							<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+								<div>
+									<label for="formIdTreino" class="block text-[11px] font-semibold text-zinc-300 mb-1">
+										Turma / Horário do Treino
+									</label>
+									<select
+										id="formIdTreino"
+										name="idTreino"
+										bind:value={formIdTreino}
+										required
+										class="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-white"
+									>
+										{#each data.turmasMatriculadas as tm}
+											<option value={tm.id_treino}>
+												{tm.descricao} ({tm.dia_semana} • {tm.horario_inicio})
+											</option>
+										{/each}
+									</select>
+								</div>
+
+								<div>
+									<label for="formDataTreino" class="block text-[11px] font-semibold text-zinc-300 mb-1">
+										Data do Treino
+									</label>
+									<input
+										id="formDataTreino"
+										type="date"
+										name="dataTreino"
+										bind:value={formDataTreino}
+										required
+										class="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-white"
+									/>
+								</div>
+
+								<div>
+									<label for="formStatusPresenca" class="block text-[11px] font-semibold text-zinc-300 mb-1">
+										Status de Presença
+									</label>
+									<select
+										id="formStatusPresenca"
+										name="status"
+										bind:value={formStatusPresenca}
+										class="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-white"
+									>
+										<option value="Presente">Presente</option>
+										<option value="Falta">Falta</option>
+										<option value="Justificada">Justificada</option>
+									</select>
+								</div>
+							</div>
+
+							<div>
+								<label for="formObservacaoPresenca" class="block text-[11px] font-semibold text-zinc-300 mb-1">
+									Observação Técnica / Justificativa (Opcional)
+								</label>
+								<input
+									id="formObservacaoPresenca"
+									type="text"
+									name="observacao"
+									bind:value={formObservacaoPresenca}
+									maxlength="255"
+									placeholder="Ex: Atestado médico entregue na secretaria / Treino forte de competição..."
+									class="w-full px-3.5 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-white placeholder-zinc-500"
+								/>
+							</div>
+
+							<div class="flex justify-end gap-2">
+								<button
+									type="button"
+									onclick={() => (mostrarFormLancamento = false)}
+									class="px-3.5 py-2 rounded-xl border border-zinc-700 text-xs text-zinc-300 hover:text-white"
+								>
+									Cancelar
+								</button>
+								<button
+									type="submit"
+									class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-xs font-bold text-white cursor-pointer"
+								>
+									Salvar Registro de Presença
+								</button>
+							</div>
+						</form>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- 3. Calendário Mensal Tradicional do Judoca -->
+			<CalendarioTatameMensal
+				sessoes={data.presencas || []}
+				turmasMatriculadas={data.turmasMatriculadas || []}
+				titulo="Calendário Mensal de Presenças — {aluno.nome}"
+				subtitulo="Inspecione os dias treinados no mês (incluindo dias com 2 ou mais treinos realizados)"
+			/>
+
+			<!-- 4. Tabela Histórica Detalhada com Filtros para Sensei/Admin/Recepção -->
+			<div class="p-5 sm:p-6 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-4">
+				<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+					<div>
+						<h3 class="text-sm sm:text-base font-bold text-white font-display flex items-center gap-2">
+							<Filter class="w-4 h-4 text-amber-400" />
+							<span>Histórico Cronológico de Chamadas ({presencasFiltradas.length})</span>
+						</h3>
+						<p class="text-xs text-zinc-400">
+							Registro auditável de todas as sessões lançadas para o judoca no dojo
+						</p>
+					</div>
+
+					<div class="flex flex-wrap items-center gap-2">
+						<select
+							bind:value={filtroStatusPresenca}
+							class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-200"
+						>
+							<option value="Todos">Todos os Status</option>
+							<option value="Presente">Apenas Presentes</option>
+							<option value="Falta">Apenas Faltas</option>
+							<option value="Justificada">Apenas Justificadas</option>
+						</select>
+
+						<select
+							bind:value={filtroIdTreino}
+							class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-200"
+						>
+							<option value="Todos">Todas as Turmas</option>
+							{#each data.turmasMatriculadas as tm}
+								<option value={tm.id_treino}>{tm.descricao} ({tm.horario_inicio})</option>
+							{/each}
+						</select>
+
+						<input
+							type="text"
+							bind:value={buscaPresenca}
+							placeholder="Buscar data ou observação..."
+							class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500"
+						/>
+					</div>
+				</div>
+
+				{#if presencasFiltradas.length === 0}
+					<div class="p-8 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center">
+						<p class="text-xs text-zinc-400">
+							Nenhum registro de presença encontrado para os filtros selecionados.
+						</p>
+					</div>
+				{:else}
+					<div class="overflow-x-auto">
+						<table class="w-full text-left border-collapse text-xs">
+							<thead>
+								<tr class="border-b border-zinc-800 text-[10px] font-mono uppercase text-zinc-400">
+									<th class="py-2.5 px-3">Data</th>
+									<th class="py-2.5 px-3">Horário & Turma</th>
+									<th class="py-2.5 px-3">Status</th>
+									<th class="py-2.5 px-3">Observação / Justificativa</th>
+									<th class="py-2.5 px-3">Registrado por</th>
+									{#if data.podeGerenciarPresenca}
+										<th class="py-2.5 px-3 text-right">Ação</th>
+									{/if}
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-zinc-900">
+								{#each presencasFiltradas as item}
+									<tr class="hover:bg-zinc-900/50 transition-colors">
+										<td class="py-2.5 px-3 font-mono font-semibold text-zinc-200 whitespace-nowrap">
+											{item.data_treino.split('-').reverse().join('/')}
+										</td>
+										<td class="py-2.5 px-3">
+											<span class="font-bold text-white block">{item.descricao_turma}</span>
+											<span class="text-[10px] font-mono text-zinc-400">
+												{item.horario_inicio} às {item.horario_fim}
+											</span>
+										</td>
+										<td class="py-2.5 px-3 whitespace-nowrap">
+											{#if item.status_presenca === 'Presente'}
+												<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-bold text-emerald-300">
+													<CheckCircle2 class="w-3 h-3" /> Presente
+												</span>
+											{:else if item.status_presenca === 'Falta'}
+												<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-[11px] font-bold text-red-300">
+													<XCircle class="w-3 h-3" /> Falta
+												</span>
+											{:else}
+												<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/30 text-[11px] font-bold text-sky-300">
+													<AlertCircle class="w-3 h-3" /> Justificada
+												</span>
+											{/if}
+										</td>
+										<td class="py-2.5 px-3 text-zinc-300 max-w-xs">
+											{#if item.observacao}
+												<span class="block truncate" title={item.observacao}>{item.observacao}</span>
+											{:else}
+												<span class="text-zinc-600">—</span>
+											{/if}
+										</td>
+										<td class="py-2.5 px-3 text-[11px] text-zinc-400 whitespace-nowrap">
+											{item.nome_registrador || 'Sistema'}
+										</td>
+										{#if data.podeGerenciarPresenca}
+											<td class="py-2.5 px-3 text-right whitespace-nowrap">
+												<button
+													type="button"
+													onclick={() => abrirEdicaoPresenca(item)}
+													class="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition cursor-pointer"
+												>
+													Retificar
+												</button>
+											</td>
+										{/if}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>

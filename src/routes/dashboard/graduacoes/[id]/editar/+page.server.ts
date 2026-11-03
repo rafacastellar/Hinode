@@ -45,6 +45,8 @@ export const actions: Actions = {
 			faixaFim: formData.get('faixaFim'),
 			tempoMinimoJudoMeses: formData.get('tempoMinimoJudoMeses'),
 			tempoMinimoUltimaGraduacaoMeses: formData.get('tempoMinimoUltimaGraduacaoMeses'),
+			percentualMinimoPresenca: formData.get('percentualMinimoPresenca'),
+			qtdMinimaAulasPresentes: formData.get('qtdMinimaAulasPresentes'),
 			taxaGraduacao: formData.get('taxaGraduacao'),
 			requisitos: formData.get('requisitos'),
 			cidade: formData.get('cidade'),

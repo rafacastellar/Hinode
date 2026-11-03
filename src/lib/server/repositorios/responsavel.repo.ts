@@ -4,6 +4,12 @@ import { gerarHashSenha } from '../auth/criptografia';
 import { mascararCpf } from './usuario.repo';
 import { calcularIdadeServidor, buscarAlunoPorId } from './aluno.repo';
 import { buscarHistoricoDoAluno, type HistoricoAlunoItem } from './graduacao.repo';
+import {
+	listarHistoricoPresencasAluno,
+	obterMetricasDetalhadasPresencaAluno,
+	type SessaoTreinoDia,
+	type MetricasDetalhadasPresencaAluno
+} from './presenca.repo';
 import { obterProximaFaixa } from '../servicos/regras-graduacao';
 import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
 
@@ -405,6 +411,8 @@ export interface AlunoDoResponsavelDetalhado {
 		professores: string;
 	}>;
 	graduacoes: HistoricoAlunoItem[];
+	presencas: SessaoTreinoDia[];
+	metricasPresenca: MetricasDetalhadasPresencaAluno;
 }
 
 /**
@@ -488,8 +496,12 @@ export async function buscarPerfilCompletoAlunosDoResponsavel(
 			professores: String(t.professores)
 		}));
 
-		// 3. Trilha cronológica de graduações homologadas
-		const graduacoes = await buscarHistoricoDoAluno(idAcademia, idAluno);
+		// 3. Trilha cronológica de graduações homologadas e presenças no tatame
+		const [graduacoes, presencas, metricasPresenca] = await Promise.all([
+			buscarHistoricoDoAluno(idAcademia, idAluno),
+			listarHistoricoPresencasAluno(idAcademia, idAluno, 180),
+			obterMetricasDetalhadasPresencaAluno(idAcademia, idAluno)
+		]);
 
 		// 4. Próxima faixa de progressão no Judô
 		const proximaFaixa = obterProximaFaixa(alunoDetalhes.graduacao_atual);
@@ -545,7 +557,9 @@ export async function buscarPerfilCompletoAlunosDoResponsavel(
 			id_professor_responsavel: alunoDetalhes.id_professor_responsavel,
 			nome_professor_responsavel: alunoDetalhes.nome_professor_responsavel,
 			treinosInscritos,
-			graduacoes
+			graduacoes,
+			presencas,
+			metricasPresenca
 		});
 	}
 

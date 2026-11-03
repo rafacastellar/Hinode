@@ -164,6 +164,22 @@
 									</div>
 								{/if}
 
+								{#if (evento.percentual_minimo_presenca || 0) > 0 || (evento.qtd_minima_aulas_presentes || 0) > 0}
+									<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800" title="Critério de presença mínima no tatame">
+										<ShieldCheck class="w-3 h-3 text-red-400" />
+										<span class="text-[11px] text-zinc-400">Presença:</span>
+										<span class="font-bold text-red-300 font-mono">
+											{#if (evento.percentual_minimo_presenca || 0) > 0 && (evento.qtd_minima_aulas_presentes || 0) > 0}
+												{evento.percentual_minimo_presenca}% ({evento.qtd_minima_aulas_presentes} aulas)
+											{:else if (evento.percentual_minimo_presenca || 0) > 0}
+												{evento.percentual_minimo_presenca}%
+											{:else}
+												{evento.qtd_minima_aulas_presentes} aulas
+											{/if}
+										</span>
+									</div>
+								{/if}
+
 								<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800">
 									<span class="text-[11px] text-zinc-400">Taxa:</span>
 									<span class="font-bold text-emerald-400 font-mono">
