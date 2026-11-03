@@ -81,28 +81,37 @@
 	<aside
 		class="hidden lg:flex lg:flex-col {sidebarMinimizada ? 'lg:w-20' : 'lg:w-72'} bg-zinc-950 border-r border-zinc-900 shrink-0 sticky top-0 h-screen transition-all duration-300 ease-in-out z-20"
 	>
-		<!-- Header da Sidebar: Logo & Informações do Tenant -->
+		<!-- Header da Sidebar: Logo da Academia & Ênfase no Nome da Academia -->
 		<div class="{sidebarMinimizada ? 'p-3.5' : 'p-6'} border-b border-zinc-900/80 transition-all">
 			{#if !sidebarMinimizada}
 				<div class="flex items-center justify-between gap-3">
-					<a href="/dashboard" class="flex items-center gap-3 group min-w-0">
+					<a href="/dashboard" class="flex items-center gap-3.5 group min-w-0">
 						<div
-							class="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.25)]"
+							class="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.2)]"
 						>
-							<img
-								src={hinodeEmblema}
-								alt="Emblema Judô Hinodê"
-								class="w-8 h-8 object-contain transition-transform duration-300 group-hover:scale-110"
-							/>
+							{#if data.logoAcademia}
+								<img
+									src={data.logoAcademia}
+									alt="Logo {data.nomeAcademia || 'Academia'}"
+									class="w-full h-full object-contain rounded-xl transition-transform duration-300 group-hover:scale-105"
+									onerror={(e) => {
+										const target = e.currentTarget as HTMLImageElement;
+										target.src = hinodeEmblema;
+									}}
+								/>
+							{:else}
+								<Building2 class="w-6 h-6 text-red-500" />
+							{/if}
 						</div>
 						<div class="min-w-0 flex-1">
 							<span
-								class="font-display font-extrabold text-lg tracking-tight text-white block leading-none truncate"
+								class="font-display font-extrabold text-base sm:text-lg tracking-tight text-white block leading-tight truncate uppercase"
+								title={data.nomeAcademia || 'Dojo Principal'}
 							>
-								HINODÊ
+								{data.nomeAcademia || 'Dojo Principal'}
 							</span>
-							<span class="text-[10px] font-mono tracking-widest text-amber-400/90 uppercase block mt-1">
-								日の出 • SaaS de Dojos
+							<span class="text-[9px] font-mono tracking-widest text-amber-400/90 uppercase block mt-1">
+								SGT • Gestão Oficial de Tatame
 							</span>
 						</div>
 					</a>
@@ -118,30 +127,33 @@
 					</button>
 				</div>
 
-				<!-- Card Informativo do Dojo (Tenant Ativo) -->
-				<div class="mt-5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80 relative overflow-hidden">
-					<div class="flex items-center gap-2 mb-1 relative z-10">
-						<Building2 class="w-3.5 h-3.5 text-red-500 shrink-0" />
-						<span class="text-xs font-semibold text-zinc-200 truncate block">
-							{data.nomeAcademia || 'Dojo Principal'}
-						</span>
-					</div>
-					<div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono relative z-10">
-						<span>Isolamento Tenant</span>
-						<span class="text-zinc-400 font-bold">#{data.idAcademia}</span>
-					</div>
+				<!-- Card Informativo da Plataforma SaaS & Tenant Ativo -->
+				<div class="mt-4 px-3 py-2 rounded-xl bg-zinc-900/40 border border-zinc-800/70 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+					<span class="flex items-center gap-1.5">
+						<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+						<span>Plataforma SGT</span>
+					</span>
+					<span class="text-zinc-500">Unidade <strong class="text-zinc-300">#{data.idAcademia}</strong></span>
 				</div>
 			{:else}
 				<div class="flex flex-col items-center gap-3">
-					<a href="/dashboard" class="group flex flex-col items-center" title="{data.nomeAcademia || 'Judô Hinodê'} - Início">
+					<a href="/dashboard" class="group flex flex-col items-center" title="{data.nomeAcademia || 'Academia'} - Início">
 						<div
-							class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.2)]"
+							class="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.2)]"
 						>
-							<img
-								src={hinodeEmblema}
-								alt="Emblema Judô Hinodê"
-								class="w-7 h-7 object-contain"
-							/>
+							{#if data.logoAcademia}
+								<img
+									src={data.logoAcademia}
+									alt="Logo {data.nomeAcademia || 'Academia'}"
+									class="w-full h-full object-contain rounded-xl"
+									onerror={(e) => {
+										const target = e.currentTarget as HTMLImageElement;
+										target.src = hinodeEmblema;
+									}}
+								/>
+							{:else}
+								<Building2 class="w-5 h-5 text-red-500" />
+							{/if}
 						</div>
 					</a>
 
@@ -236,11 +248,16 @@
 				{/if}
 			</button>
 
-			<div class="flex items-center gap-2">
-				<span class="w-2.5 h-2.5 rounded-full bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.8)]"
-				></span>
-				<span class="font-display font-bold text-sm tracking-tight text-white truncate max-w-[180px]">
-					{data.nomeAcademia || 'Judô Hinodê'}
+			<div class="flex items-center gap-2.5 min-w-0">
+				<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 p-0.5 flex items-center justify-center overflow-hidden shrink-0">
+					{#if data.logoAcademia}
+						<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded" />
+					{:else}
+						<Building2 class="w-4 h-4 text-red-500" />
+					{/if}
+				</div>
+				<span class="font-display font-extrabold text-sm tracking-tight text-white truncate max-w-[190px] uppercase">
+					{data.nomeAcademia || 'Academia'}
 				</span>
 			</div>
 		</div>
@@ -275,17 +292,28 @@
 			<div
 				class="relative w-72 max-w-[85vw] bg-zinc-950 border-r border-zinc-900 h-full flex flex-col z-10"
 			>
-				<div class="p-5 border-b border-zinc-900 flex items-center justify-between">
-					<div class="flex items-center gap-2.5">
-						<span
-							class="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]"
-						></span>
-						<span class="font-display font-extrabold text-base text-white">HINODÊ</span>
+				<div class="p-5 border-b border-zinc-900 flex items-center justify-between gap-2">
+					<div class="flex items-center gap-2.5 min-w-0">
+						<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0">
+							{#if data.logoAcademia}
+								<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-lg" />
+							{:else}
+								<Building2 class="w-4 h-4 text-red-500" />
+							{/if}
+						</div>
+						<div class="min-w-0">
+							<span class="font-display font-extrabold text-sm text-white block truncate uppercase">
+								{data.nomeAcademia || 'Academia'}
+							</span>
+							<span class="text-[9px] font-mono text-amber-400 uppercase block">
+								SGT • Gestão de Tatame
+							</span>
+						</div>
 					</div>
 					<button
 						type="button"
 						onclick={() => (menuAberto = false)}
-						class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+						class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white shrink-0"
 					>
 						<X class="w-4 h-4" />
 					</button>

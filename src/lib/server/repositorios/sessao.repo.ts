@@ -8,6 +8,7 @@ export interface SessaoAtiva {
 	nome_usuario: string;
 	email_usuario: string;
 	nome_academia: string;
+	logo_academia: string | null;
 	expira_em: Date;
 }
 
@@ -79,7 +80,8 @@ export async function buscarSessaoValidaPorHash(tokenHash: string): Promise<Sess
 			s.expira_em,
 			u.nome AS nome_usuario,
 			u.email AS email_usuario,
-			a.nome AS nome_academia
+			COALESCE(NULLIF(TRIM(a.nome_fantasia), ''), a.nome) AS nome_academia,
+			a.logo_url AS logo_academia
 		FROM Sessao s
 		INNER JOIN Usuario u ON s.id_usuario = u.id_usuario
 		INNER JOIN Academia a ON s.id_academia = a.id_academia
@@ -104,6 +106,7 @@ export async function buscarSessaoValidaPorHash(tokenHash: string): Promise<Sess
 		nome_usuario: String(linha.nome_usuario),
 		email_usuario: String(linha.email_usuario),
 		nome_academia: String(linha.nome_academia),
+		logo_academia: linha.logo_academia ? String(linha.logo_academia) : null,
 		expira_em: new Date(linha.expira_em)
 	};
 }

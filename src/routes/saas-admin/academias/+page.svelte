@@ -13,7 +13,11 @@
 		Search,
 		CheckCircle2,
 		AlertCircle,
-		ShieldCheck
+		ShieldCheck,
+		ImagePlus,
+		Globe,
+		Pencil,
+		Trash2
 	} from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -22,6 +26,78 @@
 	let modalSuspenderAberto = $state(false);
 	let academiaSuspender = $state<{ id: number; nome: string; ativa: boolean } | null>(null);
 	let motivoSuspensao = $state('');
+
+	// Logo e Domínio na criação de nova academia
+	let novaLogoUrl = $state('');
+	let novoSlug = $state('');
+	let novoDominio = $state('');
+
+	// Modal de Edição de Logo / Domínio pelo Super Admin
+	let modalBrandingAberto = $state(false);
+	let academiaBranding = $state<{
+		id: number;
+		nome: string;
+		nomeFantasia: string;
+		logoUrl: string;
+		slug: string;
+		dominioCustomizado: string;
+	} | null>(null);
+
+	function abrirModalBranding(ac: (typeof data.academias)[0]) {
+		academiaBranding = {
+			id: ac.id_academia,
+			nome: ac.nome,
+			nomeFantasia: ac.nome_fantasia || ac.nome,
+			logoUrl: ac.logo_url || '',
+			slug: ac.slug || '',
+			dominioCustomizado: ac.dominio_customizado || ''
+		};
+		modalBrandingAberto = true;
+	}
+
+	function fecharModalBranding() {
+		modalBrandingAberto = false;
+		academiaBranding = null;
+	}
+
+	function comprimirLogoArquivo(event: Event, destino: 'novo' | 'edicao') {
+		const input = event.currentTarget as HTMLInputElement;
+		const arquivo = input.files?.[0];
+		if (!arquivo || !arquivo.type.startsWith('image/')) return;
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const img = new Image();
+			img.onload = () => {
+				const canvas = document.createElement('canvas');
+				const maxDim = 256;
+				let w = img.width;
+				let h = img.height;
+				if (w > h && w > maxDim) {
+					h = Math.round((h * maxDim) / w);
+					w = maxDim;
+				} else if (h >= w && h > maxDim) {
+					w = Math.round((w * maxDim) / h);
+					h = maxDim;
+				}
+				canvas.width = w;
+				canvas.height = h;
+				const ctx = canvas.getContext('2d');
+				if (ctx) {
+					ctx.clearRect(0, 0, w, h);
+					ctx.drawImage(img, 0, 0, w, h);
+					const base64 = canvas.toDataURL('image/webp', 0.86);
+					if (destino === 'novo') {
+						novaLogoUrl = base64;
+					} else if (academiaBranding) {
+						academiaBranding.logoUrl = base64;
+					}
+				}
+			};
+			img.src = String(e.target?.result || '');
+		};
+		reader.readAsDataURL(arquivo);
+	}
 
 	// Auto-CEP no cadastro da academia
 	let cepValor = $state('');
@@ -114,16 +190,30 @@
 		{#each data.academias as ac}
 			<div class="p-6 rounded-2xl bg-zinc-950 border transition-all {ac.ativa ? 'border-zinc-900 hover:border-zinc-800' : 'border-red-950/80 bg-red-950/10'} space-y-4">
 				<div class="flex items-start justify-between gap-3">
-					<div>
-						<div class="flex items-center gap-2">
-							<span class="text-xs font-mono font-bold text-zinc-500">#{ac.id_academia}</span>
-							<h3 class="text-base font-bold text-white leading-tight">
-								{ac.nome_fantasia || ac.nome}
-							</h3>
+					<div class="flex items-center gap-3 min-w-0">
+						<div class="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0">
+							{#if ac.logo_url}
+								<img src={ac.logo_url} alt={ac.nome} class="w-full h-full object-contain rounded-xl" />
+							{:else}
+								<Building2 class="w-6 h-6 text-zinc-500" />
+							{/if}
 						</div>
-						<span class="text-[11px] text-zinc-400 font-mono block mt-1">
-							CNPJ: {ac.cnpj}
-						</span>
+						<div class="min-w-0">
+							<div class="flex items-center gap-1.5">
+								<span class="text-xs font-mono font-bold text-zinc-500">#{ac.id_academia}</span>
+								<h3 class="text-base font-bold text-white leading-tight truncate">
+									{ac.nome_fantasia || ac.nome}
+								</h3>
+							</div>
+							<span class="text-[11px] text-zinc-400 font-mono block mt-0.5">
+								CNPJ: {ac.cnpj}
+							</span>
+							{#if ac.slug || ac.dominio_customizado}
+								<span class="text-[10px] text-amber-400/90 font-mono block mt-0.5 truncate">
+									🔗 {ac.dominio_customizado || `/login?dojo=${ac.slug}`}
+								</span>
+							{/if}
+						</div>
 					</div>
 
 					{#if ac.ativa}
@@ -155,25 +245,37 @@
 					</div>
 				</div>
 
-				<!-- Rodapé do Card com Ação de Suspensão -->
-				<div class="flex items-center justify-between pt-2 border-t border-zinc-900/80 text-xs">
+				<!-- Rodapé do Card com Ações de Logo/Domínio e Suspensão -->
+				<div class="flex items-center justify-between pt-2 border-t border-zinc-900/80 text-xs gap-2">
 					<span class="text-[11px] font-mono text-zinc-500">
 						Online: <strong class="text-amber-400">{ac.sessoes_ativas}</strong>
 					</span>
 
-					<button
-						type="button"
-						onclick={() => abrirModalSuspender(ac.id_academia, ac.nome_fantasia || ac.nome, ac.ativa)}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer {ac.ativa ? 'bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-zinc-400 hover:text-red-400' : 'bg-zinc-900 hover:bg-emerald-950/60 border border-zinc-800 hover:border-emerald-800 text-zinc-400 hover:text-emerald-400'}"
-					>
-						{#if ac.ativa}
-							<Ban class="w-3.5 h-3.5" />
-							<span>Suspender</span>
-						{:else}
-							<CheckCircle class="w-3.5 h-3.5" />
-							<span>Reativar</span>
-						{/if}
-					</button>
+					<div class="flex items-center gap-1.5">
+						<button
+							type="button"
+							onclick={() => abrirModalBranding(ac)}
+							class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-300 transition-colors cursor-pointer"
+							title="Configurar Logo da Academia e Domínio Próprio"
+						>
+							<ImagePlus class="w-3.5 h-3.5" />
+							<span>Logo & Domínio</span>
+						</button>
+
+						<button
+							type="button"
+							onclick={() => abrirModalSuspender(ac.id_academia, ac.nome_fantasia || ac.nome, ac.ativa)}
+							class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer {ac.ativa ? 'bg-zinc-900 hover:bg-red-950/60 border border-zinc-800 hover:border-red-800 text-zinc-400 hover:text-red-400' : 'bg-zinc-900 hover:bg-emerald-950/60 border border-zinc-800 hover:border-emerald-800 text-zinc-400 hover:text-emerald-400'}"
+						>
+							{#if ac.ativa}
+								<Ban class="w-3.5 h-3.5" />
+								<span>Suspender</span>
+							{:else}
+								<CheckCircle class="w-3.5 h-3.5" />
+								<span>Reativar</span>
+							{/if}
+						</button>
+					</div>
 				</div>
 			</div>
 		{/each}
@@ -260,6 +362,46 @@
 								placeholder="(11) 98888-0000"
 								class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500 font-mono"
 							/>
+						</div>
+						<div>
+							<label for="slug" class="text-zinc-400 font-mono block mb-1">Slug do Login (/login?dojo=slug)</label>
+							<input
+								id="slug"
+								name="slug"
+								bind:value={novoSlug}
+								placeholder="ex: bushido"
+								class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500 font-mono lowercase"
+							/>
+						</div>
+						<div>
+							<label for="dominioCustomizado" class="text-zinc-400 font-mono block mb-1">Domínio Próprio (Opcional)</label>
+							<input
+								id="dominioCustomizado"
+								name="dominioCustomizado"
+								bind:value={novoDominio}
+								placeholder="ex: app.bushido.com.br"
+								class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500 font-mono lowercase"
+							/>
+						</div>
+						<div class="sm:col-span-2 flex items-center gap-3 p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
+							<input type="hidden" name="logoUrl" value={novaLogoUrl} />
+							<div class="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0">
+								{#if novaLogoUrl}
+									<img src={novaLogoUrl} alt="Logo" class="w-full h-full object-contain rounded-lg" />
+								{:else}
+									<Building2 class="w-5 h-5 text-zinc-600" />
+								{/if}
+							</div>
+							<div class="flex-1">
+								<label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-semibold cursor-pointer transition-colors">
+									<ImagePlus class="w-3.5 h-3.5" />
+									<span>Selecionar Foto do Logo da Academia</span>
+									<input type="file" accept="image/*" onchange={(e) => comprimirLogoArquivo(e, 'novo')} class="hidden" />
+								</label>
+								<span class="text-[10px] text-zinc-500 block mt-1">
+									Usado na transição de login e no painel principal da academia.
+								</span>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -460,6 +602,124 @@
 						class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-bold uppercase tracking-wider transition-all shadow-lg"
 					>
 						Provisionar Academia
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- MODAL: EDITAR LOGO, NOME FANTASIA E DOMÍNIO PRÓPRIO DA ACADEMIA (SUPER ADMIN) -->
+{#if modalBrandingAberto && academiaBranding}
+	<div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+		<div class="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative space-y-5">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2 text-white font-bold text-sm">
+					<ImagePlus class="w-4 h-4 text-amber-400" />
+					<span>Identidade Visual & Domínio (#{academiaBranding.id})</span>
+				</div>
+				<button
+					type="button"
+					onclick={fecharModalBranding}
+					class="text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+				>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<form
+				method="POST"
+				action="?/editarBrandingAcademia"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						fecharModalBranding();
+					};
+				}}
+				class="space-y-4 text-xs"
+			>
+				<input type="hidden" name="idAcademia" value={academiaBranding.id} />
+				<input type="hidden" name="logoUrl" value={academiaBranding.logoUrl} />
+
+				<!-- Upload e Preview do Logo -->
+				<div class="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800">
+					<div class="w-20 h-20 rounded-2xl bg-zinc-950 border border-zinc-800 p-1.5 flex items-center justify-center overflow-hidden shrink-0">
+						{#if academiaBranding.logoUrl}
+							<img src={academiaBranding.logoUrl} alt="Preview Logo" class="w-full h-full object-contain rounded-xl" />
+						{:else}
+							<Building2 class="w-8 h-8 text-zinc-600" />
+						{/if}
+					</div>
+					<div class="space-y-2 flex-1">
+						<label class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider cursor-pointer transition-all">
+							<ImagePlus class="w-3.5 h-3.5" />
+							<span>Trocar Foto do Logo</span>
+							<input type="file" accept="image/*" onchange={(e) => comprimirLogoArquivo(e, 'edicao')} class="hidden" />
+						</label>
+						{#if academiaBranding.logoUrl}
+							<button
+								type="button"
+								onclick={() => {
+									if (academiaBranding) academiaBranding.logoUrl = '';
+								}}
+								class="inline-flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 font-mono block cursor-pointer"
+							>
+								<Trash2 class="w-3 h-3" />
+								<span>Remover logo</span>
+							</button>
+						{/if}
+						<p class="text-[10px] text-zinc-500">
+							Exibido na transição de login e no topo do painel da academia.
+						</p>
+					</div>
+				</div>
+
+				<div>
+					<label for="editNomeFantasia" class="text-zinc-400 font-mono block mb-1">Nome em Destaque na Academia</label>
+					<input
+						id="editNomeFantasia"
+						name="nomeFantasia"
+						bind:value={academiaBranding.nomeFantasia}
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
+					/>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div>
+						<label for="editSlug" class="text-zinc-400 font-mono block mb-1">Slug (/login?dojo=slug)</label>
+						<input
+							id="editSlug"
+							name="slug"
+							bind:value={academiaBranding.slug}
+							placeholder="ex: hinode"
+							class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500 font-mono lowercase"
+						/>
+					</div>
+					<div>
+						<label for="editDominio" class="text-zinc-400 font-mono block mb-1">Domínio Próprio</label>
+						<input
+							id="editDominio"
+							name="dominioCustomizado"
+							bind:value={academiaBranding.dominioCustomizado}
+							placeholder="ex: app.academia.com.br"
+							class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500 font-mono lowercase"
+						/>
+					</div>
+				</div>
+
+				<div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-900">
+					<button
+						type="button"
+						onclick={fecharModalBranding}
+						class="px-4 py-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+					>
+						Cancelar
+					</button>
+					<button
+						type="submit"
+						class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+					>
+						Salvar Identidade
 					</button>
 				</div>
 			</form>

@@ -4,7 +4,8 @@ import { z } from 'zod';
 import {
 	listarAcademiasSaas,
 	alternarAtivacaoAcademia,
-	criarNovaAcademiaComAdminTx
+	criarNovaAcademiaComAdminTx,
+	atualizarBrandingAcademiaSaas
 } from '#lib/server/repositorios/saas-admin.repo';
 
 const criarAcademiaComAdminSchema = z.object({
@@ -15,6 +16,9 @@ const criarAcademiaComAdminSchema = z.object({
 		.regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$|^\d{14}$/, 'CNPJ deve conter 14 dígitos numéricos válidos'),
 	inscrEst: z.string().max(50).trim().nullable().optional(),
 	telefoneAcademia: z.string().max(20).trim().nullable().optional(),
+	logoUrl: z.string().nullable().optional(),
+	slug: z.string().max(100).trim().nullable().optional(),
+	dominioCustomizado: z.string().max(255).trim().nullable().optional(),
 	// Endereço
 	cep: z.string().regex(/^\d{5}-?\d{3}$|^\d{8}$/, 'CEP deve ter 8 dígitos numéricos'),
 	logradouro: z.string().min(2, 'Logradouro obrigatório').max(255).trim(),
@@ -95,6 +99,9 @@ export const actions: Actions = {
 			cnpj: ((formData.get('cnpj') as string) || '').trim(),
 			inscrEst: strOuNull(formData.get('inscrEst')),
 			telefoneAcademia: strOuNull(formData.get('telefoneAcademia')),
+			logoUrl: strOuNull(formData.get('logoUrl')),
+			slug: strOuNull(formData.get('slug')),
+			dominioCustomizado: strOuNull(formData.get('dominioCustomizado')),
 			cep: ((formData.get('cep') as string) || '').trim(),
 			logradouro: ((formData.get('logradouro') as string) || '').trim(),
 			numero: strOuNull(formData.get('numero')),
@@ -128,6 +135,9 @@ export const actions: Actions = {
 						cnpj: validacao.data.cnpj,
 						inscr_est: validacao.data.inscrEst,
 						telefone: validacao.data.telefoneAcademia,
+						logo_url: validacao.data.logoUrl,
+						slug: validacao.data.slug,
+						dominio_customizado: validacao.data.dominioCustomizado,
 						endereco: {
 							cep: validacao.data.cep,
 							logradouro: validacao.data.logradouro,
@@ -160,6 +170,44 @@ export const actions: Actions = {
 			};
 		} catch (erro: any) {
 			return fail(400, { erro: erro?.message || 'Falha ao criar nova academia.', valores: dadosBrutos });
+		}
+	},
+
+	editarBrandingAcademia: async ({ request, locals, getClientAddress }) => {
+		if (!locals.superAdmin) {
+			return fail(401, { erro: 'Não autorizado.' });
+		}
+
+		const formData = await request.formData();
+		const idAcademia = Number(formData.get('idAcademia'));
+		const nomeFantasia = formData.get('nomeFantasia') ? String(formData.get('nomeFantasia')).trim() : null;
+		const logoUrl = formData.get('logoUrl') ? String(formData.get('logoUrl')).trim() : null;
+		const slug = formData.get('slug') ? String(formData.get('slug')).trim() : null;
+		const dominioCustomizado = formData.get('dominioCustomizado') ? String(formData.get('dominioCustomizado')).trim() : null;
+
+		if (!idAcademia) {
+			return fail(400, { erro: 'ID da academia não informado.' });
+		}
+
+		try {
+			await atualizarBrandingAcademiaSaas(
+				idAcademia,
+				{
+					nome_fantasia: nomeFantasia,
+					logo_url: logoUrl || null,
+					slug: slug || null,
+					dominio_customizado: dominioCustomizado || null
+				},
+				locals.superAdmin.id,
+				getClientAddress()
+			);
+
+			return {
+				sucesso: true,
+				mensagem: 'Logo, identidade visual e configurações de domínio da academia atualizados com sucesso.'
+			};
+		} catch (erro: any) {
+			return fail(400, { erro: erro?.message || 'Falha ao atualizar logo/domínio da academia.' });
 		}
 	}
 };

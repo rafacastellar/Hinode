@@ -23,6 +23,7 @@ export interface AcademiaVinculada {
 	id_academia: number;
 	nome: string;
 	nome_fantasia: string | null;
+	logo_url: string | null;
 }
 
 export interface PerfilItem {
@@ -240,7 +241,8 @@ export async function buscarAcademiasDoUsuario(idUsuario: number): Promise<Acade
 		SELECT 
 			a.id_academia,
 			a.nome,
-			a.nome_fantasia
+			a.nome_fantasia,
+			a.logo_url
 		FROM Academia a
 		INNER JOIN Usuario_Academia ua ON a.id_academia = ua.id_academia
 		WHERE ua.id_usuario = ?
@@ -253,7 +255,8 @@ export async function buscarAcademiasDoUsuario(idUsuario: number): Promise<Acade
 	return linhas.map((linha) => ({
 		id_academia: Number(linha.id_academia),
 		nome: String(linha.nome),
-		nome_fantasia: linha.nome_fantasia ? String(linha.nome_fantasia) : null
+		nome_fantasia: linha.nome_fantasia ? String(linha.nome_fantasia) : null,
+		logo_url: linha.logo_url ? String(linha.logo_url) : null
 	}));
 }
 

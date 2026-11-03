@@ -11,6 +11,7 @@ declare global {
 			} | null;
 			idAcademia: number | null;
 			nomeAcademia: string | null;
+			logoAcademia: string | null;
 			perfis: string[];
 			superAdmin: {
 				id: number;

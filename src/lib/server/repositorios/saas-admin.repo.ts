@@ -56,6 +56,9 @@ export interface AcademiaResumoSaas {
 	nome_fantasia: string | null;
 	cnpj: string;
 	telefone: string | null;
+	logo_url: string | null;
+	slug: string | null;
+	dominio_customizado: string | null;
 	ativa: boolean;
 	motivo_desativacao: string | null;
 	desativada_em: string | null;
@@ -258,6 +261,9 @@ export async function listarAcademiasSaas(): Promise<AcademiaResumoSaas[]> {
 			a.nome_fantasia,
 			a.cnpj,
 			a.telefone,
+			a.logo_url,
+			a.slug,
+			a.dominio_customizado,
 			COALESCE(a.ativa, 1) AS ativa,
 			a.motivo_desativacao,
 			DATE_FORMAT(a.desativada_em, '%d/%m/%Y %H:%i') AS desativada_em,
@@ -278,6 +284,9 @@ export async function listarAcademiasSaas(): Promise<AcademiaResumoSaas[]> {
 		nome_fantasia: l.nome_fantasia ? String(l.nome_fantasia) : null,
 		cnpj: String(l.cnpj),
 		telefone: l.telefone ? String(l.telefone) : null,
+		logo_url: l.logo_url ? String(l.logo_url) : null,
+		slug: l.slug ? String(l.slug) : null,
+		dominio_customizado: l.dominio_customizado ? String(l.dominio_customizado) : null,
 		ativa: Boolean(l.ativa),
 		motivo_desativacao: l.motivo_desativacao ? String(l.motivo_desativacao) : null,
 		desativada_em: l.desativada_em ? String(l.desativada_em) : null,
@@ -344,6 +353,9 @@ export interface CriarAcademiaComAdminInput {
 		cnpj: string;
 		inscr_est?: string | null;
 		telefone?: string | null;
+		logo_url?: string | null;
+		slug?: string | null;
+		dominio_customizado?: string | null;
 		endereco?: {
 			cep: string;
 			logradouro: string;
@@ -368,6 +380,74 @@ export interface CriarAcademiaComAdminInput {
 	};
 }
 
+export async function atualizarBrandingAcademiaSaas(
+	idAcademia: number,
+	dados: {
+		nome_fantasia?: string | null;
+		logo_url?: string | null;
+		slug?: string | null;
+		dominio_customizado?: string | null;
+	},
+	idSuperAdminOperador: number,
+	ipOperador?: string | null
+): Promise<void> {
+	await executarTransacao(async (conn) => {
+		const slugLimpo = dados.slug
+			? dados.slug
+					.trim()
+					.toLowerCase()
+					.replace(/[^a-z0-9-]/g, '-')
+					.replace(/-+/g, '-')
+					.replace(/^-|-$/g, '')
+			: null;
+		const dominioLimpo = dados.dominio_customizado
+			? dados.dominio_customizado.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+			: null;
+
+		if (slugLimpo) {
+			const [dupSlug] = await conn.execute<RowDataPacket[]>(
+				'SELECT id_academia FROM Academia WHERE LOWER(slug) = ? AND id_academia != ? LIMIT 1',
+				[slugLimpo, idAcademia]
+			);
+			if (dupSlug.length > 0) {
+				throw new Error('O identificador (slug) informado já está em uso por outra academia.');
+			}
+		}
+
+		await conn.execute(
+			`UPDATE Academia 
+			 SET nome_fantasia = COALESCE(?, nome_fantasia),
+			     logo_url = ?,
+			     slug = ?,
+			     dominio_customizado = ?
+			 WHERE id_academia = ?`,
+			[
+				dados.nome_fantasia !== undefined ? (dados.nome_fantasia?.trim() || null) : null,
+				dados.logo_url || null,
+				slugLimpo,
+				dominioLimpo,
+				idAcademia
+			]
+		);
+
+		await conn.execute(
+			`INSERT INTO Log_Auditoria (id_academia, id_usuario, acao, entidade, id_entidade, dados_depois, ip)
+			 VALUES (?, ?, 'SAAS_ATUALIZAR_BRANDING_ACADEMIA', 'Academia', ?, ?, ?)`,
+			[
+				idAcademia,
+				idSuperAdminOperador,
+				String(idAcademia),
+				JSON.stringify({
+					slug: slugLimpo,
+					dominio_customizado: dominioLimpo,
+					possui_logo: Boolean(dados.logo_url)
+				}),
+				ipOperador || null
+			]
+		);
+	});
+}
+
 export async function criarNovaAcademiaComAdminTx(
 	dados: CriarAcademiaComAdminInput,
 	idSuperAdminOperador: number,
@@ -388,15 +468,30 @@ export async function criarNovaAcademiaComAdminTx(
 		}
 
 		// 2. Insere a Academia
+		const slugLimpo = dados.academia.slug
+			? dados.academia.slug
+					.trim()
+					.toLowerCase()
+					.replace(/[^a-z0-9-]/g, '-')
+					.replace(/-+/g, '-')
+					.replace(/^-|-$/g, '')
+			: null;
+		const dominioLimpo = dados.academia.dominio_customizado
+			? dados.academia.dominio_customizado.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+			: null;
+
 		const [resAcademia] = await conn.execute<ResultSetHeader>(
-			`INSERT INTO Academia (nome, nome_fantasia, cnpj, inscr_est, telefone, ativa)
-			 VALUES (?, ?, ?, ?, ?, 1)`,
+			`INSERT INTO Academia (nome, nome_fantasia, cnpj, inscr_est, telefone, logo_url, slug, dominio_customizado, ativa)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
 			[
 				dados.academia.nome.trim(),
 				dados.academia.nome_fantasia?.trim() || null,
 				cnpjLimpo,
 				dados.academia.inscr_est?.trim() || null,
-				dados.academia.telefone?.trim() || null
+				dados.academia.telefone?.trim() || null,
+				dados.academia.logo_url || null,
+				slugLimpo,
+				dominioLimpo
 			]
 		);
 		const idAcademia = resAcademia.insertId;

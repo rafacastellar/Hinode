@@ -18,7 +18,19 @@ export interface DadosAcademia {
 	cnpj: string;
 	inscr_est: string | null;
 	telefone: string | null;
+	logo_url: string | null;
+	slug: string | null;
+	dominio_customizado: string | null;
 	endereco: EnderecoAcademia | null;
+}
+
+export interface AcademiaPublicaLogin {
+	id_academia: number;
+	nome: string;
+	nome_fantasia: string | null;
+	logo_url: string | null;
+	slug: string | null;
+	dominio_customizado: string | null;
 }
 
 export interface MetricasGestaoDojo {
@@ -62,6 +74,9 @@ export interface AtualizarDadosAcademiaInput {
 	cnpj: string;
 	inscr_est?: string | null;
 	telefone?: string | null;
+	logo_url?: string | null;
+	slug?: string | null;
+	dominio_customizado?: string | null;
 	endereco: {
 		cep: string;
 		logradouro: string;
@@ -71,6 +86,68 @@ export interface AtualizarDadosAcademiaInput {
 		cidade: string;
 		uf: string;
 	};
+}
+
+/**
+ * Busca uma academia ativa pelo domínio personalizado (Host) ou pelo slug (?dojo=slug)
+ * para personalizar a tela de login quando aplicável.
+ */
+export async function buscarAcademiaPorHostOuSlug(
+	host?: string | null,
+	slugParam?: string | null
+): Promise<AcademiaPublicaLogin | null> {
+	const pool = getDbPool();
+	const slugLimpo = slugParam ? slugParam.trim().toLowerCase() : null;
+	const hostSemPorta = host ? host.split(':')[0].trim().toLowerCase() : null;
+
+	// 1. Se foi passado ?dojo=slug ou ?academia=slug explícito na URL
+	if (slugLimpo) {
+		const [rowsSlug] = await pool.query<RowDataPacket[]>(
+			`SELECT id_academia, nome, nome_fantasia, logo_url, slug, dominio_customizado
+			 FROM Academia
+			 WHERE COALESCE(ativa, 1) = 1
+			   AND (LOWER(slug) = ? OR id_academia = ?)
+			 LIMIT 1`,
+			[slugLimpo, Number(slugLimpo) || 0]
+		);
+		if (rowsSlug.length > 0) {
+			const r = rowsSlug[0];
+			return {
+				id_academia: Number(r.id_academia),
+				nome: String(r.nome),
+				nome_fantasia: r.nome_fantasia ? String(r.nome_fantasia) : null,
+				logo_url: r.logo_url ? String(r.logo_url) : null,
+				slug: r.slug ? String(r.slug) : null,
+				dominio_customizado: r.dominio_customizado ? String(r.dominio_customizado) : null
+			};
+		}
+	}
+
+	// 2. Verifica se o host corresponde a um domínio customizado ou subdomínio de slug
+	if (hostSemPorta && hostSemPorta !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(hostSemPorta) && !hostSemPorta.endsWith('.trycloudflare.com')) {
+		const primeiroSubdominio = hostSemPorta.split('.')[0];
+		const [rowsHost] = await pool.query<RowDataPacket[]>(
+			`SELECT id_academia, nome, nome_fantasia, logo_url, slug, dominio_customizado
+			 FROM Academia
+			 WHERE COALESCE(ativa, 1) = 1
+			   AND (LOWER(dominio_customizado) = ? OR LOWER(slug) = ?)
+			 LIMIT 1`,
+			[hostSemPorta, primeiroSubdominio]
+		);
+		if (rowsHost.length > 0) {
+			const r = rowsHost[0];
+			return {
+				id_academia: Number(r.id_academia),
+				nome: String(r.nome),
+				nome_fantasia: r.nome_fantasia ? String(r.nome_fantasia) : null,
+				logo_url: r.logo_url ? String(r.logo_url) : null,
+				slug: r.slug ? String(r.slug) : null,
+				dominio_customizado: r.dominio_customizado ? String(r.dominio_customizado) : null
+			};
+		}
+	}
+
+	return null;
 }
 
 /**
@@ -89,6 +166,9 @@ export async function buscarDadosAcademia(
 			a.cnpj,
 			a.inscr_est,
 			a.telefone,
+			a.logo_url,
+			a.slug,
+			a.dominio_customizado,
 			ea.logradouro,
 			ea.numero,
 			ea.complemento,
@@ -125,6 +205,9 @@ export async function buscarDadosAcademia(
 		cnpj: String(r.cnpj),
 		inscr_est: r.inscr_est ? String(r.inscr_est) : null,
 		telefone: r.telefone ? String(r.telefone) : null,
+		logo_url: r.logo_url ? String(r.logo_url) : null,
+		slug: r.slug ? String(r.slug) : null,
+		dominio_customizado: r.dominio_customizado ? String(r.dominio_customizado) : null,
 		endereco
 	};
 }
@@ -358,7 +441,7 @@ export async function atualizarDadosAcademiaTx(
 		// 2. Busca estado anterior para o Log de Auditoria
 		const [linhasAntes] = await conn.execute<RowDataPacket[]>(
 			`SELECT 
-				a.nome, a.nome_fantasia, a.cnpj, a.inscr_est, a.telefone,
+				a.nome, a.nome_fantasia, a.cnpj, a.inscr_est, a.telefone, a.logo_url, a.slug, a.dominio_customizado,
 				ea.logradouro, ea.numero, ea.complemento, ea.bairro, ea.cidade, ea.uf, ea.cep
 			 FROM Academia a
 			 LEFT JOIN Endereco_Academia ea ON a.id_academia = ea.id_academia
@@ -368,9 +451,31 @@ export async function atualizarDadosAcademiaTx(
 		const dadosAntes = linhasAntes.length > 0 ? linhasAntes[0] : null;
 
 		// 3. Atualiza tabela Academia
+		const slugLimpo = dados.slug
+			? dados.slug
+					.trim()
+					.toLowerCase()
+					.replace(/[^a-z0-9-]/g, '-')
+					.replace(/-+/g, '-')
+					.replace(/^-|-$/g, '')
+			: null;
+		const dominioLimpo = dados.dominio_customizado
+			? dados.dominio_customizado.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+			: null;
+
+		if (slugLimpo) {
+			const [dupSlug] = await conn.execute<RowDataPacket[]>(
+				'SELECT id_academia FROM Academia WHERE LOWER(slug) = ? AND id_academia != ? LIMIT 1',
+				[slugLimpo, idAcademia]
+			);
+			if (dupSlug.length > 0) {
+				throw new Error('O identificador (slug) escolhido já está em uso por outra academia.');
+			}
+		}
+
 		await conn.execute(
 			`UPDATE Academia 
-			 SET nome = ?, nome_fantasia = ?, cnpj = ?, inscr_est = ?, telefone = ?
+			 SET nome = ?, nome_fantasia = ?, cnpj = ?, inscr_est = ?, telefone = ?, logo_url = ?, slug = ?, dominio_customizado = ?
 			 WHERE id_academia = ?`,
 			[
 				dados.nome,
@@ -378,6 +483,9 @@ export async function atualizarDadosAcademiaTx(
 				cnpjLimpo,
 				dados.inscr_est || null,
 				dados.telefone || null,
+				dados.logo_url !== undefined ? (dados.logo_url || null) : (dadosAntes?.logo_url || null),
+				slugLimpo !== null ? slugLimpo : (dadosAntes?.slug || null),
+				dominioLimpo !== null ? dominioLimpo : (dadosAntes?.dominio_customizado || null),
 				idAcademia
 			]
 		);

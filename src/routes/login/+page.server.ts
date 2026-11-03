@@ -1,11 +1,23 @@
-import { fail, redirect, type Actions } from '@sveltejs/kit';
+import { fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { loginSchema } from '#lib/server/validacao/auth.schema';
 import { autenticarUsuario } from '#lib/server/servicos/auth.servico';
+import { buscarAcademiaPorHostOuSlug } from '#lib/server/repositorios/academia.repo';
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ url, request }) => {
+	const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || url.host;
+	const slugParam = url.searchParams.get('dojo') || url.searchParams.get('academia');
+
+	let academiaPersonalizada = null;
+	try {
+		academiaPersonalizada = await buscarAcademiaPorHostOuSlug(host, slugParam);
+	} catch {
+		academiaPersonalizada = null;
+	}
+
 	return {
-		expirada: url.searchParams.get('expirada') === '1'
+		expirada: url.searchParams.get('expirada') === '1',
+		academiaPersonalizada
 	};
 };
 
@@ -55,15 +67,12 @@ export const actions: Actions = {
 			}
 
 			// Sessão autenticada: emite o cookie httpOnly seguro
-			// Em HTTP local (IP da VM) secure deve ser false para o navegador aceitar o cookie;
-			// Em HTTPS (Túnel Cloudflare / Produção AWS) secure é ativado automaticamente.
 			const cookieSeguro =
 				url.protocol === 'https:' ||
 				request.headers.get('x-forwarded-proto') === 'https' ||
 				process.env.COOKIE_SECURE === 'true';
 
 			if (resultado.lembrar) {
-				// Persistência longa (7 dias) solicitada explicitamente pelo usuário
 				cookies.set('hinode_session', resultado.tokenPuro, {
 					path: '/',
 					httpOnly: true,
@@ -72,7 +81,6 @@ export const actions: Actions = {
 					expires: resultado.expiraEm
 				});
 			} else {
-				// Sessão padrão por inatividade de 2 horas (7200 segundos)
 				cookies.set('hinode_session', resultado.tokenPuro, {
 					path: '/',
 					httpOnly: true,
@@ -81,6 +89,18 @@ export const actions: Actions = {
 					maxAge: 2 * 60 * 60
 				});
 			}
+
+			// Retorna os dados da academia autenticada para acionar a transição cinematográfica com o logo da academia!
+			return {
+				autenticadoComSucesso: true,
+				destino: '/dashboard',
+				academiaLogada: {
+					id: resultado.idAcademia,
+					nome: resultado.nomeAcademia,
+					logo: resultado.logoAcademia
+				},
+				nomeUsuario: resultado.usuario.nome
+			};
 		} catch (erro: any) {
 			console.error('Erro de autenticação/banco:', erro?.message || erro);
 			return fail(500, {
@@ -88,7 +108,5 @@ export const actions: Actions = {
 				email: validacao.data.email
 			});
 		}
-
-		throw redirect(303, '/dashboard');
 	}
 };
