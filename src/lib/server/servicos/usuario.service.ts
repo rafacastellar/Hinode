@@ -449,3 +449,89 @@ export async function desvincularUsuarioDoDojo(
 		);
 	});
 }
+
+/**
+ * Alterna o status de bloqueio de um usuário especificamente dentro da academia atual (Dojo).
+ * Não apaga histórico de graduações, presenças ou vínculos; apenas suspende/reativa o acesso.
+ */
+export async function alternarBloqueioUsuarioNoDojo(
+	ctx: ContextoOperador,
+	idUsuario: number,
+	bloquear: boolean,
+	motivo?: string | null
+): Promise<void> {
+	if (idUsuario === ctx.idUsuarioOperador && bloquear) {
+		throw new Error('Operação bloqueada: Você não pode bloquear sua própria conta de acesso.');
+	}
+
+	return await executarTransacao(async (conn) => {
+		const usuarioAtual = await buscarUsuarioDetalhadoNoDojo(ctx.idAcademia, idUsuario);
+		if (!usuarioAtual) {
+			throw new Error('Usuário não encontrado neste dojo.');
+		}
+
+		if (bloquear) {
+			const todosPerfis = await listarPerfisDoSistema();
+			const perfilAdmin = todosPerfis.find((p) => p.role.toLowerCase() === 'admin');
+			const eraAdmin = perfilAdmin && usuarioAtual.ids_perfis.includes(perfilAdmin.id_perfil);
+
+			if (eraAdmin) {
+				const totalAdmins = await contarAdminsAtivosNoDojo(ctx.idAcademia);
+				if (totalAdmins <= 1) {
+					throw new Error('Operação bloqueada: Este usuário é o único Administrador ativo do dojo.');
+				}
+			}
+
+			// Atualiza status para inativo no dojo
+			await conn.query(
+				`UPDATE Usuario_Academia 
+				 SET ativo = 0, motivo_bloqueio = ?, bloqueado_em = NOW() 
+				 WHERE id_usuario = ? AND id_academia = ?`,
+				[motivo?.trim() || 'Acesso suspenso pela administração do dojo', idUsuario, ctx.idAcademia]
+			);
+
+			// Revoga instantaneamente as sessões ativas deste usuário no dojo (Kill Switch)
+			await conn.query(
+				`UPDATE Sessao 
+				 SET revogada_em = NOW() 
+				 WHERE id_usuario = ? AND id_academia = ? AND revogada_em IS NULL`,
+				[idUsuario, ctx.idAcademia]
+			);
+		} else {
+			// Reativa o acesso do usuário no dojo
+			await conn.query(
+				`UPDATE Usuario_Academia 
+				 SET ativo = 1, motivo_bloqueio = NULL, bloqueado_em = NULL 
+				 WHERE id_usuario = ? AND id_academia = ?`,
+				[idUsuario, ctx.idAcademia]
+			);
+		}
+
+		const acao = bloquear ? 'BLOQUEAR_USUARIO_DOJO' : 'ATIVAR_USUARIO_DOJO';
+		await conn.query(
+			`INSERT INTO Log_Auditoria (
+				id_academia,
+				id_usuario,
+				acao,
+				entidade,
+				id_entidade,
+				dados_depois,
+				ip,
+				criado_em
+			) VALUES (?, ?, ?, 'Usuario', ?, ?, ?, NOW(3))`,
+			[
+				ctx.idAcademia,
+				ctx.idUsuarioOperador,
+				acao,
+				String(idUsuario),
+				JSON.stringify({
+					bloqueado: bloquear,
+					motivo: motivo || null,
+					nome: usuarioAtual.nome,
+					email: usuarioAtual.email
+				}),
+				ctx.ip || '127.0.0.1'
+			]
+		);
+	});
+}

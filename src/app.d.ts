@@ -12,6 +12,11 @@ declare global {
 			idAcademia: number | null;
 			nomeAcademia: string | null;
 			perfis: string[];
+			superAdmin: {
+				id: number;
+				nome: string;
+				email: string;
+			} | null;
 		}
 		// interface PageData {}
 		// interface PageState {}

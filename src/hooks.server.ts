@@ -1,7 +1,12 @@
 import type { Handle } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
 import { calcularHashToken } from '#lib/server/auth/criptografia';
-import { buscarSessaoValidaPorHash, renovarSessao } from '#lib/server/repositorios/sessao.repo';
+import {
+	buscarSessaoValidaPorHash,
+	renovarSessao,
+	buscarSessaoSaasValidaPorHash,
+	renovarSessaoSaas
+} from '#lib/server/repositorios/sessao.repo';
 import { buscarPerfisDoUsuarioNaAcademia } from '#lib/server/repositorios/usuario.repo';
 import { sincronizarSchemaBanco } from '#lib/server/db/auto-migration';
 
@@ -19,6 +24,46 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.idAcademia = null;
 	event.locals.nomeAcademia = null;
 	event.locals.perfis = [];
+	event.locals.superAdmin = null;
+
+	const tokenSaas = event.cookies.get('sgt_saas_session');
+	if (tokenSaas) {
+		const tokenSaasHash = calcularHashToken(tokenSaas);
+		const sessaoSaas = await buscarSessaoSaasValidaPorHash(tokenSaasHash);
+
+		if (sessaoSaas) {
+			const agora = Date.now();
+			const tempoRestanteMs = sessaoSaas.expira_em.getTime() - agora;
+
+			if (tempoRestanteMs > 0 && tempoRestanteMs <= TEMPO_INATIVIDADE_MS) {
+				if (tempoRestanteMs < (TEMPO_INATIVIDADE_MS - INTERVALO_MINIMO_RENOVACAO_MS)) {
+					const novaExpiraEm = new Date(agora + TEMPO_INATIVIDADE_MS);
+					await renovarSessaoSaas(sessaoSaas.id_sessao_saas, novaExpiraEm);
+
+					const cookieSeguro =
+						event.url.protocol === 'https:' ||
+						event.request.headers.get('x-forwarded-proto') === 'https' ||
+						process.env.COOKIE_SECURE === 'true';
+
+					event.cookies.set('sgt_saas_session', tokenSaas, {
+						path: '/',
+						httpOnly: true,
+						sameSite: 'lax',
+						secure: cookieSeguro,
+						maxAge: Math.floor(TEMPO_INATIVIDADE_MS / 1000)
+					});
+				}
+			}
+
+			event.locals.superAdmin = {
+				id: sessaoSaas.id_usuario,
+				nome: sessaoSaas.nome_usuario,
+				email: sessaoSaas.email_usuario
+			};
+		} else {
+			event.cookies.delete('sgt_saas_session', { path: '/' });
+		}
+	}
 
 	let sessaoExpirou = false;
 
@@ -75,7 +120,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const rota = event.url.pathname;
 
-	// Proteção de rotas do painel administrativo
+	// Proteção de rotas do Control Plane SaaS (/saas-admin)
+	if (rota.startsWith('/saas-admin')) {
+		if (rota === '/saas-admin/login') {
+			if (event.locals.superAdmin) {
+				throw redirect(303, '/saas-admin');
+			}
+		} else {
+			if (!event.locals.superAdmin) {
+				throw redirect(303, `/saas-admin/login?redirect=${encodeURIComponent(rota)}`);
+			}
+		}
+	}
+
+	// Proteção de rotas do painel administrativo da academia (/dashboard)
 	if (rota.startsWith('/dashboard')) {
 		if (!event.locals.usuario || !event.locals.idAcademia) {
 			const queryExpirada = sessaoExpirou ? '&expirada=1' : '';
@@ -83,7 +141,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	// Redireciona usuários já autenticados que tentarem acessar a tela de login
+	// Redireciona usuários já autenticados que tentarem acessar a tela de login da academia
 	if (rota === '/login' && event.locals.usuario) {
 		throw redirect(303, '/dashboard');
 	}

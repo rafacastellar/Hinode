@@ -14,6 +14,9 @@ export interface UsuarioAutenticavel {
 	email: string;
 	senha_hash: string;
 	telefone: string | null;
+	is_super_admin?: boolean;
+	ativo?: boolean;
+	motivo_bloqueio_global?: string | null;
 }
 
 export interface AcademiaVinculada {
@@ -200,7 +203,10 @@ export async function buscarUsuarioPorEmail(email: string): Promise<UsuarioAuten
 			genero,
 			email,
 			senha_hash,
-			telefone
+			telefone,
+			COALESCE(is_super_admin, 0) AS is_super_admin,
+			COALESCE(ativo, 1) AS ativo,
+			motivo_bloqueio_global
 		FROM Usuario
 		WHERE email = ?
 		LIMIT 1
@@ -218,12 +224,15 @@ export async function buscarUsuarioPorEmail(email: string): Promise<UsuarioAuten
 		genero: (linha.genero || 'M') as 'M' | 'F',
 		email: String(linha.email),
 		senha_hash: String(linha.senha_hash),
-		telefone: linha.telefone ? String(linha.telefone) : null
+		telefone: linha.telefone ? String(linha.telefone) : null,
+		is_super_admin: Boolean(linha.is_super_admin),
+		ativo: Boolean(linha.ativo),
+		motivo_bloqueio_global: linha.motivo_bloqueio_global ? String(linha.motivo_bloqueio_global) : null
 	};
 }
 
 /**
- * Retorna todas as academias (tenants) às quais o usuário está formalmente associado.
+ * Retorna todas as academias (tenants) ativas às quais o usuário está formalmente associado e não bloqueado.
  */
 export async function buscarAcademiasDoUsuario(idUsuario: number): Promise<AcademiaVinculada[]> {
 	const pool = getDbPool();
@@ -235,6 +244,8 @@ export async function buscarAcademiasDoUsuario(idUsuario: number): Promise<Acade
 		FROM Academia a
 		INNER JOIN Usuario_Academia ua ON a.id_academia = ua.id_academia
 		WHERE ua.id_usuario = ?
+		  AND COALESCE(a.ativa, 1) = 1
+		  AND COALESCE(ua.ativo, 1) = 1
 		ORDER BY a.nome ASC
 	`;
 
@@ -374,9 +385,9 @@ export async function listarUsuariosDoDojo(
 			perfis: mapaPerfis.get(idUser) || [],
 			dados_professor: u.n_federacao || u.grau_faixa
 				? {
-						n_federacao: u.n_federacao ? String(u.n_federacao) : null,
-						grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
-				  }
+					n_federacao: u.n_federacao ? String(u.n_federacao) : null,
+					grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
+				}
 				: null
 		};
 	});
@@ -444,14 +455,14 @@ export async function buscarUsuarioDetalhadoNoDojo(
 	const endereco: EnderecoUsuario | null =
 		enderecos.length > 0
 			? {
-					logradouro: String(enderecos[0].logradouro),
-					numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
-					complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
-					bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
-					cidade: String(enderecos[0].cidade),
-					uf: String(enderecos[0].uf),
-					cep: String(enderecos[0].cep)
-			  }
+				logradouro: String(enderecos[0].logradouro),
+				numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
+				complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
+				bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
+				cidade: String(enderecos[0].cidade),
+				uf: String(enderecos[0].uf),
+				cep: String(enderecos[0].cep)
+			}
 			: null;
 
 	// Busca responsáveis legais (caso este usuário seja um aluno/menor com responsáveis vinculados)
@@ -562,9 +573,9 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		dados_professor:
 			u.n_federacao || u.grau_faixa
 				? {
-						n_federacao: u.n_federacao ? String(u.n_federacao) : null,
-						grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
-				  }
+					n_federacao: u.n_federacao ? String(u.n_federacao) : null,
+					grau_faixa: u.grau_faixa ? String(u.grau_faixa) : null
+				}
 				: null,
 		dados_aluno: dadosAluno,
 		endereco,
@@ -1006,14 +1017,14 @@ export async function buscarPerfilCompletoParaUsuario(
 	const endereco: EnderecoUsuario | null =
 		enderecos.length > 0
 			? {
-					logradouro: String(enderecos[0].logradouro),
-					numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
-					complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
-					bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
-					cidade: String(enderecos[0].cidade),
-					uf: String(enderecos[0].uf),
-					cep: String(enderecos[0].cep)
-			  }
+				logradouro: String(enderecos[0].logradouro),
+				numero: enderecos[0].numero ? String(enderecos[0].numero) : null,
+				complemento: enderecos[0].complemento ? String(enderecos[0].complemento) : null,
+				bairro: enderecos[0].bairro ? String(enderecos[0].bairro) : null,
+				cidade: String(enderecos[0].cidade),
+				uf: String(enderecos[0].uf),
+				cep: String(enderecos[0].cep)
+			}
 			: null;
 
 	// 4. Dados de Aluno (se aplicável)

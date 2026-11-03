@@ -71,6 +71,16 @@ export async function autenticarUsuario(
 		};
 	}
 
+	// Verifica se o usuário está bloqueado globalmente na plataforma SaaS
+	if (usuario.ativo === false) {
+		return {
+			sucesso: false,
+			erro: usuario.motivo_bloqueio_global
+				? `Acesso à plataforma bloqueado: ${usuario.motivo_bloqueio_global}`
+				: 'Seu acesso a esta plataforma foi bloqueado pela administração do SaaS.'
+		};
+	}
+
 	const senhaValida = await verificarSenha(dados.senha, usuario.senha_hash);
 	if (!senhaValida) {
 		const falha = await registrarFalhaLogin(dados.email, meta.ip);
@@ -91,7 +101,10 @@ export async function autenticarUsuario(
 
 	const academias = await buscarAcademiasDoUsuario(usuario.id_usuario);
 	if (academias.length === 0) {
-		return { sucesso: false, erro: 'Este usuário não possui vínculo ativo com nenhum dojo' };
+		return {
+			sucesso: false,
+			erro: 'Este usuário não possui vínculo ativo ou a academia vinculada encontra-se suspensa'
+		};
 	}
 
 	let academiaSelecionadaId: number;
@@ -152,4 +165,100 @@ export async function encerrarSessao(tokenPuro: string): Promise<void> {
 	if (!tokenPuro) return;
 	const tokenHash = calcularHashToken(tokenPuro);
 	await revogarSessaoPorHash(tokenHash);
+}
+
+// =============================================================================
+// AUTENTICAÇÃO DO CONTROL PLANE SAAS (/saas-admin/login)
+// =============================================================================
+
+export interface LoginSaasInput {
+	email: string;
+	senha: string;
+}
+
+export type ResultadoLoginSaas =
+	| {
+			sucesso: true;
+			tokenPuro: string;
+			expiraEm: Date;
+			usuario: { id: number; nome: string; email: string };
+	  }
+	| {
+			sucesso: false;
+			erro: string;
+	  };
+
+/**
+ * Autentica especificamente o Super Admin no Control Plane SGT Manager.
+ */
+export async function autenticarSuperAdminSaas(
+	dados: LoginSaasInput,
+	meta: { ip?: string | null; userAgent?: string | null }
+): Promise<ResultadoLoginSaas> {
+	const statusBloqueio = verificarBloqueioLogin(dados.email, meta.ip);
+	if (statusBloqueio.bloqueado) {
+		return {
+			sucesso: false,
+			erro: statusBloqueio.mensagem || 'Muitas tentativas incorretas. Conta bloqueada temporariamente.'
+		};
+	}
+
+	const usuario = await buscarUsuarioPorEmail(dados.email);
+	if (!usuario) {
+		await verificarSenha(dados.senha, '$2a$12$e8YpXg.pW1E9sWd9hU23kOD8N9gY.dC2N/wJ9gU1gO3Y8jO6iK2k6');
+		const falha = await registrarFalhaLogin(dados.email, meta.ip);
+		return {
+			sucesso: false,
+			erro: `Credenciais inválidas de Super Admin. Tentativas restantes: ${falha.tentativasRestantes}.`
+		};
+	}
+
+	const senhaValida = await verificarSenha(dados.senha, usuario.senha_hash);
+	if (!senhaValida) {
+		const falha = await registrarFalhaLogin(dados.email, meta.ip);
+		return {
+			sucesso: false,
+			erro: `Credenciais inválidas de Super Admin. Tentativas restantes: ${falha.tentativasRestantes}.`
+		};
+	}
+
+	if (!usuario.is_super_admin) {
+		return {
+			sucesso: false,
+			erro: 'Acesso negado: este usuário não possui privilégios de Super Admin do SaaS.'
+		};
+	}
+
+	if (usuario.ativo === false) {
+		return {
+			sucesso: false,
+			erro: 'Conta de administrador suspensa.'
+		};
+	}
+
+	resetarTentativasLogin(dados.email, meta.ip);
+
+	const { criarSessaoSaas } = await import('../repositorios/sessao.repo');
+	const duracaoMs = TEMPO_SESSAO.INATIVIDADE_PADRAO_MS; // 2 horas
+	const expiraEm = new Date(Date.now() + duracaoMs);
+	const { tokenPuro, tokenHash } = gerarTokenSessao();
+
+	await criarSessaoSaas({
+		idUsuario: usuario.id_usuario,
+		tokenHash,
+		expiraEm,
+		ip: meta.ip,
+		userAgent: meta.userAgent
+	});
+
+	return {
+		sucesso: true,
+		tokenPuro,
+		expiraEm,
+		usuario: {
+			id: usuario.id_usuario,
+			nome: usuario.nome,
+			email: usuario.email
+		}
+	};
 }
