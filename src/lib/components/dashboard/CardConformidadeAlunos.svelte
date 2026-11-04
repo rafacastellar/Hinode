@@ -171,20 +171,16 @@
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
 				{#each viradaTemporada.alunos as aluno (aluno.id_usuario)}
 					<div
-						class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-zinc-900/95 border border-amber-900/50 hover:border-amber-600/60 transition-colors"
+						class="flex flex-col gap-2.5 p-3.5 rounded-xl bg-zinc-900/90 border border-amber-900/40 hover:border-amber-600/60 transition-colors shadow-sm"
 					>
-						<!-- Aluno + Faixa Compacta -->
-						<div class="flex items-center gap-2.5 min-w-0 flex-1">
-							<div class="shrink-0">
-								<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-20" />
-							</div>
-
+						<!-- Linha Superior: Nome do Aluno + Faixa -->
+						<div class="flex items-center justify-between gap-3 min-w-0">
 							<div class="min-w-0 flex-1">
 								{#if onSelecionarAluno}
 									<button
 										type="button"
 										onclick={() => onSelecionarAluno(aluno.id_usuario)}
-										class="text-left font-bold text-white text-xs truncate hover:text-amber-400 cursor-pointer block leading-tight"
+										class="text-left font-bold text-white text-sm truncate hover:text-amber-400 cursor-pointer block leading-tight"
 										title={aluno.nome}
 									>
 										{aluno.nome}
@@ -192,27 +188,41 @@
 								{:else}
 									<a
 										href="/dashboard/alunos/{aluno.id_usuario}"
-										class="font-bold text-white text-xs truncate hover:text-amber-400 block leading-tight"
+										class="font-bold text-white text-sm truncate hover:text-amber-400 block leading-tight"
 										title={aluno.nome}
 									>
 										{aluno.nome}
 									</a>
 								{/if}
-								<span class="text-[10px] font-mono text-zinc-400 block mt-0.5">
-									Classe: <strong class="text-zinc-200">{aluno.classe_esperada}</strong>
+								<span class="text-[11px] font-mono text-zinc-400 block mt-0.5">
+									Classe esperada: <strong class="text-zinc-200">{aluno.classe_esperada}</strong>
 								</span>
+							</div>
+
+							<div class="shrink-0">
+								<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-20" />
 							</div>
 						</div>
 
-						<!-- De/Para da Categoria -->
-						<div class="flex items-center gap-2 shrink-0 font-mono text-[11px] bg-zinc-950/80 px-2.5 py-1.5 rounded-lg border border-zinc-800/80 self-end sm:self-auto">
-							<span class="text-zinc-500 line-through truncate max-w-[90px]" title="Atual: {aluno.categoria_atual || 'Sem categoria'}">
-								{aluno.categoria_atual || 'Sem cat.'}
-							</span>
-							<ArrowRight class="w-3.5 h-3.5 text-amber-400 shrink-0" />
-							<span class="text-amber-300 font-bold truncate max-w-[125px]" title="Nova esperada: {aluno.categoria_esperada || 'A calcular'}">
-								{aluno.categoria_esperada || 'A calcular'}
-							</span>
+						<!-- Linha Inferior: Mudança de Categoria De/Para -->
+						<div class="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 font-mono text-xs bg-zinc-950/40 -mx-3.5 -mb-3.5 px-3.5 py-2 rounded-b-xl">
+							<div class="flex flex-col min-w-0 flex-1">
+								<span class="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Atual</span>
+								<span class="text-zinc-400 line-through truncate text-[11px]" title={aluno.categoria_atual || 'Sem categoria'}>
+									{aluno.categoria_atual || 'Sem categoria'}
+								</span>
+							</div>
+
+							<div class="shrink-0 px-1 text-amber-500">
+								<ArrowRight class="w-4 h-4" />
+							</div>
+
+							<div class="flex flex-col min-w-0 flex-1 text-right">
+								<span class="text-[10px] text-amber-400 uppercase tracking-wider font-bold">Nova CBJ {viradaTemporada.anoVigente}</span>
+								<span class="text-amber-300 font-bold truncate text-[11px]" title={aluno.categoria_esperada || 'A calcular'}>
+									{aluno.categoria_esperada || 'A calcular'}
+								</span>
+							</div>
 						</div>
 					</div>
 				{/each}
