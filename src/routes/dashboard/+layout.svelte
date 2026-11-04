@@ -81,13 +81,13 @@
 	<aside
 		class="hidden lg:flex lg:flex-col {sidebarMinimizada ? 'lg:w-20' : 'lg:w-72'} bg-zinc-950 border-r border-zinc-900 shrink-0 sticky top-0 h-screen transition-all duration-300 ease-in-out z-20"
 	>
-		<!-- Header da Sidebar: Logo da Academia & Ênfase no Nome da Academia -->
-		<div class="{sidebarMinimizada ? 'p-3.5' : 'p-6'} border-b border-zinc-900/80 transition-all">
+		<!-- Header da Sidebar: Logo da Academia & Identidade Visual SGT -->
+		<div class="{sidebarMinimizada ? 'p-3.5' : 'p-5'} border-b border-zinc-900/80 transition-all">
 			{#if !sidebarMinimizada}
-				<div class="flex items-center justify-between gap-3">
-					<a href="/dashboard" class="flex items-center gap-3.5 group min-w-0">
+				<div class="flex items-center justify-between gap-2.5">
+					<a href="/dashboard" class="flex items-center gap-3 group min-w-0 flex-1" title={data.nomeAcademia || 'Dojo Principal'}>
 						<div
-							class="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.2)]"
+							class="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-red-600/60 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.2)]"
 						>
 							{#if data.logoAcademia}
 								<img
@@ -100,18 +100,18 @@
 									}}
 								/>
 							{:else}
-								<Building2 class="w-6 h-6 text-red-500" />
+								<Building2 class="w-5 h-5 text-red-500" />
 							{/if}
 						</div>
 						<div class="min-w-0 flex-1">
 							<span
-								class="font-display font-extrabold text-base sm:text-lg tracking-tight text-white block leading-tight truncate uppercase"
+								class="font-display font-extrabold text-sm sm:text-base tracking-tight text-white block leading-snug line-clamp-2 uppercase group-hover:text-amber-400 transition-colors"
 								title={data.nomeAcademia || 'Dojo Principal'}
 							>
 								{data.nomeAcademia || 'Dojo Principal'}
 							</span>
-							<span class="text-[9px] font-mono tracking-widest text-amber-400/90 uppercase block mt-1">
-								SGT • Gestão Oficial de Tatame
+							<span class="text-[9px] font-mono tracking-wider text-amber-400/90 uppercase block mt-0.5 truncate">
+								SGT • Gestão de Tatame
 							</span>
 						</div>
 					</a>
@@ -119,7 +119,7 @@
 					<button
 						type="button"
 						onclick={alternarSidebar}
-						class="p-2 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+						class="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
 						title="Minimizar menu lateral"
 						aria-label="Minimizar menu lateral"
 					>
@@ -128,12 +128,12 @@
 				</div>
 
 				<!-- Card Informativo da Plataforma SaaS & Tenant Ativo -->
-				<div class="mt-4 px-3 py-2 rounded-xl bg-zinc-900/40 border border-zinc-800/70 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+				<div class="mt-3.5 px-3 py-1.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80 flex items-center justify-between text-[10px] font-mono text-zinc-400">
 					<span class="flex items-center gap-1.5">
-						<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-						<span>Plataforma SGT</span>
+						<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+						<span class="text-zinc-300">Plataforma SGT</span>
 					</span>
-					<span class="text-zinc-500">Unidade <strong class="text-zinc-300">#{data.idAcademia}</strong></span>
+					<span class="text-zinc-500">Unidade <strong class="text-amber-400 font-bold">#{data.idAcademia}</strong></span>
 				</div>
 			{:else}
 				<div class="flex flex-col items-center gap-3">
@@ -229,16 +229,17 @@
 	</aside>
 
 	<!-- ========================================================================= -->
-	<!-- TOPBAR MOBILE & DRAWER -->
+	<!-- TOPBAR MOBILE & DRAWER RESPONSIVO COM OTIMIZAÇÕES MOBILE                  -->
 	<!-- ========================================================================= -->
 	<header
-		class="lg:hidden border-b border-zinc-900 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-40 px-4 h-16 flex items-center justify-between"
+		class="lg:hidden border-b border-zinc-900 bg-zinc-950/95 backdrop-blur-md sticky top-0 z-40 px-3.5 h-16 flex items-center justify-between gap-2.5"
 	>
-		<div class="flex items-center gap-3">
+		<div class="flex items-center gap-2.5 min-w-0 flex-1">
+			<!-- Botão Hamburger -->
 			<button
 				type="button"
 				onclick={() => (menuAberto = !menuAberto)}
-				class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white"
+				class="p-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-zinc-300 hover:text-white shrink-0 active:scale-95 transition-all"
 				aria-label="Abrir menu de navegação"
 			>
 				{#if menuAberto}
@@ -248,26 +249,53 @@
 				{/if}
 			</button>
 
-			<div class="flex items-center gap-2.5 min-w-0">
-				<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 p-0.5 flex items-center justify-center overflow-hidden shrink-0">
+			<!-- Identidade da Academia no Topo Mobile (Sem cortar) -->
+			<a href="/dashboard" class="flex items-center gap-2.5 min-w-0 flex-1 group" title={data.nomeAcademia || 'Academia'}>
+				<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group-hover:border-amber-500/50 transition-colors">
 					{#if data.logoAcademia}
-						<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded" />
+						<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-lg" />
 					{:else}
 						<Building2 class="w-4 h-4 text-red-500" />
 					{/if}
 				</div>
-				<span class="font-display font-extrabold text-sm tracking-tight text-white truncate max-w-[190px] uppercase">
-					{data.nomeAcademia || 'Academia'}
-				</span>
-			</div>
+				<div class="min-w-0 flex-1">
+					<span class="font-display font-extrabold text-xs sm:text-sm tracking-tight text-white block leading-snug line-clamp-1 uppercase group-hover:text-amber-400 transition-colors">
+						{data.nomeAcademia || 'Academia'}
+					</span>
+					<div class="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400">
+						<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+						<span class="text-amber-400/90 font-semibold truncate">SGT</span>
+						<span class="text-zinc-600">•</span>
+						<span class="text-zinc-500">#{data.idAcademia}</span>
+					</div>
+				</div>
+			</a>
 		</div>
 
-		<div class="flex items-center gap-2">
+		<!-- Ações Rápidas Mobile: Avatar do Usuário e Botão Logout -->
+		<div class="flex items-center gap-1.5 shrink-0">
+			{#if data.totalAcoesPendentes && data.totalAcoesPendentes > 0}
+				<span
+					class="w-6 h-6 rounded-full bg-red-600 text-white font-mono text-[10px] font-bold flex items-center justify-center animate-pulse shadow-sm"
+					title="{data.totalAcoesPendentes} Ação Pendente"
+				>
+					{data.totalAcoesPendentes}
+				</span>
+			{/if}
+
+			<a
+				href="/dashboard/perfil"
+				class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold font-mono text-zinc-200"
+				title="Perfil ({data.usuario?.nome})"
+			>
+				{data.usuario?.nome?.charAt(0).toUpperCase()}
+			</a>
+
 			<form action="/logout" method="POST">
 				<button
 					type="submit"
-					class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
-					title="Sair"
+					class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-red-400 active:scale-95 transition-all cursor-pointer"
+					title="Encerrar Sessão"
 				>
 					<LogOut class="w-4 h-4" />
 				</button>
@@ -290,22 +318,23 @@
 
 			<!-- Painel Lateral Deslizante -->
 			<div
-				class="relative w-72 max-w-[85vw] bg-zinc-950 border-r border-zinc-900 h-full flex flex-col z-10"
+				class="relative w-80 max-w-[85vw] bg-zinc-950 border-r border-zinc-900 h-full flex flex-col z-10"
 			>
-				<div class="p-5 border-b border-zinc-900 flex items-center justify-between gap-2">
-					<div class="flex items-center gap-2.5 min-w-0">
-						<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0">
+				<!-- Cabeçalho do Drawer com Logo e Nome Completo da Academia -->
+				<div class="p-5 border-b border-zinc-900 flex items-center justify-between gap-3">
+					<div class="flex items-center gap-3 min-w-0 flex-1">
+						<div class="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
 							{#if data.logoAcademia}
-								<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-lg" />
+								<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-xl" />
 							{:else}
-								<Building2 class="w-4 h-4 text-red-500" />
+								<Building2 class="w-5 h-5 text-red-500" />
 							{/if}
 						</div>
-						<div class="min-w-0">
-							<span class="font-display font-extrabold text-sm text-white block truncate uppercase">
+						<div class="min-w-0 flex-1">
+							<span class="font-display font-extrabold text-sm text-white block leading-snug line-clamp-2 uppercase">
 								{data.nomeAcademia || 'Academia'}
 							</span>
-							<span class="text-[9px] font-mono text-amber-400 uppercase block">
+							<span class="text-[9px] font-mono text-amber-400/90 uppercase block mt-0.5">
 								SGT • Gestão de Tatame
 							</span>
 						</div>
@@ -313,14 +342,26 @@
 					<button
 						type="button"
 						onclick={() => (menuAberto = false)}
-						class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white shrink-0"
+						class="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white shrink-0 active:scale-95 transition-all"
 					>
 						<X class="w-4 h-4" />
 					</button>
 				</div>
 
+				<!-- Badge de Status do Dojo no Drawer -->
+				<div class="px-5 py-2.5 bg-zinc-900/40 border-b border-zinc-900 flex items-center justify-between text-[11px] font-mono">
+					<span class="text-zinc-400 flex items-center gap-1.5">
+						<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+						<span>Tenant Ativo</span>
+					</span>
+					<span class="text-amber-400 font-bold">Unidade #{data.idAcademia}</span>
+				</div>
+
 				<!-- Links Mobile -->
-				<nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+				<nav class="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+					<div class="px-3 pb-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+						Navegação
+					</div>
 					{#each data.itensMenu as item}
 						{@const Icone = mapaIcones[item.icone] || LayoutDashboard}
 						{@const ativo = rotaAtiva(item.href)}
@@ -328,7 +369,7 @@
 						<a
 							href={item.href}
 							onclick={() => (menuAberto = false)}
-							class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs font-medium {ativo
+							class="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-xs font-medium {ativo
 								? 'bg-red-950/40 border border-red-800/70 text-white font-semibold'
 								: 'text-zinc-400 hover:text-white hover:bg-zinc-900'}"
 						>
@@ -356,21 +397,31 @@
 					{/each}
 				</nav>
 
-				<!-- Rodapé Mobile -->
-				<div class="p-4 border-t border-zinc-900 bg-zinc-950/90">
-					<div class="text-xs text-white font-medium mb-1 truncate">{data.usuario?.nome}</div>
-					<div class="flex flex-wrap gap-1 mb-3">
+				<!-- Rodapé Mobile com Usuário & Logout -->
+				<div class="p-4 border-t border-zinc-900 bg-zinc-950/95 space-y-3">
+					<div class="flex items-center gap-3">
+						<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold font-mono text-zinc-200 shrink-0">
+							{data.usuario?.nome?.charAt(0).toUpperCase()}
+						</div>
+						<div class="min-w-0 flex-1">
+							<div class="text-xs text-white font-bold truncate leading-tight">{data.usuario?.nome}</div>
+							<div class="text-[10px] text-zinc-500 font-mono truncate">{data.usuario?.email}</div>
+						</div>
+					</div>
+
+					<div class="flex flex-wrap gap-1">
 						{#each data.perfis as perfil}
 							<BadgePerfil {perfil} tamanho="sm" />
 						{/each}
 					</div>
+
 					<form action="/logout" method="POST">
 						<button
 							type="submit"
-							class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-zinc-400 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800"
+							class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-red-400 bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 active:scale-95 transition-all"
 						>
 							<LogOut class="w-3.5 h-3.5" />
-							<span>Sair</span>
+							<span>Encerrar Sessão</span>
 						</button>
 					</form>
 				</div>
@@ -382,15 +433,16 @@
 	<!-- CONTEÚDO PRINCIPAL (Slot das rotas filhas) -->
 	<!-- ========================================================================= -->
 	<main class="flex-1 min-w-0 bg-black flex flex-col">
-		<!-- Topbar Desktop Minimalista -->
+		<!-- Topbar Desktop Minimalista com Identidade em Destaque -->
 		<div
 			class="hidden lg:flex min-h-16 lg:h-20 border-b border-zinc-900/80 bg-zinc-950/40 backdrop-blur-md px-6 sm:px-8 items-center justify-between sticky top-0 z-30"
 		>
-			<div class="flex items-center gap-3 min-w-0">
+			<!-- Lado Esquerdo: Botão Toggle Sidebar + Destaque da Academia / Breadcrumb -->
+			<div class="flex items-center gap-3.5 min-w-0 flex-1">
 				<button
 					type="button"
 					onclick={alternarSidebar}
-					class="p-2 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+					class="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
 					title={sidebarMinimizada ? 'Expandir menu lateral' : 'Minimizar menu lateral'}
 					aria-label={sidebarMinimizada ? 'Expandir menu lateral' : 'Minimizar menu lateral'}
 				>
@@ -401,23 +453,41 @@
 					{/if}
 				</button>
 
-				<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono flex-wrap">
-					<span>Dojo</span>
-					<ChevronRight class="w-3.5 h-3.5 text-zinc-600" />
-					<span class="text-zinc-200 font-medium">{data.nomeAcademia}</span>
-					<span class="text-zinc-600">/</span>
-					<span class="text-red-400 font-semibold uppercase tracking-wider">
-						{ehApenasAluno ? 'Portal do Judoca' : 'Painel Administrativo'}
-					</span>
-					{#if data.totalAcoesPendentes && data.totalAcoesPendentes > 0}
-						<span class="text-zinc-600">•</span>
-						<span
-							class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-red-600/20 border border-red-500/60 text-red-300 flex items-center gap-1.5 animate-pulse"
-						>
-							<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-							<span>{data.totalAcoesPendentes} Ação Pendente</span>
+				<!-- Destaque Especial da Academia na Topbar Superior -->
+				<div class="flex items-center gap-3 min-w-0">
+					<!-- Miniatura do Logo na barra superior -->
+					<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+						{#if data.logoAcademia}
+							<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-lg" />
+						{:else}
+							<Building2 class="w-4 h-4 text-red-500" />
+						{/if}
+					</div>
+
+					<!-- Breadcrumb & Nome Completo -->
+					<div class="flex flex-col min-w-0">
+						<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+							<span class="text-white font-extrabold tracking-tight text-sm uppercase truncate max-w-[280px] xl:max-w-[420px]" title={data.nomeAcademia || 'Dojo'}>
+								{data.nomeAcademia || 'Dojo'}
+							</span>
+							<span class="text-zinc-600">/</span>
+							<span class="text-red-400 font-semibold uppercase tracking-wider text-[11px]">
+								{ehApenasAluno ? 'Portal do Judoca' : 'Painel Administrativo'}
+							</span>
+							{#if data.totalAcoesPendentes && data.totalAcoesPendentes > 0}
+								<span class="text-zinc-600">•</span>
+								<span
+									class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-red-600/20 border border-red-500/60 text-red-300 flex items-center gap-1.5 animate-pulse"
+								>
+									<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+									<span>{data.totalAcoesPendentes} Pendente</span>
+								</span>
+							{/if}
+						</div>
+						<span class="text-[9px] font-mono text-zinc-500 tracking-wider uppercase">
+							Plataforma SGT • Unidade #{data.idAcademia}
 						</span>
-					{/if}
+					</div>
 				</div>
 			</div>
 

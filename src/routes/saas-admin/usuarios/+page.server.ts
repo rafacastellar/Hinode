@@ -3,7 +3,6 @@ import { fail } from '@sveltejs/kit';
 import {
 	listarUsuariosGlobalSaas,
 	alternarBloqueioGlobalUsuario,
-	vincularAdminEmAcademiaExistente,
 	listarAcademiasSaas
 } from '#lib/server/repositorios/saas-admin.repo';
 
@@ -55,35 +54,5 @@ export const actions: Actions = {
 		} catch (erro: any) {
 			return fail(400, { erro: erro?.message || 'Falha ao alterar status global do usuário.' });
 		}
-	},
-
-	designarAdminAcademia: async ({ request, locals, getClientAddress }) => {
-		if (!locals.superAdmin) {
-			return fail(401, { erro: 'Não autorizado.' });
-		}
-
-		const formData = await request.formData();
-		const idUsuario = Number(formData.get('idUsuario'));
-		const idAcademia = Number(formData.get('idAcademia'));
-
-		if (!idUsuario || !idAcademia) {
-			return fail(400, { erro: 'Usuário e Academia são obrigatórios.' });
-		}
-
-		try {
-			await vincularAdminEmAcademiaExistente(
-				idUsuario,
-				idAcademia,
-				locals.superAdmin.id,
-				getClientAddress()
-			);
-			return {
-				sucesso: true,
-				mensagem: 'Usuário designado como Administrador da academia com sucesso.'
-			};
-		} catch (erro: any) {
-			return fail(400, { erro: erro?.message || 'Falha ao designar administrador.' });
-		}
 	}
 };
-

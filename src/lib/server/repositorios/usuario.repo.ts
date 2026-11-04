@@ -43,6 +43,8 @@ export interface UsuarioResumoDojo {
 	genero: 'M' | 'F';
 	idade: number;
 	telefone: string | null;
+	ativo_no_dojo: boolean;
+	motivo_bloqueio_dojo?: string | null;
 	perfis: PerfilItem[];
 	dados_professor: {
 		n_federacao: string | null;
@@ -319,7 +321,9 @@ export async function listarUsuariosDoDojo(
 			TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) AS idade,
 			u.telefone,
 			prof.n_federacao,
-			prof.grau_faixa
+			prof.grau_faixa,
+			COALESCE(ua.ativo, 1) AS ativo_no_dojo,
+			ua.motivo_bloqueio AS motivo_bloqueio_dojo
 		FROM Usuario u
 		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
 		LEFT JOIN Professor prof ON prof.id_usuario = u.id_usuario
@@ -385,6 +389,8 @@ export async function listarUsuariosDoDojo(
 			genero: (u.genero || 'M') as 'M' | 'F',
 			idade: Number(u.idade),
 			telefone: u.telefone ? String(u.telefone) : null,
+			ativo_no_dojo: Number(u.ativo_no_dojo) === 1,
+			motivo_bloqueio_dojo: u.motivo_bloqueio_dojo ? String(u.motivo_bloqueio_dojo) : null,
 			perfis: mapaPerfis.get(idUser) || [],
 			dados_professor: u.n_federacao || u.grau_faixa
 				? {
@@ -930,7 +936,7 @@ export async function buscarUsuariosParaMatricula(
 					WHERE a.id_usuario = u.id_usuario AND ua.id_academia = ?
 				) THEN 1 
 				ELSE 0 
-			END AS ja_aluno
+				END AS ja_aluno
 		FROM Usuario u
 		WHERE (
 			u.nome LIKE ? 
@@ -1266,4 +1272,3 @@ export async function alterarPropriaSenhaUsuario(
 		[novoHash, idUsuario]
 	);
 }
-

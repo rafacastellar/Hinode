@@ -81,32 +81,27 @@
 	);
 </script>
 
-<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
+<section class="p-4 sm:p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
 	<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-		<div class="flex items-center gap-2.5">
+		<div class="flex items-center gap-2.5 min-w-0">
 			<div
-				class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400"
+				class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400 shrink-0"
 			>
 				<AlertTriangle class="w-4 h-4 text-red-400" />
 			</div>
-			<div>
-				<h2 class="text-sm font-bold text-white font-display">
+			<div class="min-w-0">
+				<h2 class="text-sm font-bold text-white font-display truncate">
 					Conformidade & Pendências dos Alunos
 				</h2>
-				<p class="text-[11px] text-zinc-500">
+				<p class="text-[11px] text-zinc-500 truncate">
 					{subtituloCalculado}
 				</p>
 			</div>
 		</div>
-		{#if totalPendencias === 0}
+
+		{#if totalPendencias > 0}
 			<span
-				class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800 text-emerald-400"
-			>
-				✓ 100% Em Dia
-			</span>
-		{:else}
-			<span
-				class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-red-950/60 border border-red-800 text-red-400"
+				class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-red-950 border border-red-800 text-red-400 shrink-0 ml-2"
 			>
 				{totalPendencias} pendência{totalPendencias > 1 ? 's' : ''}
 			</span>
@@ -118,10 +113,10 @@
 	<!-- ========================================================================= -->
 	{#if viradaTemporada && viradaTemporada.totalDesatualizados > 0}
 		<div
-			class="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-950/40 via-amber-900/20 to-zinc-950 border border-amber-500/50 shadow-lg space-y-3"
+			class="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-950/40 via-amber-900/20 to-zinc-950 border border-amber-500/50 shadow-lg space-y-4"
 		>
-			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-				<div class="flex items-start gap-2.5">
+			<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+				<div class="flex items-start gap-2.5 min-w-0">
 					<div
 						class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5"
 					>
@@ -138,7 +133,7 @@
 								{viradaTemporada.totalDesatualizados} atleta{viradaTemporada.totalDesatualizados > 1 ? 's' : ''} com classe defasada
 							</span>
 						</div>
-						<p class="text-[11px] text-zinc-300 mt-0.5 leading-relaxed">
+						<p class="text-[11px] text-zinc-300 mt-1 leading-relaxed">
 							Pelo regulamento oficial da CBJ/FPJ, a classe etária (Sub-11, Sub-15, Sub-18, etc.) é calculada pelo ano civil de nascimento ({viradaTemporada.anoVigente} - ano). Com a virada do calendário, as categorias dos atletas abaixo precisam de sincronização.
 						</p>
 					</div>
@@ -159,7 +154,7 @@
 					<button
 						type="submit"
 						disabled={atualizandoCategorias}
-						class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-zinc-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+						class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-zinc-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
 					>
 						{#if atualizandoCategorias}
 							<RefreshCw class="w-3.5 h-3.5 animate-spin" />
@@ -172,40 +167,62 @@
 				</form>
 			</div>
 
-			<!-- Lista detalhada dos judocas com categoria defasada pela virada do ano -->
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+			<!-- Lista detalhada dos judocas com categoria defasada (Layout Card Limpo e Responsivo) -->
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
 				{#each viradaTemporada.alunos as aluno (aluno.id_usuario)}
 					<div
-						class="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-900/90 border border-amber-900/40 text-xs"
+						class="flex flex-col gap-2.5 p-3.5 rounded-xl bg-zinc-900/90 border border-amber-900/40 hover:border-amber-600/60 transition-colors shadow-sm"
 					>
-						<div class="flex items-center gap-2 min-w-0">
-							{#if onSelecionarAluno}
-								<button
-									type="button"
-									onclick={() => onSelecionarAluno(aluno.id_usuario)}
-									class="text-left font-semibold text-white truncate hover:text-amber-400 cursor-pointer"
-								>
-									{aluno.nome}
-								</button>
-							{:else}
-								<a
-									href="/dashboard/alunos/{aluno.id_usuario}"
-									class="font-semibold text-white truncate hover:text-amber-400"
-								>
-									{aluno.nome}
-								</a>
-							{/if}
-							<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
-							<span class="text-[10px] font-mono text-zinc-400">({aluno.classe_esperada})</span>
+						<!-- Linha Superior: Nome do Aluno + Faixa -->
+						<div class="flex items-center justify-between gap-3 min-w-0">
+							<div class="min-w-0 flex-1">
+								{#if onSelecionarAluno}
+									<button
+										type="button"
+										onclick={() => onSelecionarAluno(aluno.id_usuario)}
+										class="text-left font-bold text-white text-sm truncate hover:text-amber-400 cursor-pointer block leading-tight"
+										title={aluno.nome}
+									>
+										{aluno.nome}
+									</button>
+								{:else}
+									<a
+										href="/dashboard/alunos/{aluno.id_usuario}"
+										class="font-bold text-white text-sm truncate hover:text-amber-400 block leading-tight"
+										title={aluno.nome}
+									>
+										{aluno.nome}
+									</a>
+								{/if}
+								<span class="text-[11px] font-mono text-zinc-400 block mt-0.5">
+									Classe esperada: <strong class="text-zinc-200">{aluno.classe_esperada}</strong>
+								</span>
+							</div>
+
+							<div class="shrink-0">
+								<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-20" />
+							</div>
 						</div>
-						<div class="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
-							<span class="text-zinc-500 line-through truncate max-w-[85px]" title={aluno.categoria_atual || ''}>
-								{aluno.categoria_atual || 'Sem cat.'}
-							</span>
-							<ArrowRight class="w-3 h-3 text-amber-400 shrink-0" />
-							<span class="text-amber-300 font-bold truncate max-w-[110px]" title={aluno.categoria_esperada || ''}>
-								{aluno.categoria_esperada || 'A calcular'}
-							</span>
+
+						<!-- Linha Inferior: Mudança de Categoria De/Para -->
+						<div class="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 font-mono text-xs bg-zinc-950/40 -mx-3.5 -mb-3.5 px-3.5 py-2 rounded-b-xl">
+							<div class="flex flex-col min-w-0 flex-1">
+								<span class="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Atual</span>
+								<span class="text-zinc-400 line-through truncate text-[11px]" title={aluno.categoria_atual || 'Sem categoria'}>
+									{aluno.categoria_atual || 'Sem categoria'}
+								</span>
+							</div>
+
+							<div class="shrink-0 px-1 text-amber-500">
+								<ArrowRight class="w-4 h-4" />
+							</div>
+
+							<div class="flex flex-col min-w-0 flex-1 text-right">
+								<span class="text-[10px] text-amber-400 uppercase tracking-wider font-bold">Nova CBJ {viradaTemporada.anoVigente}</span>
+								<span class="text-amber-300 font-bold truncate text-[11px]" title={aluno.categoria_esperada || 'A calcular'}>
+									{aluno.categoria_esperada || 'A calcular'}
+								</span>
+							</div>
 						</div>
 					</div>
 				{/each}
@@ -242,20 +259,20 @@
 								<button
 									type="button"
 									onclick={() => onSelecionarAluno(a.id_usuario)}
-									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-amber-500 hover:bg-zinc-800 transition-colors cursor-pointer text-left"
+									class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-amber-500 hover:bg-zinc-800 transition-colors cursor-pointer text-left"
 									title={a.nome_professor_responsavel ? `Sensei: ${a.nome_professor_responsavel}` : undefined}
 								>
 									<span>{a.nome}</span>
-									<BadgeFaixa faixa={a.graduacao_atual} size="sm" />
+									<BadgeFaixa faixa={a.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 								</button>
 							{:else}
 								<a
 									href="/dashboard/alunos/{a.id_usuario}"
-									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-amber-500 transition-colors"
+									class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-amber-500 transition-colors"
 									title={a.nome_professor_responsavel ? `Sensei: ${a.nome_professor_responsavel}` : undefined}
 								>
 									<span>{a.nome}</span>
-									<BadgeFaixa faixa={a.graduacao_atual} size="sm" />
+									<BadgeFaixa faixa={a.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 								</a>
 							{/if}
 						{/each}
@@ -282,20 +299,20 @@
 								<button
 									type="button"
 									onclick={() => onSelecionarAluno(a.id_usuario)}
-									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-red-500 hover:bg-zinc-800 transition-colors cursor-pointer text-left"
+									class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-red-500 hover:bg-zinc-800 transition-colors cursor-pointer text-left"
 									title={a.nome_professor_responsavel ? `Sensei: ${a.nome_professor_responsavel}` : undefined}
 								>
 									<span>{a.nome}</span>
-									<BadgeFaixa faixa={a.graduacao_atual} size="sm" />
+									<BadgeFaixa faixa={a.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 								</button>
 							{:else}
 								<a
 									href="/dashboard/alunos/{a.id_usuario}"
-									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-red-500 transition-colors"
+									class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-white hover:border-red-500 transition-colors"
 									title={a.nome_professor_responsavel ? `Sensei: ${a.nome_professor_responsavel}` : undefined}
 								>
 									<span>{a.nome}</span>
-									<BadgeFaixa faixa={a.graduacao_atual} size="sm" />
+									<BadgeFaixa faixa={a.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 								</a>
 							{/if}
 						{/each}
@@ -363,20 +380,20 @@
 										<button
 											type="button"
 											onclick={() => onSelecionarAluno(c.id_aluno)}
-											class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white hover:border-purple-500 hover:bg-zinc-900 transition-colors cursor-pointer text-left"
+											class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white hover:border-purple-500 hover:bg-zinc-900 transition-colors cursor-pointer text-left"
 											title="Clique para selecionar este dependente no painel"
 										>
 											<span>{c.nome_aluno}</span>
-											<BadgeFaixa faixa={c.graduacao_atual} size="sm" />
+											<BadgeFaixa faixa={c.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 										</button>
 									{:else}
 										<a
 											href="/dashboard/alunos/{c.id_aluno}"
-											class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white hover:border-purple-500 transition-colors"
+											class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white hover:border-purple-500 transition-colors"
 											title={c.nome_professor_responsavel ? `Sensei: ${c.nome_professor_responsavel}` : undefined}
 										>
 											<span>{c.nome_aluno}</span>
-											<BadgeFaixa faixa={c.graduacao_atual} size="sm" />
+											<BadgeFaixa faixa={c.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 										</a>
 									{/if}
 
@@ -448,7 +465,7 @@
 									{m.nome_aluno}
 								</a>
 							{/if}
-							<BadgeFaixa faixa={m.graduacao_atual} size="sm" />
+							<BadgeFaixa faixa={m.graduacao_atual} size="sm" uniformWidth={false} customWidth="w-16" />
 							<span class="text-[10px] font-mono text-zinc-500">
 								{#if m.origem}
 									• {m.origem}

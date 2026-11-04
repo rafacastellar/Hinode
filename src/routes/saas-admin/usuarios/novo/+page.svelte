@@ -2,12 +2,14 @@
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import {
-		UserPlus,
 		ArrowLeft,
 		ShieldCheck,
 		Building2,
 		AlertCircle,
-		Save,
+		CheckCircle2,
+		UserPlus,
+		Eye,
+		EyeOff,
 		KeyRound,
 		User
 	} from '@lucide/svelte';
@@ -17,10 +19,14 @@
 	let tipoDocumento = $state<'CPF' | 'ESTRANGEIRO'>('CPF');
 	let isSuperAdmin = $state(false);
 	let vincularDojo = $state(true);
-	let idAcademiaSelecionada = $state<number | null>(
-		data.academias.length > 0 ? data.academias[0].id_academia : null
-	);
+	let idAcademiaSelecionada = $state<number | null>(null);
 	let idsPerfisSelecionados = $state<number[]>([]);
+
+	$effect(() => {
+		if (data.academias && data.academias.length > 0 && idAcademiaSelecionada === null) {
+			idAcademiaSelecionada = data.academias[0].id_academia;
+		}
+	});
 
 	// Máscara simples para CPF
 	function aplicarMascaraCpf(valor: string) {
@@ -49,7 +55,7 @@
 </script>
 
 <svelte:head>
-	<title>SGT Manager • Cadastrar Novo Usuário</title>
+	<title>SGT Manager • Novo Usuário na Plataforma</title>
 </svelte:head>
 
 <div class="max-w-4xl mx-auto space-y-6">
@@ -64,9 +70,9 @@
 				<ArrowLeft class="w-4 h-4" />
 			</a>
 			<div>
-				<div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-mono mb-1">
+				<div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-amber-950/40 border border-amber-800/60 text-amber-300 text-[11px] font-mono mb-1">
 					<UserPlus class="w-3.5 h-3.5" />
-					<span>Backoffice SaaS • Criação de Credenciais</span>
+					<span>Backoffice Global SaaS</span>
 				</div>
 				<h1 class="text-xl font-extrabold text-white tracking-tight font-display">
 					Cadastrar Novo Usuário
@@ -82,13 +88,13 @@
 		</div>
 	{/if}
 
-	<form method="POST" use:enhance class="space-y-6">
-		<!-- 1. DADOS PESSOAIS E DOCUMENTO -->
+	<form method="POST" action="?/criar" use:enhance class="space-y-6">
+		<!-- 1. IDENTIFICAÇÃO E DOCUMENTO -->
 		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
 			<div class="flex items-center gap-2 border-b border-zinc-900 pb-3">
-				<User class="w-4 h-4 text-indigo-400" />
+				<User class="w-4 h-4 text-amber-400" />
 				<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
-					1. Identificação Cadastral
+					1. Identificação Básica
 				</h2>
 			</div>
 
@@ -100,9 +106,8 @@
 						id="nome"
 						name="nome"
 						required
-						value={form?.valores?.nome || ''}
-						placeholder="Ex: João da Silva Santos"
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-indigo-500"
+						placeholder="Ex: João da Silva"
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
 					/>
 				</div>
 
@@ -112,7 +117,7 @@
 						id="tipoDocumento"
 						name="tipoDocumento"
 						bind:value={tipoDocumento}
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-indigo-500"
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
 					>
 						<option value="CPF">CPF (Nacional Brasileiro)</option>
 						<option value="ESTRANGEIRO">Passaporte / Documento Estrangeiro</option>
@@ -129,9 +134,8 @@
 						name="cpf"
 						required
 						oninput={handleInputDoc}
-						value={form?.valores?.cpf || ''}
-						placeholder={tipoDocumento === 'CPF' ? '000.000.000-00' : 'Ex: AB1234567'}
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-indigo-500 font-mono"
+						placeholder={tipoDocumento === 'CPF' ? '000.000.000-00' : 'Passaporte internacional'}
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500 font-mono"
 					/>
 				</div>
 
@@ -143,8 +147,8 @@
 							id="paisOrigem"
 							name="paisOrigem"
 							required
-							value={form?.valores?.paisOrigem || 'Japão'}
-							class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-indigo-500"
+							placeholder="Ex: Japão, Portugal, etc."
+							class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
 						/>
 					</div>
 				{/if}
@@ -156,8 +160,7 @@
 						id="dataNascimento"
 						name="dataNascimento"
 						required
-						value={form?.valores?.dataNascimento || ''}
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-indigo-500"
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
 					/>
 				</div>
 
@@ -166,7 +169,7 @@
 					<select
 						id="genero"
 						name="genero"
-						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-indigo-500"
+						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
 					>
 						<option value="M">Masculino</option>
 						<option value="F">Feminino</option>
@@ -175,7 +178,7 @@
 			</div>
 		</div>
 
-		<!-- 2. CONTATO E ACESSO -->
+		<!-- 2. CONTATO E CREDENCIAIS DE ACESSO -->
 		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
 			<div class="flex items-center gap-2 border-b border-zinc-900 pb-3">
 				<KeyRound class="w-4 h-4 text-emerald-400" />
@@ -184,15 +187,14 @@
 				</h2>
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-				<div class="sm:col-span-2">
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+				<div>
 					<label for="email" class="block font-mono text-zinc-400 mb-1">E-mail de Login *</label>
 					<input
 						type="email"
 						id="email"
 						name="email"
 						required
-						value={form?.valores?.email || ''}
 						placeholder="usuario@dominio.com"
 						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-emerald-500 font-mono"
 					/>
@@ -204,39 +206,35 @@
 						type="text"
 						id="telefone"
 						name="telefone"
-						value={form?.valores?.telefone || ''}
 						placeholder="(11) 98765-4321"
 						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-emerald-500"
 					/>
 				</div>
 
-				<div class="sm:col-span-3">
-					<label for="senha" class="block font-mono text-zinc-400 mb-1">Senha Provisória *</label>
+				<div class="sm:col-span-2">
+					<label for="senha" class="block font-mono text-zinc-400 mb-1">Senha Provisória * (Mín. 8 caracteres)</label>
 					<input
 						type="password"
 						id="senha"
 						name="senha"
 						required
-						placeholder="Mínimo 6 caracteres"
+						minlength="8"
+						placeholder="Senha segura com letras, números e símbolos"
 						class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-emerald-500 font-mono"
 					/>
-					<span class="text-[11px] text-zinc-500 mt-1 block">
-						Esta senha provisória permitirá o primeiro acesso do usuário na plataforma.
-					</span>
 				</div>
 			</div>
 		</div>
 
-		<!-- 3. PRIVILÉGIOS E VÍNCULOS -->
+		<!-- 3. PRIVILÉGIOS DE SUPER ADMIN (SAAS CONTROL PLANE) -->
 		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
 			<div class="flex items-center gap-2 border-b border-zinc-900 pb-3">
-				<ShieldCheck class="w-4 h-4 text-amber-400" />
+				<ShieldCheck class="w-4 h-4 text-indigo-400" />
 				<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
-					3. Níveis de Acesso & Unidade de Destino
+					3. Privilégios Globais da Plataforma
 				</h2>
 			</div>
 
-			<!-- Opção Super Admin do SaaS -->
 			<div class="p-4 rounded-xl border border-indigo-900/50 bg-indigo-950/20 flex items-start gap-3">
 				<input
 					type="checkbox"
@@ -248,33 +246,45 @@
 				/>
 				<div>
 					<label for="isSuperAdmin" class="text-xs font-bold text-indigo-300 font-display cursor-pointer">
-						Privilégio de Super Admin do SaaS (Control Plane)
+						Privilégio de Super Administrador do SaaS (SGT Manager)
 					</label>
-					<p class="text-[11px] text-zinc-400 mt-0.5">
-						Concede permissão irrestrita para gerenciar todas as academias, usuários, telemetria do servidor e radar de sessões no SGT Manager.
+					<p class="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+						Concede acesso ao painel <code>/saas-admin</code> com poder para suspender academias, gerenciar operadores, encerrar sessões ativas globalmente e visualizar telemetria.
 					</p>
 				</div>
 			</div>
+		</div>
 
-			<!-- Vínculo com Academia -->
-			<div class="space-y-4 pt-2">
+		<!-- 4. VÍNCULO OPCIONAL COM UMA ACADEMIA INICIAL -->
+		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+			<div class="flex items-center justify-between border-b border-zinc-900 pb-3">
 				<div class="flex items-center gap-2">
-					<input
-						type="checkbox"
-						id="vincularDojo"
-						bind:checked={vincularDojo}
-						class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-amber-500 cursor-pointer"
-					/>
-					<label for="vincularDojo" class="text-xs font-bold text-white cursor-pointer">
-						Vincular este usuário a uma Academia (Dojo)
-					</label>
+					<Building2 class="w-4 h-4 text-amber-400" />
+					<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
+						4. Vínculo Inicial com Academia (Opcional)
+					</h2>
 				</div>
 
-				{#if vincularDojo}
-					<div class="p-4 rounded-xl border border-zinc-900 bg-zinc-900/30 space-y-4 text-xs">
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input
+						type="checkbox"
+						bind:checked={vincularDojo}
+						class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-amber-400"
+					/>
+					<span class="text-xs text-zinc-300 font-mono">Vincular a um Dojo agora</span>
+				</label>
+			</div>
+
+			{#if vincularDojo}
+				{#if data.academias.length === 0}
+					<div class="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 text-xs text-zinc-400 text-center font-mono">
+						Nenhuma academia cadastrada no sistema para vinculação.
+					</div>
+				{:else}
+					<div class="space-y-4 text-xs">
 						<div>
 							<label for="idAcademia" class="block font-mono text-zinc-400 mb-1">
-								Selecione a Academia *
+								Selecione a Academia (Tenant)
 							</label>
 							<select
 								id="idAcademia"
@@ -291,9 +301,9 @@
 						</div>
 
 						<div>
-							<label class="block font-mono text-zinc-400 mb-2">
+							<span class="block font-mono text-zinc-400 mb-2">
 								Papéis / Perfis no Dojo
-							</label>
+							</span>
 							<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 								{#each data.perfis as perfil}
 									{@const checked = idsPerfisSelecionados.includes(perfil.id_perfil)}
@@ -309,13 +319,18 @@
 									</button>
 								{/each}
 							</div>
-							{#each idsPerfisSelecionados as id}
-								<input type="hidden" name="idsPerfis" value={id} />
-							{/each}
+							<input
+								type="hidden"
+								name="idsPerfisJson"
+								value={JSON.stringify(idsPerfisSelecionados)}
+							/>
+							<span class="text-[11px] text-zinc-500 mt-1.5 block">
+								Pode acumular papéis (Ex: Professor + Admin). Se nenhum for marcado, o padrão será Aluno.
+							</span>
 						</div>
 					</div>
 				{/if}
-			</div>
+			{/if}
 		</div>
 
 		<!-- BOTÕES DE SUBMISSÃO -->
@@ -330,10 +345,9 @@
 				type="submit"
 				class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer"
 			>
-				<Save class="w-4 h-4" />
-				<span>Salvar Usuário</span>
+				<UserPlus class="w-4 h-4" />
+				<span>Cadastrar Usuário</span>
 			</button>
 		</div>
 	</form>
 </div>
-
