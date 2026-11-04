@@ -282,15 +282,13 @@
 		}
 
 		// Padrão: Faixa Branca (Mukyu)
-		default:
-			return {
-				bg: "bg-zinc-100",
-				text: "text-zinc-900 font-bold",
-				border: "border-zinc-300 shadow-xs",
-				isPreta: false,
-			};
-	}
-});
+		return {
+			bg: "bg-zinc-100",
+			text: "text-zinc-900 font-bold",
+			border: "border-zinc-300 shadow-xs",
+			isPreta: false,
+		};
+	});
 
 	// Largura padronizada para todas as faixas terem rigorosamente o mesmo tamanho
 	const larguraContainer = $derived.by(() => {
