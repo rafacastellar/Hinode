@@ -19,7 +19,7 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals, getClientAddress }) => {
+	criar: async ({ request, locals, getClientAddress }) => {
 		if (!locals.superAdmin) {
 			return fail(401, { erro: 'Acesso restrito ao Super Admin.' });
 		}
@@ -39,7 +39,17 @@ export const actions: Actions = {
 		const idAcademiaRaw = formData.get('idAcademia');
 		const idAcademia = idAcademiaRaw && Number(idAcademiaRaw) > 0 ? Number(idAcademiaRaw) : null;
 		const idsPerfisRaw = formData.getAll('idsPerfis');
-		const idsPerfis = idsPerfisRaw.map((id) => Number(id)).filter((id) => id > 0);
+		let idsPerfis = idsPerfisRaw.map((id) => Number(id)).filter((id) => id > 0);
+
+		const idsPerfisJson = formData.get('idsPerfisJson');
+		if (idsPerfis.length === 0 && idsPerfisJson) {
+			try {
+				const parsed = JSON.parse(String(idsPerfisJson));
+				if (Array.isArray(parsed)) {
+					idsPerfis = parsed.map((id) => Number(id)).filter((id) => id > 0);
+				}
+			} catch {}
+		}
 
 		if (!nome || !cpf || !dataNascimento || !email || !senha) {
 			return fail(400, {
