@@ -88,7 +88,7 @@
 		</div>
 	{/if}
 
-	<form method="POST" action="?/criar" use:enhance class="space-y-6">
+	<form method="POST" use:enhance class="space-y-6">
 		<!-- 1. IDENTIFICAÇÃO E DOCUMENTO -->
 		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
 			<div class="flex items-center gap-2 border-b border-zinc-900 pb-3">

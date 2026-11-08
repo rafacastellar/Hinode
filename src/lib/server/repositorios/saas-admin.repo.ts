@@ -1,6 +1,7 @@
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import os from 'node:os';
 import process from 'node:process';
+import bcrypt from 'bcryptjs';
 import { getDbPool, executarTransacao } from '../db/pool';
 import { mascararCpf } from './usuario.repo';
 
@@ -928,13 +929,40 @@ export async function criarUsuarioSaas(
 				[idNovoUsuario, dados.idAcademia]
 			);
 
-			if (dados.idsPerfis && dados.idsPerfis.length > 0) {
-				for (const idPerfil of dados.idsPerfis) {
-					await conn.execute(
-						`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)`,
-						[idNovoUsuario, dados.idAcademia, idPerfil]
-					);
-				}
+			const [perfisBd] = await conn.query<RowDataPacket[]>('SELECT id_perfil, role FROM Perfil');
+			const idPerfilAluno = perfisBd.find((p) => p.role.toLowerCase() === 'aluno')?.id_perfil;
+			const idPerfilProfessor = perfisBd.find((p) => p.role.toLowerCase() === 'professor')?.id_perfil;
+			const idPerfilResponsavel = perfisBd.find((p) => p.role.toLowerCase() === 'responsável' || p.role.toLowerCase() === 'responsavel')?.id_perfil;
+
+			const perfisEfetivos =
+				dados.idsPerfis && dados.idsPerfis.length > 0
+					? dados.idsPerfis
+					: idPerfilAluno
+					  ? [Number(idPerfilAluno)]
+					  : [];
+
+			for (const idPerfil of perfisEfetivos) {
+				await conn.execute(
+					`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)`,
+					[idNovoUsuario, dados.idAcademia, idPerfil]
+				);
+			}
+
+			if (idPerfilProfessor && perfisEfetivos.includes(Number(idPerfilProfessor))) {
+				await conn.execute(
+					`INSERT INTO Professor (id_usuario, grau_faixa) VALUES (?, 'Sensei')
+					 ON DUPLICATE KEY UPDATE id_usuario = VALUES(id_usuario)`,
+					[idNovoUsuario]
+				);
+			}
+
+			if (idPerfilResponsavel && perfisEfetivos.includes(Number(idPerfilResponsavel))) {
+				await conn.execute(
+					`INSERT INTO Responsavel (id_usuario, grau_parentesco, financeiro)
+					 VALUES (?, 'Responsável Legal', 0)
+					 ON DUPLICATE KEY UPDATE id_usuario = VALUES(id_usuario)`,
+					[idNovoUsuario]
+				);
 			}
 		}
 
@@ -1115,6 +1143,48 @@ export async function atualizarUsuarioSaas(
 					ativo: dados.ativo,
 					senha_alterada: Boolean(dados.novaSenha && dados.novaSenha.trim())
 				}),
+				ipOperador || null
+			]
+		);
+	});
+}
+
+/**
+ * Designa um usuário existente como Administrador de uma academia específica
+ */
+export async function designarAdminAcademiaSaas(
+	idUsuario: number,
+	idAcademia: number,
+	idSuperAdminOperador: number,
+	ipOperador?: string | null
+): Promise<void> {
+	await executarTransacao(async (conn) => {
+		const [perfisBd] = await conn.query<RowDataPacket[]>('SELECT id_perfil, role FROM Perfil');
+		const idPerfilAdmin = perfisBd.find((p) => p.role.toLowerCase() === 'admin')?.id_perfil;
+
+		if (!idPerfilAdmin) {
+			throw new Error('Perfil Admin não localizado no sistema.');
+		}
+
+		await conn.execute(
+			`INSERT INTO Usuario_Academia (id_usuario, id_academia, ativo) VALUES (?, ?, 1)
+			 ON DUPLICATE KEY UPDATE ativo = 1, motivo_bloqueio = NULL, bloqueado_em = NULL`,
+			[idUsuario, idAcademia]
+		);
+
+		await conn.execute(
+			`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil) VALUES (?, ?, ?)`,
+			[idUsuario, idAcademia, idPerfilAdmin]
+		);
+
+		await conn.execute(
+			`INSERT INTO Log_Auditoria (id_academia, id_usuario, acao, entidade, id_entidade, dados_depois, ip)
+			 VALUES (?, ?, 'SAAS_DESIGNAR_ADMIN_ACADEMIA', 'Usuario', ?, ?, ?)`,
+			[
+				idAcademia,
+				idSuperAdminOperador,
+				String(idUsuario),
+				JSON.stringify({ id_usuario: idUsuario, id_academia: idAcademia, perfil: 'Admin' }),
 				ipOperador || null
 			]
 		);

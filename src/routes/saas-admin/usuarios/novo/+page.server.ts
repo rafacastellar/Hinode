@@ -38,8 +38,23 @@ export const actions: Actions = {
 
 		const idAcademiaRaw = formData.get('idAcademia');
 		const idAcademia = idAcademiaRaw && Number(idAcademiaRaw) > 0 ? Number(idAcademiaRaw) : null;
-		const idsPerfisRaw = formData.getAll('idsPerfis');
-		const idsPerfis = idsPerfisRaw.map((id) => Number(id)).filter((id) => id > 0);
+
+		let idsPerfis: number[] = [];
+		const idsPerfisJsonRaw = formData.get('idsPerfisJson');
+		if (idsPerfisJsonRaw) {
+			try {
+				const parsed = JSON.parse(String(idsPerfisJsonRaw));
+				if (Array.isArray(parsed)) {
+					idsPerfis = parsed.map((id) => Number(id)).filter((id) => id > 0);
+				}
+			} catch {
+				// fallback abaixo
+			}
+		}
+		if (idsPerfis.length === 0) {
+			const idsPerfisRaw = formData.getAll('idsPerfis');
+			idsPerfis = idsPerfisRaw.map((id) => Number(id)).filter((id) => id > 0);
+		}
 
 		if (!nome || !cpf || !dataNascimento || !email || !senha) {
 			return fail(400, {
