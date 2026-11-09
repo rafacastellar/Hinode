@@ -3,7 +3,7 @@
 	import StatCard from '#lib/components/ui/StatCard.svelte';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import CardAniversariantes from './CardAniversariantes.svelte';
-	import CardConformidadeAlunos from './CardConformidadeAlunos.svelte';
+	import BarraAlertasNotificacao from './BarraAlertasNotificacao.svelte';
 	import {
 		Award,
 		Users,
@@ -37,63 +37,48 @@
 
 <div class="space-y-8 animate-in fade-in duration-300">
 	<!-- ========================================================================= -->
-	<!-- 1. BANNER DO SENSEI / CREDENCIAMENTO TÉCNICO                              -->
+	<!-- BARRA DE ALERTAS COMPACTA (ESTILO MOBILE) LOGO ABAIXO DA TOPBAR           -->
 	<!-- ========================================================================= -->
-	<section
-		class="relative overflow-hidden p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-2xl"
-	>
-		<!-- Brilho âmbar sutil no fundo representando a autoridade do Sensei -->
-		<div
-			class="absolute -top-24 -right-24 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none"
-		></div>
+	<BarraAlertasNotificacao
+		pendenciasTecnicas={painel.pendenciasTecnicas}
+		escopo="tutela"
+	/>
 
-		<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-			<div>
-				<div class="flex items-center gap-2 mb-3 flex-wrap">
-					<span
-						class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-950/40 border border-amber-800/60 text-xs font-mono text-amber-300"
-					>
-						<Award class="w-3.5 h-3.5 text-amber-500" />
-						<span>Sensei Técnico: {painel.professor.grau_faixa || 'Faixa Preta'}</span>
+	<!-- ========================================================================= -->
+	<!-- 0. DESTAQUE DE GRADUAÇÃO & CREDENCIAL TÉCNICA DO SENSEI NO TATAME         -->
+	<!-- ========================================================================= -->
+	<div
+		class="p-4 sm:p-5 rounded-2xl bg-zinc-950 border border-zinc-800/90 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+	>
+		<div class="flex items-center gap-3.5 min-w-0">
+			<div
+				class="w-10 h-10 rounded-xl bg-amber-950/50 border border-amber-700/60 flex items-center justify-center text-amber-400 shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+			>
+				<Award class="w-5 h-5" />
+			</div>
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 flex-wrap">
+					<span class="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold">
+						Credenciamento Técnico no Tatame
 					</span>
 					{#if painel.professor.n_federacao}
-						<span class="text-xs text-zinc-600 font-mono">•</span>
-						<span class="text-xs text-zinc-400 font-mono">
-							Reg.: {painel.professor.n_federacao}
-						</span>
+						<span class="text-[10px] font-mono text-zinc-500">• Reg. FPJ/CBJ: <strong class="text-zinc-300">{painel.professor.n_federacao}</strong></span>
 					{/if}
-					<span class="text-xs text-zinc-600 font-mono">•</span>
-					<span class="text-xs text-zinc-400 font-mono">{nomeAcademia}</span>
+					<span class="text-[10px] font-mono text-zinc-500 hidden md:inline">• {painel.totalAlunosSobTutela} judoca(s) sob tutela</span>
 				</div>
-
-				<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
-					Tatame do Sensei, {painel.professor.nome}
-				</h1>
-				<p class="text-sm text-zinc-400 mt-1 max-w-2xl">
-					Painel de gestão técnica das suas turmas, judocas sob sua tutela e conformidade marcial.
-				</p>
-			</div>
-
-			<!-- Resumo da Tutela -->
-			<div
-				class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 shrink-0 self-start md:self-auto space-y-1.5"
-			>
-				<span class="text-[11px] font-mono uppercase tracking-wider text-zinc-500 block">
-					Status Técnico no Dojo:
-				</span>
-				<div class="flex items-center gap-2">
-					<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-					<span class="text-xs font-bold text-white">Professor Ativo no Tatame</span>
-				</div>
-				<span class="text-[11px] font-mono text-zinc-400 block">
-					{painel.totalAlunosSobTutela} judoca(s) sob sua responsabilidade
-				</span>
+				<h2 class="text-sm sm:text-base font-bold text-white font-display truncate">
+					Sensei {painel.professor.nome} — Graduação Oficial & Responsabilidade Técnica
+				</h2>
 			</div>
 		</div>
-	</section>
+
+		<div class="flex items-center gap-3 shrink-0 self-start sm:self-auto">
+			<BadgeFaixa faixa={painel.professor.grau_faixa || 'Preta Shodan'} size="lg" showLegend={true} />
+		</div>
+	</div>
 
 	<!-- ========================================================================= -->
-	<!-- 2. GRID DE KPIS OPERACIONAIS DO SENSEI                                    -->
+	<!-- 1. GRID DE KPIS OPERACIONAIS DO SENSEI                                    -->
 	<!-- ========================================================================= -->
 	<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 		<StatCard
@@ -216,11 +201,6 @@
 					</div>
 				{/if}
 			</section>
-
-			<!-- ===================================================================== -->
-			<!-- ALERTAS & PENDÊNCIAS TÉCNICAS DA TUTELA                               -->
-			<!-- ===================================================================== -->
-			<CardConformidadeAlunos pendencias={painel.pendenciasTecnicas} escopo="tutela" />
 
 			<!-- ===================================================================== -->
 			<!-- PRÓXIMOS EVENTOS DO DOJO                                              -->

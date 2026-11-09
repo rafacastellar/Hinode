@@ -179,26 +179,34 @@
 
 					<div class="flex items-center gap-2 flex-wrap pt-0.5">
 						{#each data.perfil.perfis as perfil}
-							<BadgePerfil perfil={perfil.role} tamanho="sm" />
+							{@const chave = perfil.role.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()}
+							<BadgePerfil perfil={perfil.role} tamanho="sm" href="/dashboard?visao={chave}" />
 						{/each}
 					</div>
 				</div>
 			</div>
 
-			{#if data.perfil.dados_aluno}
-				<!-- Badge de Graduação do Aluno -->
+			{#if data.perfil.dados_aluno || data.perfil.dados_professor}
+				{@const faixaExibicao = data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor?.grau_faixa || 'Preta Shodan'}
+				<!-- Badge de Graduação Unificada do Judoca / Sensei -->
 				<div
-					class="shrink-0 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800/80 flex flex-col items-center justify-center min-w-[180px] text-center space-y-1.5 shadow-lg"
+					class="shrink-0 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800/80 flex flex-col items-center justify-center min-w-[200px] text-center space-y-1.5 shadow-lg"
 				>
 					<span class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold">
 						Graduação Atual
 					</span>
 					<div class="my-0.5">
-						<BadgeFaixa faixa={data.perfil.dados_aluno.graduacao_atual} size="md" />
+						<BadgeFaixa faixa={faixaExibicao} size="lg" showLegend={true} />
 					</div>
-					<span class="text-[10px] font-mono text-zinc-500">
-						Sensei: {data.perfil.dados_aluno.nome_professor_responsavel}
-					</span>
+					{#if data.perfil.dados_aluno?.nome_professor_responsavel}
+						<span class="text-[10px] font-mono text-zinc-500">
+							Sensei: {data.perfil.dados_aluno.nome_professor_responsavel}
+						</span>
+					{:else if data.perfil.dados_professor?.n_federacao}
+						<span class="text-[10px] font-mono text-zinc-500">
+							Reg. FPJ/CBJ: {data.perfil.dados_professor.n_federacao}
+						</span>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -776,13 +784,18 @@
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 				<div class="space-y-1">
 					<label for="sensei-grau" class="text-xs font-semibold text-zinc-400">Grau / Faixa (Dan)</label>
-					<input
-						id="sensei-grau"
-						type="text"
-						readonly
-						value={data.perfil.dados_professor.grau_faixa || 'Sensei'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
-					/>
+					<div class="relative flex items-center">
+						<input
+							id="sensei-grau"
+							type="text"
+							readonly
+							value={data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor.grau_faixa || 'Preta Shodan'}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed pr-36 select-all"
+						/>
+						<div class="absolute right-2.5 pointer-events-none">
+							<BadgeFaixa faixa={data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor.grau_faixa || 'Preta Shodan'} size="sm" />
+						</div>
+					</div>
 				</div>
 				<div class="space-y-1">
 					<label for="sensei-federacao" class="text-xs font-semibold text-zinc-400">Nº Registro Federativo</label>
@@ -790,7 +803,7 @@
 						id="sensei-federacao"
 						type="text"
 						readonly
-						value={data.perfil.dados_professor.n_federacao || 'Não informado'}
+						value={data.perfil.dados_professor.n_federacao || data.perfil.dados_aluno?.n_federacao || 'Não informado'}
 						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
 					/>
 				</div>

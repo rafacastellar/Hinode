@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LayoutProps } from './$types';
 	import BadgePerfil from '#lib/components/ui/BadgePerfil.svelte';
+	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import ToastContainer from '#lib/components/ui/ToastContainer.svelte';
 	import hinodeEmblema from '#lib/assets/hinode-emblema.svg';
 	import {
@@ -44,6 +45,14 @@
 		}
 	}
 
+	function normalizarPapel(texto: string): string {
+		return texto
+			.toLowerCase()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.trim();
+	}
+
 	const mapaIcones: Record<string, any> = {
 		dashboard: LayoutDashboard,
 		users: Users,
@@ -56,10 +65,101 @@
 		'heart-handshake': HeartHandshake
 	};
 
-	const ehApenasAluno = $derived(
-		data.perfis.some((p) => p.toLowerCase() === 'aluno') &&
-			!data.perfis.some((p) => ['admin', 'professor', 'recepcao'].includes(p.toLowerCase()))
+	// Visão ativa atualmente resolvida na página ou pelo perfil padrão de maior autoridade
+	const visaoAtivaAtual = $derived.by(() => {
+		const daPagina = (page.data as Record<string, any>)?.visaoAtiva as string | undefined;
+		if (daPagina) return daPagina;
+
+		const visaoUrl = page.url.searchParams.get('visao');
+		if (visaoUrl) return normalizarPapel(visaoUrl);
+
+		const perfisNorm = data.perfis.map(normalizarPapel);
+		if (perfisNorm.includes('admin')) return 'admin';
+		if (perfisNorm.includes('professor')) return 'professor';
+		if (perfisNorm.includes('recepcao')) return 'recepcao';
+		if (perfisNorm.includes('aluno')) return 'aluno';
+		if (perfisNorm.includes('responsavel')) return 'responsavel';
+		return 'admin';
+	});
+
+	const configContextoRota = $derived.by(() => {
+		const caminho = page.url.pathname;
+
+		if (caminho === '/dashboard') {
+			switch (visaoAtivaAtual) {
+				case 'aluno':
+					return {
+						titulo: 'Portal do Judoca',
+						corTexto: 'text-red-400'
+					};
+				case 'professor':
+					return {
+						titulo: 'Tatame do Sensei',
+						corTexto: 'text-amber-400'
+					};
+				case 'recepcao':
+					return {
+						titulo: 'Secretaria & Recepção',
+						corTexto: 'text-sky-400'
+					};
+				case 'responsavel':
+					return {
+						titulo: 'Espaço da Família',
+						corTexto: 'text-emerald-400'
+					};
+				default:
+					return {
+						titulo: 'Painel Administrativo',
+						corTexto: 'text-red-400'
+					};
+			}
+		}
+
+		if (caminho.startsWith('/dashboard/alunos')) {
+			return { titulo: 'Alunos & Judocas', corTexto: 'text-red-400' };
+		}
+		if (caminho.startsWith('/dashboard/turmas')) {
+			return { titulo: 'Turmas & Treinos', corTexto: 'text-amber-400' };
+		}
+		if (caminho.startsWith('/dashboard/graduacoes')) {
+			return { titulo: 'Graduações & Faixas', corTexto: 'text-red-400' };
+		}
+		if (caminho.startsWith('/dashboard/campeonatos')) {
+			return { titulo: 'Campeonatos & Torneios', corTexto: 'text-amber-400' };
+		}
+		if (caminho.startsWith('/dashboard/perfil')) {
+			return { titulo: 'Meu Perfil', corTexto: 'text-red-400' };
+		}
+		if (caminho.startsWith('/dashboard/responsavel')) {
+			return { titulo: 'Perfil do Responsável', corTexto: 'text-emerald-400' };
+		}
+		if (caminho.startsWith('/dashboard/usuarios')) {
+			return { titulo: 'Equipe & Usuários', corTexto: 'text-sky-400' };
+		}
+		if (caminho.startsWith('/dashboard/configuracoes')) {
+			return { titulo: 'Configurações do Dojo', corTexto: 'text-zinc-300' };
+		}
+
+		const itemMenuAtivo = data.itensMenu.find((item) => rotaAtiva(item.href));
+		return {
+			titulo: itemMenuAtivo?.titulo || 'Painel Administrativo',
+			corTexto: 'text-red-400'
+		};
+	});
+
+	// Faixa unificada (Obi oficial) exibida com destaque na barra superior para Aluno e/ou Professor,
+	// mantendo a mesma faixa em todos os perfis e páginas acessadas
+	const faixaUnificadaUsuario = $derived(
+		data.resumoCredenciais?.aluno?.graduacaoAtual ||
+			data.resumoCredenciais?.professor?.grauFaixa ||
+			null
 	);
+
+	const matriculaUsuario = $derived(data.resumoCredenciais?.aluno?.matricula || null);
+	const registroFederacaoProfessor = $derived(
+		data.resumoCredenciais?.professor?.nFederacao || null
+	);
+	const senseiDoUsuario = $derived(data.resumoCredenciais?.aluno?.nomeSensei || null);
 
 	function rotaAtiva(href: string): boolean {
 		const caminhoAtual = page.url.pathname;
@@ -250,12 +350,12 @@
 			</button>
 
 			<!-- Identidade da Academia no Topo Mobile (Sem cortar) -->
-			<a href="/dashboard" class="flex items-center gap-2.5 min-w-0 flex-1 group" title={data.nomeAcademia || 'Academia'}>
-				<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group-hover:border-amber-500/50 transition-colors">
+			<a href="/dashboard" class="flex items-center gap-3 min-w-0 flex-1 group" title={data.nomeAcademia || 'Academia'}>
+				<div class="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_12px_rgba(220,38,38,0.18)] group-hover:border-amber-500/50 transition-colors">
 					{#if data.logoAcademia}
 						<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-lg" />
 					{:else}
-						<Building2 class="w-4 h-4 text-red-500" />
+						<Building2 class="w-5 h-5 text-red-500" />
 					{/if}
 				</div>
 				<div class="min-w-0 flex-1">
@@ -399,19 +499,31 @@
 
 				<!-- Rodapé Mobile com Usuário & Logout -->
 				<div class="p-4 border-t border-zinc-900 bg-zinc-950/95 space-y-3">
-					<div class="flex items-center gap-3">
-						<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold font-mono text-zinc-200 shrink-0">
-							{data.usuario?.nome?.charAt(0).toUpperCase()}
+					<div class="flex items-center justify-between gap-2">
+						<div class="flex items-center gap-3 min-w-0 flex-1">
+							<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold font-mono text-zinc-200 shrink-0">
+								{data.usuario?.nome?.charAt(0).toUpperCase()}
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="text-xs text-white font-bold truncate leading-tight">{data.usuario?.nome}</div>
+								<div class="text-[10px] text-zinc-500 font-mono truncate">{data.usuario?.email}</div>
+							</div>
 						</div>
-						<div class="min-w-0 flex-1">
-							<div class="text-xs text-white font-bold truncate leading-tight">{data.usuario?.nome}</div>
-							<div class="text-[10px] text-zinc-500 font-mono truncate">{data.usuario?.email}</div>
-						</div>
+						{#if faixaUnificadaUsuario}
+							<BadgeFaixa faixa={faixaUnificadaUsuario} size="sm" />
+						{/if}
 					</div>
 
-					<div class="flex flex-wrap gap-1">
+					<div class="flex flex-wrap gap-1.5">
 						{#each data.perfis as perfil}
-							<BadgePerfil {perfil} tamanho="sm" />
+							{@const chavePerfil = normalizarPapel(perfil)}
+							<BadgePerfil
+								{perfil}
+								tamanho="sm"
+								href="/dashboard?visao={chavePerfil}"
+								ativo={page.url.pathname === '/dashboard' && visaoAtivaAtual === chavePerfil}
+								onclick={() => (menuAberto = false)}
+							/>
 						{/each}
 					</div>
 
@@ -433,12 +545,12 @@
 	<!-- CONTEÚDO PRINCIPAL (Slot das rotas filhas) -->
 	<!-- ========================================================================= -->
 	<main class="flex-1 min-w-0 bg-black flex flex-col">
-		<!-- Topbar Desktop Minimalista com Identidade em Destaque -->
+		<!-- Topbar Desktop Minimalista com Identidade, Faixa em Destaque & Controle de Visualização -->
 		<div
-			class="hidden lg:flex min-h-16 lg:h-20 border-b border-zinc-900/80 bg-zinc-950/40 backdrop-blur-md px-6 sm:px-8 items-center justify-between sticky top-0 z-30"
+			class="hidden lg:flex min-h-20 lg:h-24 border-b border-zinc-900/80 bg-zinc-950/40 backdrop-blur-md px-6 sm:px-8 items-center justify-between gap-4 sticky top-0 z-30"
 		>
-			<!-- Lado Esquerdo: Botão Toggle Sidebar + Destaque da Academia / Breadcrumb -->
-			<div class="flex items-center gap-3.5 min-w-0 flex-1">
+			<!-- Lado Esquerdo: Botão Toggle Sidebar + Destaque da Academia + Rota Acessada + Credenciais Fixas -->
+			<div class="flex items-center gap-4 min-w-0 flex-1">
 				<button
 					type="button"
 					onclick={alternarSidebar}
@@ -454,26 +566,39 @@
 				</button>
 
 				<!-- Destaque Especial da Academia na Topbar Superior -->
-				<div class="flex items-center gap-3 min-w-0">
-					<!-- Miniatura do Logo na barra superior -->
-					<div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+				<div class="flex items-center gap-4 min-w-0">
+					<!-- Logo Ampliado da Academia na barra superior -->
+					<a
+						href="/dashboard"
+						class="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_18px_rgba(220,38,38,0.22)] hover:border-red-600/60 transition-all group"
+						title={data.nomeAcademia || 'Academia'}
+					>
 						{#if data.logoAcademia}
-							<img src={data.logoAcademia} alt={data.nomeAcademia || 'Academia'} class="w-full h-full object-contain rounded-lg" />
+							<img
+								src={data.logoAcademia}
+								alt={data.nomeAcademia || 'Academia'}
+								class="w-full h-full object-contain rounded-xl transition-transform duration-300 group-hover:scale-105"
+								onerror={(e) => {
+									const target = e.currentTarget as HTMLImageElement;
+									target.src = hinodeEmblema;
+								}}
+							/>
 						{:else}
-							<Building2 class="w-4 h-4 text-red-500" />
+							<Building2 class="w-6 h-6 text-red-500" />
 						{/if}
-					</div>
+					</a>
 
-					<!-- Breadcrumb & Nome Completo -->
+					<!-- Breadcrumb, Rota Atual & Metadados Persistentes -->
 					<div class="flex flex-col min-w-0">
-						<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono">
-							<span class="text-white font-extrabold tracking-tight text-sm uppercase truncate max-w-[280px] xl:max-w-[420px]" title={data.nomeAcademia || 'Dojo'}>
+						<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono flex-wrap">
+							<span class="text-white font-extrabold tracking-tight text-sm uppercase truncate max-w-[240px] xl:max-w-[340px]" title={data.nomeAcademia || 'Dojo'}>
 								{data.nomeAcademia || 'Dojo'}
 							</span>
 							<span class="text-zinc-600">/</span>
-							<span class="text-red-400 font-semibold uppercase tracking-wider text-[11px]">
-								{ehApenasAluno ? 'Portal do Judoca' : 'Painel Administrativo'}
+							<span class="{configContextoRota.corTexto} font-semibold uppercase tracking-wider text-[11px]">
+								{configContextoRota.titulo}
 							</span>
+
 							{#if data.totalAcoesPendentes && data.totalAcoesPendentes > 0}
 								<span class="text-zinc-600">•</span>
 								<span
@@ -484,16 +609,47 @@
 								</span>
 							{/if}
 						</div>
-						<span class="text-[9px] font-mono text-zinc-500 tracking-wider uppercase">
-							Plataforma SGT • Unidade #{data.idAcademia}
-						</span>
+
+						<!-- Subtítulo persistente independente do perfil ativo -->
+						<div class="flex items-center gap-2 text-[9px] font-mono text-zinc-500 tracking-wider uppercase mt-0.5 flex-wrap">
+							<span>Plataforma SGT • Unidade #{data.idAcademia}</span>
+							{#if matriculaUsuario}
+								<span class="text-zinc-700">•</span>
+								<span class="text-zinc-400">Matr. <strong class="text-zinc-300">{matriculaUsuario}</strong></span>
+							{/if}
+							{#if registroFederacaoProfessor}
+								<span class="text-zinc-700">•</span>
+								<span class="text-amber-400/90">Reg. FPJ/CBJ <strong class="text-amber-300">{registroFederacaoProfessor}</strong></span>
+							{/if}
+							{#if senseiDoUsuario}
+								<span class="text-zinc-700 hidden xl:inline">•</span>
+								<span class="text-zinc-400 hidden xl:inline">Sensei: <strong class="text-zinc-300">{senseiDoUsuario}</strong></span>
+							{/if}
+							{#if data.totalDependentes && data.totalDependentes > 0}
+								<span class="text-zinc-700 hidden 2xl:inline">•</span>
+								<span class="text-emerald-400/90 hidden 2xl:inline">{data.totalDependentes} {data.totalDependentes === 1 ? 'Tutelado' : 'Tutelados'}</span>
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>
 
-			<!-- Painel do Usuário Logado & Logout (Topo Direito) -->
+			<!-- Painel do Usuário Logado, Faixa Unificada em Destaque & Controle de Visualização (Topo Direito) -->
 			<div class="flex items-center gap-3.5 sm:gap-4 shrink-0">
-				<!-- Identificação do Usuário (Avatar + Nome + Email + Badges) -->
+				<!-- Destaque da Faixa Oficial do Judoca / Sensei (Mantida em todos os perfis) -->
+				{#if faixaUnificadaUsuario}
+					<a
+						href="/dashboard/perfil"
+						class="flex items-center p-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800/90 hover:border-amber-500/40 transition-all shadow-sm"
+						title="Graduação oficial no tatame ({faixaUnificadaUsuario})"
+					>
+						<BadgeFaixa faixa={faixaUnificadaUsuario} size="md" />
+					</a>
+
+					<div class="w-px h-8 bg-zinc-800/80"></div>
+				{/if}
+
+				<!-- Identificação do Usuário (Avatar + Nome + Email + Botões de Controle de Visualização) -->
 				<div class="flex items-center gap-3">
 					<a
 						href="/dashboard/perfil"
@@ -516,10 +672,16 @@
 							</span>
 						</div>
 
-						<!-- Badges de Perfis do Usuário -->
-						<div class="flex items-center gap-1 mt-1 flex-wrap">
+						<!-- Botões de Controle de Visualização do Painel por Perfil -->
+						<div class="flex items-center gap-1.5 mt-1 flex-wrap" role="group" aria-label="Alternar visualização do painel por perfil">
 							{#each data.perfis as perfil}
-								<BadgePerfil {perfil} tamanho="sm" />
+								{@const chavePerfil = normalizarPapel(perfil)}
+								<BadgePerfil
+									{perfil}
+									tamanho="sm"
+									href="/dashboard?visao={chavePerfil}"
+									ativo={page.url.pathname === '/dashboard' && visaoAtivaAtual === chavePerfil}
+								/>
 							{/each}
 						</div>
 					</div>

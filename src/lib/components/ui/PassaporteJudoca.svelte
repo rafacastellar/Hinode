@@ -16,6 +16,8 @@
 		nomeSensei?: string | null;
 		nomeAcademia?: string | null;
 		dataReferenciaGraduacao?: string | null;
+		tempoJudo?: string | null;
+		tempoFaixaAtual?: string | null;
 	}
 
 	let {
@@ -29,7 +31,9 @@
 		statusFederacao = 'Ativo',
 		nomeSensei = null,
 		nomeAcademia = 'Judô Hinodê',
-		dataReferenciaGraduacao = null
+		dataReferenciaGraduacao = null,
+		tempoJudo = null,
+		tempoFaixaAtual = null
 	}: Props = $props();
 
 	let exibirPassaporte = $state(false);
@@ -42,24 +46,33 @@
 		onclick={() => (exibirPassaporte = !exibirPassaporte)}
 		class="w-full p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-zinc-900/50 transition-colors cursor-pointer text-left"
 	>
-		<div class="flex items-center gap-3.5">
+		<div class="flex items-center gap-3.5 min-w-0 flex-1">
 			<div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
 				<img src={hinodeEmblema} alt="Hinodê" class="w-7 h-7 object-contain" />
 			</div>
-			<div>
-				<div class="flex items-center gap-2">
+			<div class="min-w-0 flex-1">
+				<div class="flex items-center gap-2 flex-wrap">
 					<span class="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold">
 						Identidade Federativa & Progressão
 					</span>
+					{#if tempoJudo}
+						<span class="text-[10px] font-mono text-zinc-500 hidden sm:inline">• No Judô há {tempoJudo}</span>
+					{/if}
+					{#if tempoFaixaAtual}
+						<span class="text-[10px] font-mono text-zinc-500 hidden md:inline">• Na faixa há {tempoFaixaAtual}</span>
+					{/if}
 				</div>
-				<h3 class="text-sm sm:text-base font-bold text-white font-display">
+				<h3 class="text-sm sm:text-base font-bold text-white font-display truncate">
 					Passaporte Digital do Judoca & Termômetro de Faixa
 				</h3>
 			</div>
 		</div>
 
-		<div class="flex items-center gap-2 shrink-0">
-			<span class="text-xs font-mono text-zinc-400 hidden sm:inline">
+		<div class="flex items-center gap-3 shrink-0">
+			<div>
+				<BadgeFaixa faixa={faixaAtual} size="lg" showLegend={true} />
+			</div>
+			<span class="text-xs font-mono text-zinc-400 hidden lg:inline">
 				{exibirPassaporte ? 'Ocultar Carteirinha' : 'Exibir Carteirinha'}
 			</span>
 			<div class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300">

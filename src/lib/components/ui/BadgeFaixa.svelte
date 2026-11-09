@@ -87,7 +87,7 @@
 	});
 
 	// Rótulo oficial da faixa (ex: "Preta (1º Dan)", "Branca Ponta Cinza")
-	const rotuloPrincipal = $derived(obterRotuloOficialFaixa(faixa, numeroDan));
+	const rotuloPrincipal = $derived(obterRotuloOficialFaixa(faixa));
 
 	// Legenda oficial detalhada (ex: "1º Dan (Sho-dan) - Faixa Preta")
 	const legendaOficial = $derived(

@@ -1083,7 +1083,7 @@ export async function buscarPerfilCompletoParaUsuario(
 		};
 	}
 
-	// 5. Dados de Professor (se aplicável)
+	// 5. Dados de Professor (se aplicável, unificando a faixa com Aluno quando possuir ambos)
 	let dadosProfessor: PerfilCompletoUsuario['dados_professor'] = null;
 	const [profLinhas] = await pool.query<RowDataPacket[]>(
 		`SELECT n_federacao, grau_faixa FROM Professor WHERE id_usuario = ? LIMIT 1`,
@@ -1091,8 +1091,12 @@ export async function buscarPerfilCompletoParaUsuario(
 	);
 	if (profLinhas.length > 0) {
 		dadosProfessor = {
-			n_federacao: profLinhas[0].n_federacao ? String(profLinhas[0].n_federacao) : null,
-			grau_faixa: profLinhas[0].grau_faixa ? String(profLinhas[0].grau_faixa) : null
+			n_federacao: profLinhas[0].n_federacao
+				? String(profLinhas[0].n_federacao)
+				: dadosAluno?.n_federacao || null,
+			grau_faixa:
+				dadosAluno?.graduacao_atual ||
+				(profLinhas[0].grau_faixa ? String(profLinhas[0].grau_faixa) : null)
 		};
 	}
 

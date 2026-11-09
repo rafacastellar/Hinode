@@ -927,18 +927,19 @@ export async function obterPainelProfessor(
 ): Promise<PainelProfessorDados | null> {
 	const pool = getDbPool();
 
-	// 1. Dados cadastrais e marciais do professor
+	// 1. Dados cadastrais e marciais do professor (unificando a faixa de Aluno e Professor)
 	const sqlProf = `
 		SELECT 
 			u.id_usuario,
 			u.nome,
 			u.email,
 			u.telefone,
-			p.n_federacao,
-			p.grau_faixa
+			COALESCE(p.n_federacao, a.n_federacao) AS n_federacao,
+			COALESCE(a.graduacao_atual, p.grau_faixa, 'Preta Shodan') AS grau_faixa
 		FROM Professor p
 		INNER JOIN Usuario u ON u.id_usuario = p.id_usuario
 		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
+		LEFT JOIN Aluno a ON a.id_usuario = u.id_usuario
 		WHERE p.id_usuario = ? AND ua.id_academia = ?
 		LIMIT 1
 	`;

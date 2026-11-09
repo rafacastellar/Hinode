@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PainelResponsavelDados } from '#lib/server/repositorios/dashboard.repo';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
-	import CardConformidadeAlunos from './CardConformidadeAlunos.svelte';
+	import BarraAlertasNotificacao from './BarraAlertasNotificacao.svelte';
 	import {
 		HeartHandshake,
 		Users,
@@ -51,65 +51,64 @@
 
 <div class="space-y-8 animate-in fade-in duration-300">
 	<!-- ========================================================================= -->
-	<!-- 1. BANNER PRINCIPAL DO RESPONSÁVEL / ESPAÇO DA FAMÍLIA                    -->
+	<!-- 0. BARRA DE ALERTAS COMPACTA (ESTILO NOTIFICAÇÕES MOBILE)                 -->
 	<!-- ========================================================================= -->
-	<section
-		class="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950/20 border border-zinc-800 shadow-2xl"
-	>
-		<!-- Brilho esmeralda sutil de fundo representando tutela e acolhimento familiar -->
-		<div
-			class="absolute -top-24 -right-24 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"
-		></div>
+	<BarraAlertasNotificacao
+		pendenciasTecnicas={painel.pendenciasTecnicas}
+		pendenciasJudoca={pendenciasAtivas}
+		nomeJudocaAlvo={dependenteAtivo?.aluno.nome}
+		escopo="responsavel"
+		onSelecionarAluno={(idAluno) => {
+			const idx = painel.dependentes.findIndex((d) => d.aluno.id_usuario === idAluno);
+			if (idx !== -1) {
+				indiceSelecionado = idx;
+			}
+		}}
+	/>
 
-		<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+	<!-- ========================================================================= -->
+	<!-- 1. KPIs RÁPIDOS DA FAMÍLIA / TUTELA                                       -->
+	<!-- ========================================================================= -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3">
 			<div>
-				<div class="flex items-center gap-2 mb-3">
-					<span
-						class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/80 text-xs font-mono font-bold text-emerald-400"
-					>
-						<HeartHandshake class="w-3.5 h-3.5 text-emerald-400" />
-						<span>Espaço da Família</span>
-					</span>
-					<span class="text-xs text-zinc-600 font-mono">•</span>
-					<span class="text-xs text-zinc-400 font-mono">{nomeDojo}</span>
+				<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Atletas Sob Tutela</span>
+				<div class="flex items-baseline gap-1.5 mt-0.5">
+					<span class="text-2xl font-black text-white font-display">{painel.totalDependentes}</span>
+					<span class="text-xs text-zinc-400 font-mono">judoca(s)</span>
 				</div>
-
-				<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
-					Olá, {painel.responsavel.nome}!
-				</h1>
-				<p class="text-xs sm:text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-					Acompanhe de perto a evolução técnica, pontualidade nos treinos e conquistas esportivas dos judocas sob sua responsabilidade legal no dojo.
-				</p>
 			</div>
-
-			<!-- Resumo Rápido da Família -->
-			<div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 shrink-0">
-				<div class="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-center">
-					<span class="text-[10px] font-mono uppercase text-zinc-500 block">Tutelados</span>
-					<span class="text-lg font-black text-white font-display">
-						{painel.totalDependentes}
-					</span>
-					<span class="text-[10px] text-zinc-400 block font-mono">atleta(s)</span>
-				</div>
-
-				<div class="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-center">
-					<span class="text-[10px] font-mono uppercase text-zinc-500 block">Aulas Semanais</span>
-					<span class="text-lg font-black text-emerald-400 font-display">
-						{painel.totalTurmasAtivas}
-					</span>
-					<span class="text-[10px] text-zinc-400 block font-mono">horário(s)</span>
-				</div>
-
-				<div class="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-center col-span-2 sm:col-span-1">
-					<span class="text-[10px] font-mono uppercase text-zinc-500 block">Pódios Família</span>
-					<span class="text-lg font-black text-amber-400 font-display">
-						{painel.totalMedalhasFamilia}
-					</span>
-					<span class="text-[10px] text-zinc-400 block font-mono">medalha(s)</span>
-				</div>
+			<div class="w-10 h-10 rounded-xl bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shrink-0">
+				<Users class="w-5 h-5" />
 			</div>
 		</div>
-	</section>
+
+		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3">
+			<div>
+				<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Aulas Semanais</span>
+				<div class="flex items-baseline gap-1.5 mt-0.5">
+					<span class="text-2xl font-black text-emerald-400 font-display">{painel.totalTurmasAtivas}</span>
+					<span class="text-xs text-zinc-400 font-mono">horário(s)</span>
+				</div>
+			</div>
+			<div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+				<Calendar class="w-5 h-5" />
+			</div>
+		</div>
+
+		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3">
+			<div>
+				<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Pódios da Família</span>
+				<div class="flex items-baseline gap-1.5 mt-0.5">
+					<span class="text-2xl font-black text-amber-400 font-display">{painel.totalMedalhasFamilia}</span>
+					<span class="text-xs text-zinc-400 font-mono">medalha(s)</span>
+				</div>
+			</div>
+			<div class="w-10 h-10 rounded-xl bg-amber-950/40 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+				<Medal class="w-5 h-5" />
+			</div>
+		</div>
+	</div>
 
 	{#if painel.dependentes.length === 0}
 		<!-- ESTADO VAZIO: NENHUM DEPENDENTE VINCULADO -->
@@ -127,22 +126,6 @@
 			</div>
 		</div>
 	{:else}
-		<!-- ========================================================================= -->
-		<!-- CONFORMIDADE & PENDÊNCIAS TÉCNICAS DOS TUTELADOS                          -->
-		<!-- ========================================================================= -->
-		{#if painel.pendenciasTecnicas}
-			<CardConformidadeAlunos
-				pendencias={painel.pendenciasTecnicas}
-				escopo="responsavel"
-				onSelecionarAluno={(idAluno) => {
-					const idx = painel.dependentes.findIndex((d) => d.aluno.id_usuario === idAluno);
-					if (idx !== -1) {
-						indiceSelecionado = idx;
-					}
-				}}
-			/>
-		{/if}
-
 		<!-- ========================================================================= -->
 		<!-- 2. SELETOR DE ATLETA TUTELADO (TABS MULTI-FILHOS)                         -->
 		<!-- ========================================================================= -->
@@ -203,70 +186,6 @@
 			{@const graduacoes = dependenteAtivo.painelJudoca.graduacoes}
 			{@const conquistas = dependenteAtivo.painelJudoca.conquistas}
 			{@const proximosEventos = dependenteAtivo.painelJudoca.proximosEventos}
-
-			<!-- ===================================================================== -->
-			<!-- 3. ALERTA DE AÇÃO PRIORITÁRIA PARA O DEPENDENTE SELECIONADO           -->
-			<!-- ===================================================================== -->
-			{#if temAcaoPendente && primeiraAcao}
-				<aside
-					class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-950 via-zinc-950 to-amber-950/70 border-2 border-red-500/80 p-5 sm:p-6 shadow-[0_0_40px_rgba(239,68,68,0.3)] animate-in slide-in-from-top-4 duration-300"
-					aria-label="Alerta de ação pendente prioritária para o atleta"
-				>
-					<div
-						class="absolute -top-16 -right-16 w-56 h-56 bg-red-600/20 rounded-full blur-3xl pointer-events-none"
-					></div>
-
-					<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-						<div class="flex items-start gap-4">
-							<div
-								class="w-12 h-12 rounded-2xl bg-red-600/20 border-2 border-red-500/90 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_25px_rgba(239,68,68,0.4)] animate-pulse"
-							>
-								<BellRing class="w-6 h-6 text-red-400" />
-							</div>
-
-							<div class="space-y-1.5">
-								<div class="flex items-center gap-2 flex-wrap">
-									<span
-										class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-mono font-extrabold uppercase bg-red-600 text-white shadow-sm tracking-wider"
-									>
-										<span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-										<span>Ação Requerida para {dependenteAtivo.aluno.nome}</span>
-									</span>
-									{#if pendenciasAcao.length > 1}
-										<span
-											class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 border border-amber-500/50 text-amber-300"
-										>
-											+{pendenciasAcao.length - 1} outra{pendenciasAcao.length - 1 > 1 ? 's' : ''}
-										</span>
-									{/if}
-									{#if primeiraAcao.prazo}
-										<span class="text-xs text-zinc-400 font-mono">
-											• Data: <strong class="text-white">{primeiraAcao.prazo}</strong>
-										</span>
-									{/if}
-								</div>
-
-								<h2 class="text-base sm:text-lg font-bold text-white font-display tracking-tight flex items-center gap-2">
-									{primeiraAcao.titulo}
-								</h2>
-								<p class="text-xs sm:text-sm text-zinc-300 max-w-2xl leading-relaxed">
-									{primeiraAcao.descricao}
-								</p>
-							</div>
-						</div>
-
-						<div class="flex items-center gap-3 self-end md:self-auto shrink-0 flex-wrap">
-							<a
-								href={primeiraAcao.href}
-								class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-extrabold shadow-[0_0_20px_rgba(220,38,38,0.55)] transition-all hover:scale-105 active:scale-95"
-							>
-								<span>{primeiraAcao.textoBotao}</span>
-								<ArrowRight class="w-4 h-4" />
-							</a>
-						</div>
-					</div>
-				</aside>
-			{/if}
 
 			<!-- ===================================================================== -->
 			<!-- 4. HEADER HERO DO ATLETA: APRESENTAÇÃO & GRADUAÇÃO ATUAL               -->

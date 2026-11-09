@@ -2,6 +2,7 @@ import type { LayoutServerLoad } from './$types';
 import { calcularPermissoes, obterMenuAutorizado, normalizarNomePapel } from '#lib/server/auth/rbac';
 import { contarPendenciasAcaoAluno } from '#lib/server/repositorios/dashboard.repo';
 import { contarAlunosDoResponsavel } from '#lib/server/repositorios/responsavel.repo';
+import { buscarPerfilCompletoParaUsuario } from '#lib/server/repositorios/usuario.repo';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	const perfis = locals.perfis || [];
@@ -33,6 +34,36 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		}
 	}
 
+	let resumoCredenciais: {
+		aluno?: { matricula: string | null; graduacaoAtual: string; nomeSensei: string } | null;
+		professor?: { grauFaixa: string | null; nFederacao: string | null } | null;
+	} = {};
+
+	if (idAcademia && idUsuario) {
+		try {
+			const perfilCompleto = await buscarPerfilCompletoParaUsuario(idAcademia, idUsuario);
+			if (perfilCompleto) {
+				resumoCredenciais = {
+					aluno: perfilCompleto.dados_aluno
+						? {
+								matricula: perfilCompleto.dados_aluno.matricula,
+								graduacaoAtual: perfilCompleto.dados_aluno.graduacao_atual,
+								nomeSensei: perfilCompleto.dados_aluno.nome_professor_responsavel
+							}
+						: null,
+					professor: perfilCompleto.dados_professor
+						? {
+								grauFaixa: perfilCompleto.dados_professor.grau_faixa,
+								nFederacao: perfilCompleto.dados_professor.n_federacao
+							}
+						: null
+				};
+			}
+		} catch (e) {
+			console.error('Erro ao carregar resumo de credenciais para barra superior:', e);
+		}
+	}
+
 	const itensMenu = obterMenuAutorizado(perfis, { totalDependentes }).map((item) => {
 		if (ehAluno && !ehGestorOuProfessor && item.href === '/dashboard' && totalAcoesPendentes > 0) {
 			return {
@@ -59,6 +90,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		permissoes,
 		itensMenu,
 		totalAcoesPendentes,
-		totalDependentes
+		totalDependentes,
+		resumoCredenciais
 	};
 };
