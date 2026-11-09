@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { PainelProfessorDados } from '#lib/server/repositorios/dashboard.repo';
-	import StatCard from '#lib/components/ui/StatCard.svelte';
-	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
-	import CardAniversariantes from './CardAniversariantes.svelte';
-	import BarraAlertasNotificacao from './BarraAlertasNotificacao.svelte';
+	import type { PainelProfessorDados } from "#lib/server/repositorios/dashboard.repo";
+	import StatCard from "#lib/components/ui/StatCard.svelte";
+	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
+	import CardAniversariantes from "./CardAniversariantes.svelte";
+	import BarraAlertasNotificacao from "./BarraAlertasNotificacao.svelte";
 	import {
 		Award,
 		Users,
@@ -16,22 +16,23 @@
 		Flame,
 		UserPlus,
 		CalendarPlus,
-		Trophy
-	} from '@lucide/svelte';
+		Trophy,
+	} from "@lucide/svelte";
 
 	interface Props {
 		painel: PainelProfessorDados;
 		nomeAcademia?: string | null;
 	}
 
-	let { painel, nomeAcademia = 'Judô Hinodê' }: Props = $props();
-	const nomeDojo = $derived(nomeAcademia || 'Judô Hinodê');
+	let { painel, nomeAcademia = "Judô Hinodê" }: Props = $props();
+	const nomeDojo = $derived(nomeAcademia || "Judô Hinodê");
 
 	const totalPendencias = $derived(
 		painel.pendenciasTecnicas.alunosSemPeso.length +
 			painel.pendenciasTecnicas.alunosSemTurma.length +
 			painel.pendenciasTecnicas.alunosFederacaoPendente.length +
-			(painel.pendenciasTecnicas.campeonatosPendentesAutorizacao?.length || 0)
+			(painel.pendenciasTecnicas.campeonatosPendentesAutorizacao
+				?.length || 0),
 	);
 </script>
 
@@ -58,22 +59,38 @@
 			</div>
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 flex-wrap">
-					<span class="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold">
+					<span
+						class="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold"
+					>
 						Credenciamento Técnico no Tatame
 					</span>
 					{#if painel.professor.n_federacao}
-						<span class="text-[10px] font-mono text-zinc-500">• Reg. FPJ/CBJ: <strong class="text-zinc-300">{painel.professor.n_federacao}</strong></span>
+						<span class="text-[10px] font-mono text-zinc-500"
+							>• Reg. FPJ/CBJ: <strong class="text-zinc-300"
+								>{painel.professor.n_federacao}</strong
+							></span
+						>
 					{/if}
-					<span class="text-[10px] font-mono text-zinc-500 hidden md:inline">• {painel.totalAlunosSobTutela} judoca(s) sob tutela</span>
+					<span
+						class="text-[10px] font-mono text-zinc-500 hidden md:inline"
+						>• {painel.totalAlunosSobTutela} judoca(s) sob tutela</span
+					>
 				</div>
-				<h2 class="text-sm sm:text-base font-bold text-white font-display truncate">
-					Sensei {painel.professor.nome} — Graduação Oficial & Responsabilidade Técnica
+				<h2
+					class="text-sm sm:text-base font-bold text-white font-display truncate"
+				>
+					Sensei {painel.professor.nome} — Graduação Oficial & Responsabilidade
+					Técnica
 				</h2>
 			</div>
 		</div>
 
 		<div class="flex items-center gap-3 shrink-0 self-start sm:self-auto">
-			<BadgeFaixa faixa={painel.professor.grau_faixa || 'Preta Shodan'} size="lg" showLegend={true} />
+			<BadgeFaixa
+				faixa={painel.professor.grau_faixa || "Preta Shodan"}
+				size="lg"
+				showLegend={true}
+			/>
 		</div>
 	</div>
 
@@ -108,11 +125,16 @@
 		<StatCard
 			titulo="Pendências Técnicas"
 			valor={totalPendencias}
-			descricao={totalPendencias === 0 ? 'Tudo em ordem' : 'Requerem sua atenção'}
+			descricao={totalPendencias === 0
+				? "Tudo em ordem"
+				: "Requerem sua atenção"}
 			icone={totalPendencias === 0 ? CheckCircle2 : AlertTriangle}
 			tendencia={{
-				texto: totalPendencias === 0 ? 'Conforme' : `${totalPendencias} pendente(s)`,
-				positivo: totalPendencias === 0
+				texto:
+					totalPendencias === 0
+						? "Conforme"
+						: `${totalPendencias} pendente(s)`,
+				positivo: totalPendencias === 0,
 			}}
 		/>
 	</section>
@@ -126,8 +148,12 @@
 			<!-- ===================================================================== -->
 			<!-- MINHAS TURMAS MINISTRADAS                                             -->
 			<!-- ===================================================================== -->
-			<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
-				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+			<section
+				class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4"
+			>
+				<div
+					class="flex items-center justify-between pb-3 border-b border-zinc-900"
+				>
 					<div class="flex items-center gap-2.5">
 						<div
 							class="w-8 h-8 rounded-lg bg-amber-950/40 border border-amber-800/60 flex items-center justify-center text-amber-400"
@@ -135,10 +161,14 @@
 							<Calendar class="w-4 h-4 text-amber-400" />
 						</div>
 						<div>
-							<h2 class="text-sm font-bold text-white font-display">
+							<h2
+								class="text-sm font-bold text-white font-display"
+							>
 								Minhas Turmas Ministradas
 							</h2>
-							<p class="text-[11px] text-zinc-500">Horários e dias em que você está escalado</p>
+							<p class="text-[11px] text-zinc-500">
+								Horários e dias em que você está escalado
+							</p>
 						</div>
 					</div>
 					<a
@@ -154,10 +184,12 @@
 					<div class="py-8 text-center space-y-2">
 						<Calendar class="w-8 h-8 mx-auto text-zinc-600" />
 						<p class="text-xs text-zinc-400 font-medium">
-							Você ainda não está vinculado como professor de nenhuma turma.
+							Você ainda não está vinculado como professor de
+							nenhuma turma.
 						</p>
 						<p class="text-[11px] text-zinc-600">
-							Solicite à secretaria ou à administração para vincular você às turmas do dojo.
+							Solicite à secretaria ou à administração para
+							vincular você às turmas do dojo.
 						</p>
 					</div>
 				{:else}
@@ -166,12 +198,18 @@
 							<div
 								class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all space-y-3"
 							>
-								<div class="flex items-start justify-between gap-2">
+								<div
+									class="flex items-start justify-between gap-2"
+								>
 									<div>
-										<span class="text-xs font-bold text-white block">
+										<span
+											class="text-xs font-bold text-white block"
+										>
 											{turma.descricao}
 										</span>
-										<span class="text-[11px] text-amber-400 font-mono font-semibold">
+										<span
+											class="text-[11px] text-amber-400 font-mono font-semibold"
+										>
 											{turma.dia_semana}
 										</span>
 									</div>
@@ -182,10 +220,18 @@
 									</span>
 								</div>
 
-								<div class="flex items-center justify-between pt-2 border-t border-zinc-800/80">
-									<div class="flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
-										<Clock class="w-3.5 h-3.5 text-zinc-500" />
-										<span>{turma.horario_inicio} - {turma.horario_fim}</span>
+								<div
+									class="flex items-center justify-between pt-2 border-t border-zinc-800/80"
+								>
+									<div
+										class="flex items-center gap-1.5 text-xs text-zinc-400 font-mono"
+									>
+										<Clock
+											class="w-3.5 h-3.5 text-zinc-500"
+										/>
+										<span
+											>{turma.horario_inicio} - {turma.horario_fim}</span
+										>
 									</div>
 
 									<a
@@ -205,8 +251,12 @@
 			<!-- ===================================================================== -->
 			<!-- PRÓXIMOS EVENTOS DO DOJO                                              -->
 			<!-- ===================================================================== -->
-			<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
-				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+			<section
+				class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4"
+			>
+				<div
+					class="flex items-center justify-between pb-3 border-b border-zinc-900"
+				>
 					<div class="flex items-center gap-2.5">
 						<div
 							class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400"
@@ -214,10 +264,15 @@
 							<Trophy class="w-4 h-4 text-zinc-400" />
 						</div>
 						<div>
-							<h2 class="text-sm font-bold text-white font-display">
+							<h2
+								class="text-sm font-bold text-white font-display"
+							>
 								Próximos Eventos & Campeonatos
 							</h2>
-							<p class="text-[11px] text-zinc-500">Calendário de atividades e competições da academia</p>
+							<p class="text-[11px] text-zinc-500">
+								Calendário de atividades e competições da
+								academia
+							</p>
 						</div>
 					</div>
 					<a
@@ -236,19 +291,30 @@
 				{:else}
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 						{#each painel.proximosEventos.slice(0, 4) as ev}
-							<div class="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1.5">
-								<div class="flex items-start justify-between gap-2">
-									<span class="text-xs font-bold text-white line-clamp-1">{ev.nome}</span>
+							<div
+								class="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1.5"
+							>
+								<div
+									class="flex items-start justify-between gap-2"
+								>
+									<span
+										class="text-xs font-bold text-white line-clamp-1"
+										>{ev.nome}</span
+									>
 									<span
 										class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase {ev.eh_campeonato
 											? 'bg-red-950/60 border border-red-800 text-red-300'
 											: 'bg-amber-950/60 border border-amber-800 text-amber-300'}"
 									>
-										{ev.eh_campeonato ? 'Torneio' : 'Graduação'}
+										{ev.eh_campeonato
+											? "Torneio"
+											: "Graduação"}
 									</span>
 								</div>
-								<div class="text-[11px] text-zinc-400 font-mono">
-									Data: {ev.data_inicio || 'A definir'}
+								<div
+									class="text-[11px] text-zinc-400 font-mono"
+								>
+									Data: {ev.data_inicio || "A definir"}
 								</div>
 							</div>
 						{/each}
@@ -267,12 +333,19 @@
 			<!-- ===================================================================== -->
 			<!-- ALUNOS SOB MINHA TUTELA TÉCNICA                                       -->
 			<!-- ===================================================================== -->
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
-				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+			<div
+				class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4"
+			>
+				<div
+					class="flex items-center justify-between pb-3 border-b border-zinc-900"
+				>
 					<div class="flex items-center gap-2">
 						<Users class="w-4 h-4 text-amber-500" />
-						<h2 class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
-							Alunos Sob Minha Tutela ({painel.alunosSobTutela.length})
+						<h2
+							class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold"
+						>
+							Alunos Sob Minha Tutela ({painel.alunosSobTutela
+								.length})
 						</h2>
 					</div>
 					<a
@@ -285,7 +358,8 @@
 
 				{#if painel.alunosSobTutela.length === 0}
 					<p class="text-xs text-zinc-500 italic py-4 text-center">
-						Nenhum judoca vinculado diretamente como aluno sob sua responsabilidade técnica.
+						Nenhum judoca vinculado diretamente como aluno sob sua
+						responsabilidade técnica.
 					</p>
 				{:else}
 					<div class="space-y-2">
@@ -300,13 +374,20 @@
 									>
 										{aluno.nome}
 									</a>
-									<span class="text-[10px] font-mono text-zinc-500">
-										{aluno.matricula ? `Matrícula: ${aluno.matricula}` : 'Sem matrícula'}
+									<span
+										class="text-[10px] font-mono text-zinc-500"
+									>
+										{aluno.matricula
+											? `Matrícula: ${aluno.matricula}`
+											: "Sem matrícula"}
 									</span>
 								</div>
 
 								<div class="shrink-0">
-									<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+									<BadgeFaixa
+										faixa={aluno.graduacao_atual}
+										size="sm"
+									/>
 								</div>
 							</div>
 						{/each}
@@ -317,10 +398,16 @@
 			<!-- ===================================================================== -->
 			<!-- ATALHOS RÁPIDOS DO PROFESSOR                                          -->
 			<!-- ===================================================================== -->
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4">
-				<div class="flex items-center gap-2 pb-2 border-b border-zinc-900">
+			<div
+				class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm space-y-4"
+			>
+				<div
+					class="flex items-center gap-2 pb-2 border-b border-zinc-900"
+				>
 					<Sparkles class="w-4 h-4 text-zinc-400" />
-					<h2 class="text-xs font-mono uppercase tracking-wider text-zinc-400">
+					<h2
+						class="text-xs font-mono uppercase tracking-wider text-zinc-400"
+					>
 						Atalhos do Tatame
 					</h2>
 				</div>

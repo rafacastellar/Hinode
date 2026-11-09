@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { PainelResponsavelDados } from '#lib/server/repositorios/dashboard.repo';
-	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
-	import BarraAlertasNotificacao from './BarraAlertasNotificacao.svelte';
+	import type { PainelResponsavelDados } from "#lib/server/repositorios/dashboard.repo";
+	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
+	import BarraAlertasNotificacao from "./BarraAlertasNotificacao.svelte";
 	import {
 		HeartHandshake,
 		Users,
@@ -19,32 +19,38 @@
 		AlertCircle,
 		BellRing,
 		Scale,
-		UserCheck
-	} from '@lucide/svelte';
+		UserCheck,
+	} from "@lucide/svelte";
 
 	interface Props {
 		painel: PainelResponsavelDados;
 		nomeAcademia?: string | null;
 	}
 
-	let { painel, nomeAcademia = 'Judô Hinodê' }: Props = $props();
-	const nomeDojo = $derived(nomeAcademia || 'Judô Hinodê');
+	let { painel, nomeAcademia = "Judô Hinodê" }: Props = $props();
+	const nomeDojo = $derived(nomeAcademia || "Judô Hinodê");
 
 	// Índice do dependente atualmente selecionado na interface
 	let indiceSelecionado = $state(0);
 
 	const dependenteAtivo = $derived(
 		painel.dependentes.length > 0
-			? painel.dependentes[Math.min(indiceSelecionado, painel.dependentes.length - 1)]
-			: null
+			? painel.dependentes[
+					Math.min(indiceSelecionado, painel.dependentes.length - 1)
+				]
+			: null,
 	);
 
 	// Aba ativa de linha do tempo do dependente selecionado
-	let abaTimeline = $state<'graduacoes' | 'conquistas'>('graduacoes');
+	let abaTimeline = $state<"graduacoes" | "conquistas">("graduacoes");
 
 	// Pendências do dependente ativo
-	const pendenciasAtivas = $derived(dependenteAtivo?.painelJudoca.pendencias || []);
-	const pendenciasAcao = $derived(pendenciasAtivas.filter((p) => p.dependeDoAluno));
+	const pendenciasAtivas = $derived(
+		dependenteAtivo?.painelJudoca.pendencias || [],
+	);
+	const pendenciasAcao = $derived(
+		pendenciasAtivas.filter((p) => p.dependeDoAluno),
+	);
 	const temAcaoPendente = $derived(pendenciasAcao.length > 0);
 	const primeiraAcao = $derived(pendenciasAcao[0] || null);
 </script>
@@ -59,7 +65,9 @@
 		nomeJudocaAlvo={dependenteAtivo?.aluno.nome}
 		escopo="responsavel"
 		onSelecionarAluno={(idAluno) => {
-			const idx = painel.dependentes.findIndex((d) => d.aluno.id_usuario === idAluno);
+			const idx = painel.dependentes.findIndex(
+				(d) => d.aluno.id_usuario === idAluno,
+			);
 			if (idx !== -1) {
 				indiceSelecionado = idx;
 			}
@@ -70,41 +78,76 @@
 	<!-- 1. KPIs RÁPIDOS DA FAMÍLIA / TUTELA                                       -->
 	<!-- ========================================================================= -->
 	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3">
+		<div
+			class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3"
+		>
 			<div>
-				<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Atletas Sob Tutela</span>
+				<span
+					class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block"
+					>Atletas Sob Tutela</span
+				>
 				<div class="flex items-baseline gap-1.5 mt-0.5">
-					<span class="text-2xl font-black text-white font-display">{painel.totalDependentes}</span>
-					<span class="text-xs text-zinc-400 font-mono">judoca(s)</span>
+					<span class="text-2xl font-black text-white font-display"
+						>{painel.totalDependentes}</span
+					>
+					<span class="text-xs text-zinc-400 font-mono"
+						>judoca(s)</span
+					>
 				</div>
 			</div>
-			<div class="w-10 h-10 rounded-xl bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shrink-0">
+			<div
+				class="w-10 h-10 rounded-xl bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shrink-0"
+			>
 				<Users class="w-5 h-5" />
 			</div>
 		</div>
 
-		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3">
+		<div
+			class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3"
+		>
 			<div>
-				<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Aulas Semanais</span>
+				<span
+					class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block"
+					>Aulas Semanais</span
+				>
 				<div class="flex items-baseline gap-1.5 mt-0.5">
-					<span class="text-2xl font-black text-emerald-400 font-display">{painel.totalTurmasAtivas}</span>
-					<span class="text-xs text-zinc-400 font-mono">horário(s)</span>
+					<span
+						class="text-2xl font-black text-emerald-400 font-display"
+						>{painel.totalTurmasAtivas}</span
+					>
+					<span class="text-xs text-zinc-400 font-mono"
+						>horário(s)</span
+					>
 				</div>
 			</div>
-			<div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+			<div
+				class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0"
+			>
 				<Calendar class="w-5 h-5" />
 			</div>
 		</div>
 
-		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3">
+		<div
+			class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 flex items-center justify-between gap-3"
+		>
 			<div>
-				<span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Pódios da Família</span>
+				<span
+					class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block"
+					>Pódios da Família</span
+				>
 				<div class="flex items-baseline gap-1.5 mt-0.5">
-					<span class="text-2xl font-black text-amber-400 font-display">{painel.totalMedalhasFamilia}</span>
-					<span class="text-xs text-zinc-400 font-mono">medalha(s)</span>
+					<span
+						class="text-2xl font-black text-amber-400 font-display"
+						>{painel.totalMedalhasFamilia}</span
+					>
+					<span class="text-xs text-zinc-400 font-mono"
+						>medalha(s)</span
+					>
 				</div>
 			</div>
-			<div class="w-10 h-10 rounded-xl bg-amber-950/40 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+			<div
+				class="w-10 h-10 rounded-xl bg-amber-950/40 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0"
+			>
 				<Medal class="w-5 h-5" />
 			</div>
 		</div>
@@ -112,8 +155,12 @@
 
 	{#if painel.dependentes.length === 0}
 		<!-- ESTADO VAZIO: NENHUM DEPENDENTE VINCULADO -->
-		<div class="p-12 rounded-3xl bg-zinc-950 border border-dashed border-zinc-800 text-center space-y-4">
-			<div class="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600 mx-auto">
+		<div
+			class="p-12 rounded-3xl bg-zinc-950 border border-dashed border-zinc-800 text-center space-y-4"
+		>
+			<div
+				class="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600 mx-auto"
+			>
 				<Users class="w-8 h-8 text-zinc-500" />
 			</div>
 			<div class="max-w-md mx-auto space-y-1">
@@ -121,7 +168,9 @@
 					Nenhum judoca vinculado ao seu perfil
 				</h3>
 				<p class="text-xs text-zinc-400 leading-relaxed">
-					Não encontramos atletas cadastrados sob sua responsabilidade legal no momento. Solicite à secretaria ou ao Sensei da academia a vinculação da matrícula do seu dependente.
+					Não encontramos atletas cadastrados sob sua responsabilidade
+					legal no momento. Solicite à secretaria ou ao Sensei da
+					academia a vinculação da matrícula do seu dependente.
 				</p>
 			</div>
 		</div>
@@ -134,7 +183,9 @@
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
 						<Users class="w-4 h-4 text-emerald-500" />
-						<span class="text-xs font-mono uppercase tracking-wider text-zinc-400 font-bold">
+						<span
+							class="text-xs font-mono uppercase tracking-wider text-zinc-400 font-bold"
+						>
 							Selecione o Atleta para Visualizar:
 						</span>
 					</div>
@@ -143,10 +194,14 @@
 					</span>
 				</div>
 
-				<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+				<div
+					class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"
+				>
 					{#each painel.dependentes as dep, idx}
 						{@const isSelected = idx === indiceSelecionado}
-						{@const hasAction = dep.painelJudoca.pendencias.some((p) => p.dependeDoAluno)}
+						{@const hasAction = dep.painelJudoca.pendencias.some(
+							(p) => p.dependeDoAluno,
+						)}
 						<button
 							type="button"
 							onclick={() => (indiceSelecionado = idx)}
@@ -156,22 +211,34 @@
 						>
 							<div class="space-y-1 min-w-0">
 								<div class="flex items-center gap-2">
-									<span class="text-sm font-bold text-white truncate block">
+									<span
+										class="text-sm font-bold text-white truncate block"
+									>
 										{dep.aluno.nome}
 									</span>
 									{#if hasAction}
-										<span class="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" title="Ação requerida"></span>
+										<span
+											class="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0"
+											title="Ação requerida"
+										></span>
 									{/if}
 								</div>
-								<div class="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+								<div
+									class="flex items-center gap-2 text-xs text-zinc-400 font-mono"
+								>
 									<span>{dep.aluno.idade} anos</span>
 									<span>•</span>
-									<span class="text-emerald-400 font-semibold">{dep.aluno.grau_parentesco}</span>
+									<span class="text-emerald-400 font-semibold"
+										>{dep.aluno.grau_parentesco}</span
+									>
 								</div>
 							</div>
 
 							<div class="shrink-0">
-								<BadgeFaixa faixa={dep.aluno.graduacao_atual} size="sm" />
+								<BadgeFaixa
+									faixa={dep.aluno.graduacao_atual}
+									size="sm"
+								/>
 							</div>
 						</button>
 					{/each}
@@ -185,7 +252,8 @@
 			{@const treinos = dependenteAtivo.painelJudoca.treinosInscritos}
 			{@const graduacoes = dependenteAtivo.painelJudoca.graduacoes}
 			{@const conquistas = dependenteAtivo.painelJudoca.conquistas}
-			{@const proximosEventos = dependenteAtivo.painelJudoca.proximosEventos}
+			{@const proximosEventos =
+				dependenteAtivo.painelJudoca.proximosEventos}
 
 			<!-- ===================================================================== -->
 			<!-- 4. HEADER HERO DO ATLETA: APRESENTAÇÃO & GRADUAÇÃO ATUAL               -->
@@ -197,29 +265,40 @@
 					class="absolute -top-24 -right-24 w-80 h-80 bg-red-600/10 rounded-full blur-3xl pointer-events-none"
 				></div>
 
-				<div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+				<div
+					class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
+				>
 					<div class="space-y-3">
 						<div class="flex items-center gap-2 flex-wrap">
 							<span
 								class="px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-800/80 text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5"
 							>
-								<UserCheck class="w-3.5 h-3.5 text-emerald-400" />
-								<span>{dependenteAtivo.aluno.grau_parentesco}</span>
+								<UserCheck
+									class="w-3.5 h-3.5 text-emerald-400"
+								/>
+								<span
+									>{dependenteAtivo.aluno
+										.grau_parentesco}</span
+								>
 							</span>
 							<span class="text-xs text-zinc-600">•</span>
 							<span class="text-xs text-zinc-400 font-mono">
-								Matrícula: {judoca.matricula || `#${judoca.id_usuario}`}
+								Matrícula: {judoca.matricula ||
+									`#${judoca.id_usuario}`}
 							</span>
 							<span class="text-xs text-zinc-600">•</span>
 							<span class="text-xs text-zinc-400 font-mono">
-								{dependenteAtivo.aluno.idade} anos ({dependenteAtivo.aluno.data_nascimento_br})
+								{dependenteAtivo.aluno.idade} anos ({dependenteAtivo
+									.aluno.data_nascimento_br})
 							</span>
 							<span class="text-xs text-zinc-600">•</span>
 							{#if temAcaoPendente}
 								<span
 									class="px-2.5 py-0.5 rounded-full bg-red-950 border border-red-800 text-[11px] font-mono font-bold text-red-400 flex items-center gap-1.5"
 								>
-									<span>⚠️ {pendenciasAcao.length} Pendência(s)</span>
+									<span
+										>⚠️ {pendenciasAcao.length} Pendência(s)</span
+									>
 								</span>
 							{:else}
 								<span
@@ -232,35 +311,71 @@
 						</div>
 
 						<div>
-							<h2 class="text-2xl sm:text-4xl font-extrabold text-white font-display tracking-tight">
+							<h2
+								class="text-2xl sm:text-4xl font-extrabold text-white font-display tracking-tight"
+							>
 								{judoca.nome}
 							</h2>
-							<p class="text-xs sm:text-sm text-zinc-400 mt-1 max-w-2xl">
-								Registro técnico oficial no tatame, acompanhamento pedagógico de graduações e rotina de treinos.
+							<p
+								class="text-xs sm:text-sm text-zinc-400 mt-1 max-w-2xl"
+							>
+								Registro técnico oficial no tatame,
+								acompanhamento pedagógico de graduações e rotina
+								de treinos.
 							</p>
 						</div>
 
 						<!-- Metadados do Atleta -->
-						<div class="flex items-center gap-3 pt-2 text-xs text-zinc-300 flex-wrap">
-							<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+						<div
+							class="flex items-center gap-3 pt-2 text-xs text-zinc-300 flex-wrap"
+						>
+							<div
+								class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800"
+							>
 								<Clock class="w-3.5 h-3.5 text-red-400" />
-								<span>No Judô há <strong>{judoca.tempo_judo}</strong></span>
+								<span
+									>No Judô há <strong
+										>{judoca.tempo_judo}</strong
+									></span
+								>
 							</div>
-							<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+							<div
+								class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800"
+							>
 								<Sparkles class="w-3.5 h-3.5 text-amber-400" />
-								<span>Na faixa atual há <strong>{judoca.tempo_faixa_atual}</strong></span>
+								<span
+									>Na faixa atual há <strong
+										>{judoca.tempo_faixa_atual}</strong
+									></span
+								>
 							</div>
 							{#if judoca.nome_professor_responsavel}
-								<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+								<div
+									class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800"
+								>
 									<Users class="w-3.5 h-3.5 text-sky-400" />
-									<span>Sensei Responsável: <strong>{judoca.nome_professor_responsavel}</strong></span>
+									<span
+										>Sensei Responsável: <strong
+											>{judoca.nome_professor_responsavel}</strong
+										></span
+									>
 								</div>
 							{/if}
-							<div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+							<div
+								class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800"
+							>
 								<Scale class="w-3.5 h-3.5 text-amber-400" />
-								<span>Peso: <strong>{judoca.peso ? `${judoca.peso} kg` : 'Pendente de pesagem'}</strong></span>
+								<span
+									>Peso: <strong
+										>{judoca.peso
+											? `${judoca.peso} kg`
+											: "Pendente de pesagem"}</strong
+									></span
+								>
 								{#if judoca.categoria}
-									<span class="text-zinc-500">({judoca.categoria})</span>
+									<span class="text-zinc-500"
+										>({judoca.categoria})</span
+									>
 								{/if}
 							</div>
 						</div>
@@ -270,11 +385,16 @@
 					<div
 						class="shrink-0 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800/80 flex flex-col items-center justify-center min-w-[200px] text-center space-y-2 shadow-lg"
 					>
-						<span class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold">
+						<span
+							class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold"
+						>
 							Graduação Ativa
 						</span>
 						<div class="scale-110 my-1">
-							<BadgeFaixa faixa={judoca.graduacao_atual} size="lg" />
+							<BadgeFaixa
+								faixa={judoca.graduacao_atual}
+								size="lg"
+							/>
 						</div>
 						<span class="text-[11px] font-mono text-zinc-400">
 							{#if judoca.data_ultima_graduacao_br}
@@ -292,151 +412,279 @@
 			<!-- ===================================================================== -->
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 				<!-- CARD: DESEMPENHO NO TATAME -->
-				<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5">
-					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div
+					class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5"
+				>
+					<div
+						class="flex items-center justify-between pb-3 border-b border-zinc-900"
+					>
 						<div class="flex items-center gap-2">
 							<Award class="w-4 h-4 text-red-500" />
-							<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+							<h3
+								class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold"
+							>
 								Métricas do Atleta ({judoca.nome})
 							</h3>
 						</div>
-						<span class="text-[10px] font-mono text-zinc-500">Desempenho</span>
+						<span class="text-[10px] font-mono text-zinc-500"
+							>Desempenho</span
+						>
 					</div>
 
 					<div class="grid grid-cols-2 gap-3">
-						<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
-							<span class="text-[10px] font-mono uppercase text-zinc-500 block">Treinos Semanais</span>
+						<div
+							class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1"
+						>
+							<span
+								class="text-[10px] font-mono uppercase text-zinc-500 block"
+								>Treinos Semanais</span
+							>
 							<div class="flex items-baseline gap-2">
-								<span class="text-2xl font-black font-display text-white">
+								<span
+									class="text-2xl font-black font-display text-white"
+								>
 									{metricas.totalTreinosInscritos}
 								</span>
-								<span class="text-[11px] text-zinc-400 font-mono">turma(s)</span>
+								<span
+									class="text-[11px] text-zinc-400 font-mono"
+									>turma(s)</span
+								>
 							</div>
 						</div>
 
-						<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
-							<span class="text-[10px] font-mono uppercase text-zinc-500 block">Torneios Disputados</span>
+						<div
+							class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1"
+						>
+							<span
+								class="text-[10px] font-mono uppercase text-zinc-500 block"
+								>Torneios Disputados</span
+							>
 							<div class="flex items-baseline gap-2">
-								<span class="text-2xl font-black font-display text-white">
+								<span
+									class="text-2xl font-black font-display text-white"
+								>
 									{metricas.totalCampeonatos}
 								</span>
-								<span class="text-[11px] text-zinc-400 font-mono">edições</span>
+								<span
+									class="text-[11px] text-zinc-400 font-mono"
+									>edições</span
+								>
 							</div>
 						</div>
 					</div>
 
 					<!-- Medalhas Individuais -->
-					<div class="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-3">
+					<div
+						class="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-3"
+					>
 						<div class="flex items-center justify-between">
-							<span class="text-xs font-mono uppercase text-zinc-400 font-bold flex items-center gap-1.5">
+							<span
+								class="text-xs font-mono uppercase text-zinc-400 font-bold flex items-center gap-1.5"
+							>
 								<Medal class="w-3.5 h-3.5 text-amber-400" />
 								<span>Pódios & Medalhas Conquistadas</span>
 							</span>
-							<span class="text-xs font-bold font-mono text-amber-400">
+							<span
+								class="text-xs font-bold font-mono text-amber-400"
+							>
 								{metricas.totalMedalhas} total
 							</span>
 						</div>
 
 						<div class="grid grid-cols-3 gap-2 text-center">
-							<div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/40">
+							<div
+								class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/40"
+							>
 								<span class="text-base block">🥇</span>
-								<span class="text-lg font-black font-display text-amber-300 block leading-tight">
+								<span
+									class="text-lg font-black font-display text-amber-300 block leading-tight"
+								>
 									{metricas.totalOuro}
 								</span>
-								<span class="text-[10px] font-mono text-amber-400/80 uppercase">Ouro</span>
+								<span
+									class="text-[10px] font-mono text-amber-400/80 uppercase"
+									>Ouro</span
+								>
 							</div>
-							<div class="p-2.5 rounded-lg bg-slate-900/50 border border-slate-700/50">
+							<div
+								class="p-2.5 rounded-lg bg-slate-900/50 border border-slate-700/50"
+							>
 								<span class="text-base block">🥈</span>
-								<span class="text-lg font-black font-display text-zinc-200 block leading-tight">
+								<span
+									class="text-lg font-black font-display text-zinc-200 block leading-tight"
+								>
 									{metricas.totalPrata}
 								</span>
-								<span class="text-[10px] font-mono text-zinc-400 uppercase">Prata</span>
+								<span
+									class="text-[10px] font-mono text-zinc-400 uppercase"
+									>Prata</span
+								>
 							</div>
-							<div class="p-2.5 rounded-lg bg-orange-950/20 border border-orange-900/40">
+							<div
+								class="p-2.5 rounded-lg bg-orange-950/20 border border-orange-900/40"
+							>
 								<span class="text-base block">🥉</span>
-								<span class="text-lg font-black font-display text-orange-300 block leading-tight">
+								<span
+									class="text-lg font-black font-display text-orange-300 block leading-tight"
+								>
 									{metricas.totalBronze}
 								</span>
-								<span class="text-[10px] font-mono text-orange-400/80 uppercase">Bronze</span>
+								<span
+									class="text-[10px] font-mono text-orange-400/80 uppercase"
+									>Bronze</span
+								>
 							</div>
 						</div>
 
 						{#if metricas.totalLutas > 0}
-							<div class="pt-2 flex items-center justify-between text-[11px] font-mono text-zinc-400 border-t border-zinc-800">
-								<span>Lutas oficiais: <strong class="text-white">{metricas.totalLutas}</strong></span>
-								<span>Vitórias: <strong class="text-emerald-400">{metricas.totalVitorias}</strong></span>
+							<div
+								class="pt-2 flex items-center justify-between text-[11px] font-mono text-zinc-400 border-t border-zinc-800"
+							>
+								<span
+									>Lutas oficiais: <strong class="text-white"
+										>{metricas.totalLutas}</strong
+									></span
+								>
+								<span
+									>Vitórias: <strong class="text-emerald-400"
+										>{metricas.totalVitorias}</strong
+									></span
+								>
 							</div>
 						{/if}
 					</div>
 				</div>
 
 				<!-- CARD: FORÇA DO DOJO & SENSEIS -->
-				<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5">
-					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div
+					class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5"
+				>
+					<div
+						class="flex items-center justify-between pb-3 border-b border-zinc-900"
+					>
 						<div class="flex items-center gap-2">
 							<Trophy class="w-4 h-4 text-amber-500" />
-							<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+							<h3
+								class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold"
+							>
 								Estrutura do Dojo ({nomeDojo})
 							</h3>
 						</div>
-						<span class="text-[10px] font-mono text-zinc-500">Coletivo</span>
+						<span class="text-[10px] font-mono text-zinc-500"
+							>Coletivo</span
+						>
 					</div>
 
 					<div class="grid grid-cols-2 gap-3">
-						<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
-							<span class="text-[10px] font-mono uppercase text-zinc-500 block">Judocas no Dojo</span>
+						<div
+							class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1"
+						>
+							<span
+								class="text-[10px] font-mono uppercase text-zinc-500 block"
+								>Judocas no Dojo</span
+							>
 							<div class="flex items-baseline gap-2">
-								<span class="text-2xl font-black font-display text-white">
-									{dependenteAtivo.painelJudoca.metricasAcademia.totalAlunos}
+								<span
+									class="text-2xl font-black font-display text-white"
+								>
+									{dependenteAtivo.painelJudoca
+										.metricasAcademia.totalAlunos}
 								</span>
-								<span class="text-[11px] text-zinc-400 font-mono">atletas</span>
+								<span
+									class="text-[11px] text-zinc-400 font-mono"
+									>atletas</span
+								>
 							</div>
 						</div>
 
-						<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
-							<span class="text-[10px] font-mono uppercase text-zinc-500 block">Treinos na Grade</span>
+						<div
+							class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1"
+						>
+							<span
+								class="text-[10px] font-mono uppercase text-zinc-500 block"
+								>Treinos na Grade</span
+							>
 							<div class="flex items-baseline gap-2">
-								<span class="text-2xl font-black font-display text-white">
-									{dependenteAtivo.painelJudoca.metricasAcademia.totalTreinosDisponiveis}
+								<span
+									class="text-2xl font-black font-display text-white"
+								>
+									{dependenteAtivo.painelJudoca
+										.metricasAcademia
+										.totalTreinosDisponiveis}
 								</span>
-								<span class="text-[11px] text-zinc-400 font-mono">horários</span>
+								<span
+									class="text-[11px] text-zinc-400 font-mono"
+									>horários</span
+								>
 							</div>
 						</div>
 
-						<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
-							<span class="text-[10px] font-mono uppercase text-zinc-500 block">Torneios Disputados</span>
+						<div
+							class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1"
+						>
+							<span
+								class="text-[10px] font-mono uppercase text-zinc-500 block"
+								>Torneios Disputados</span
+							>
 							<div class="flex items-baseline gap-2">
-								<span class="text-2xl font-black font-display text-amber-400">
-									{dependenteAtivo.painelJudoca.metricasAcademia.totalTrofeusCampeonatos}
+								<span
+									class="text-2xl font-black font-display text-amber-400"
+								>
+									{dependenteAtivo.painelJudoca
+										.metricasAcademia
+										.totalTrofeusCampeonatos}
 								</span>
-								<span class="text-[11px] text-zinc-400 font-mono">campeonatos</span>
+								<span
+									class="text-[11px] text-zinc-400 font-mono"
+									>campeonatos</span
+								>
 							</div>
 						</div>
 
-						<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
-							<span class="text-[10px] font-mono uppercase text-zinc-500 block">Medalhas do Dojo</span>
+						<div
+							class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1"
+						>
+							<span
+								class="text-[10px] font-mono uppercase text-zinc-500 block"
+								>Medalhas do Dojo</span
+							>
 							<div class="flex items-baseline gap-2">
-								<span class="text-2xl font-black font-display text-amber-300">
-									{dependenteAtivo.painelJudoca.metricasAcademia.totalMedalhasAlunos}
+								<span
+									class="text-2xl font-black font-display text-amber-300"
+								>
+									{dependenteAtivo.painelJudoca
+										.metricasAcademia.totalMedalhasAlunos}
 								</span>
-								<span class="text-[11px] text-zinc-400 font-mono">conquistas</span>
+								<span
+									class="text-[11px] text-zinc-400 font-mono"
+									>conquistas</span
+								>
 							</div>
 						</div>
 					</div>
 
 					<div class="pt-2 border-t border-zinc-900 space-y-2">
-						<span class="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block font-bold">
-							Senseis & Professores Responsáveis ({dependenteAtivo.painelJudoca.metricasAcademia.senseis.length})
+						<span
+							class="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block font-bold"
+						>
+							Senseis & Professores Responsáveis ({dependenteAtivo
+								.painelJudoca.metricasAcademia.senseis.length})
 						</span>
 						<div class="flex flex-wrap gap-2">
 							{#each dependenteAtivo.painelJudoca.metricasAcademia.senseis as sensei}
 								<div
 									class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs"
 								>
-									<div class="w-2 h-2 rounded-full bg-red-500"></div>
-									<span class="text-zinc-200 font-medium">{sensei.nome}</span>
+									<div
+										class="w-2 h-2 rounded-full bg-red-500"
+									></div>
+									<span class="text-zinc-200 font-medium"
+										>{sensei.nome}</span
+									>
 									{#if sensei.grau_faixa}
-										<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+										<span
+											class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700"
+										>
 											{sensei.grau_faixa}
 										</span>
 									{/if}
@@ -450,21 +698,30 @@
 			<!-- ===================================================================== -->
 			<!-- 6. DUAS LINHAS DO TEMPO: GRADUAÇÕES (DAN/KYU) vs CONQUISTAS ESPORTIVAS -->
 			<!-- ===================================================================== -->
-			<div class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
-				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-900">
+			<div
+				class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6"
+			>
+				<div
+					class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-900"
+				>
 					<div>
-						<h3 class="text-base sm:text-lg font-bold text-white font-display">
+						<h3
+							class="text-base sm:text-lg font-bold text-white font-display"
+						>
 							Linha do Tempo de {judoca.nome}
 						</h3>
 						<p class="text-xs text-zinc-400 mt-0.5">
-							Histórico auditado de promoções de faixa outorgadas e medalhas conquistadas em campeonatos.
+							Histórico auditado de promoções de faixa outorgadas
+							e medalhas conquistadas em campeonatos.
 						</p>
 					</div>
 
-					<div class="inline-flex p-1 rounded-xl bg-zinc-900 border border-zinc-800 self-start sm:self-auto">
+					<div
+						class="inline-flex p-1 rounded-xl bg-zinc-900 border border-zinc-800 self-start sm:self-auto"
+					>
 						<button
 							type="button"
-							onclick={() => (abaTimeline = 'graduacoes')}
+							onclick={() => (abaTimeline = "graduacoes")}
 							class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 {abaTimeline ===
 							'graduacoes'
 								? 'bg-red-600 text-white shadow-sm'
@@ -475,7 +732,7 @@
 						</button>
 						<button
 							type="button"
-							onclick={() => (abaTimeline = 'conquistas')}
+							onclick={() => (abaTimeline = "conquistas")}
 							class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 {abaTimeline ===
 							'conquistas'
 								? 'bg-red-600 text-white shadow-sm'
@@ -488,35 +745,60 @@
 				</div>
 
 				<!-- ABA 1: GRADUAÇÕES -->
-				{#if abaTimeline === 'graduacoes'}
+				{#if abaTimeline === "graduacoes"}
 					{#if graduacoes.length > 0}
-						<div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-zinc-800">
+						<div
+							class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-zinc-800"
+						>
 							{#each graduacoes as grad}
 								<div class="relative group">
 									<div
 										class="absolute -left-6 top-1.5 w-5 h-5 rounded-full bg-zinc-950 border-2 border-red-600 flex items-center justify-center transition-transform group-hover:scale-125"
 									>
-										<div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+										<div
+											class="w-1.5 h-1.5 rounded-full bg-red-500"
+										></div>
 									</div>
 
-									<div class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+									<div
+										class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+									>
 										<div class="flex items-center gap-3">
-											<BadgeFaixa faixa={grad.faixa} size="md" />
+											<BadgeFaixa
+												faixa={grad.faixa}
+												size="md"
+											/>
 											<div>
-												<span class="text-xs text-zinc-400 font-mono block">
+												<span
+													class="text-xs text-zinc-400 font-mono block"
+												>
 													Homologado em {grad.data_graduacao}
 												</span>
-												<span class="text-sm font-bold text-white">
-													{grad.nome_evento || 'Exame Oficial de Graduação'}
+												<span
+													class="text-sm font-bold text-white"
+												>
+													{grad.nome_evento ||
+														"Exame Oficial de Graduação"}
 												</span>
 											</div>
 										</div>
 
-										<div class="text-xs font-mono text-zinc-400 sm:text-right">
-											<span class="text-[10px] uppercase text-zinc-500 block">Sensei Examinador</span>
-											<span class="text-zinc-200 font-medium">{grad.nome_professor_homologador}</span>
+										<div
+											class="text-xs font-mono text-zinc-400 sm:text-right"
+										>
+											<span
+												class="text-[10px] uppercase text-zinc-500 block"
+												>Sensei Examinador</span
+											>
+											<span
+												class="text-zinc-200 font-medium"
+												>{grad.nome_professor_homologador}</span
+											>
 											{#if grad.grau_faixa_professor}
-												<span class="text-[10px] text-zinc-500">({grad.grau_faixa_professor})</span>
+												<span
+													class="text-[10px] text-zinc-500"
+													>({grad.grau_faixa_professor})</span
+												>
 											{/if}
 										</div>
 									</div>
@@ -524,50 +806,114 @@
 							{/each}
 						</div>
 					{:else}
-						<div class="p-8 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-2">
+						<div
+							class="p-8 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-2"
+						>
 							<Award class="w-8 h-8 text-zinc-600 mx-auto" />
-							<h4 class="text-sm font-bold text-white">Graduação Inicial ({judoca.graduacao_atual})</h4>
+							<h4 class="text-sm font-bold text-white">
+								Graduação Inicial ({judoca.graduacao_atual})
+							</h4>
 							<p class="text-xs text-zinc-400 max-w-sm mx-auto">
-								{judoca.nome} está no início de sua trajetória no tatame. Conforme prestar exames com os Senseis do dojo, as homologações serão registradas aqui.
+								{judoca.nome} está no início de sua trajetória no
+								tatame. Conforme prestar exames com os Senseis do
+								dojo, as homologações serão registradas aqui.
 							</p>
 						</div>
 					{/if}
 				{/if}
 
 				<!-- ABA 2: CONQUISTAS -->
-				{#if abaTimeline === 'conquistas'}
+				{#if abaTimeline === "conquistas"}
 					{#if conquistas.length > 0}
-						<div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-zinc-800">
+						<div
+							class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-zinc-800"
+						>
 							{#each conquistas as conq}
 								<div class="relative group">
 									<div
-										class="absolute -left-6 top-1.5 w-5 h-5 rounded-full bg-zinc-950 border-2 {conq.tipo_medalha === 'ouro' ? 'border-amber-400' : conq.tipo_medalha === 'prata' ? 'border-zinc-300' : conq.tipo_medalha === 'bronze' ? 'border-orange-400' : 'border-zinc-600'} flex items-center justify-center transition-transform group-hover:scale-125"
+										class="absolute -left-6 top-1.5 w-5 h-5 rounded-full bg-zinc-950 border-2 {conq.tipo_medalha ===
+										'ouro'
+											? 'border-amber-400'
+											: conq.tipo_medalha === 'prata'
+												? 'border-zinc-300'
+												: conq.tipo_medalha === 'bronze'
+													? 'border-orange-400'
+													: 'border-zinc-600'} flex items-center justify-center transition-transform group-hover:scale-125"
 									>
-										<div class="w-1.5 h-1.5 rounded-full {conq.tipo_medalha === 'ouro' ? 'bg-amber-400' : conq.tipo_medalha === 'prata' ? 'bg-zinc-300' : conq.tipo_medalha === 'bronze' ? 'bg-orange-400' : 'bg-zinc-500'}"></div>
+										<div
+											class="w-1.5 h-1.5 rounded-full {conq.tipo_medalha ===
+											'ouro'
+												? 'bg-amber-400'
+												: conq.tipo_medalha === 'prata'
+													? 'bg-zinc-300'
+													: conq.tipo_medalha ===
+														  'bronze'
+														? 'bg-orange-400'
+														: 'bg-zinc-500'}"
+										></div>
 									</div>
 
-									<div class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+									<div
+										class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+									>
 										<div class="space-y-1">
-											<div class="flex items-center gap-2 flex-wrap">
-												<span class="px-2.5 py-0.5 rounded-md text-xs font-mono font-bold {conq.tipo_medalha === 'ouro' ? 'bg-amber-950/70 text-amber-300 border border-amber-800' : conq.tipo_medalha === 'prata' ? 'bg-zinc-800 text-zinc-200 border border-zinc-700' : conq.tipo_medalha === 'bronze' ? 'bg-orange-950/70 text-orange-300 border border-orange-800' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}">
+											<div
+												class="flex items-center gap-2 flex-wrap"
+											>
+												<span
+													class="px-2.5 py-0.5 rounded-md text-xs font-mono font-bold {conq.tipo_medalha ===
+													'ouro'
+														? 'bg-amber-950/70 text-amber-300 border border-amber-800'
+														: conq.tipo_medalha ===
+															  'prata'
+															? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
+															: conq.tipo_medalha ===
+																  'bronze'
+																? 'bg-orange-950/70 text-orange-300 border border-orange-800'
+																: 'bg-zinc-800 text-zinc-400 border border-zinc-700'}"
+												>
 													{conq.classificacao}
 												</span>
-												<span class="text-xs text-zinc-400 font-mono">{conq.data_evento}</span>
+												<span
+													class="text-xs text-zinc-400 font-mono"
+													>{conq.data_evento}</span
+												>
 											</div>
-											<h4 class="text-sm font-bold text-white">
-												{conq.nome_campeonato} {conq.edicao ? `(${conq.edicao})` : ''}
+											<h4
+												class="text-sm font-bold text-white"
+											>
+												{conq.nome_campeonato}
+												{conq.edicao
+													? `(${conq.edicao})`
+													: ""}
 											</h4>
 										</div>
 
-										<div class="flex items-center gap-4 text-xs font-mono text-zinc-400">
+										<div
+											class="flex items-center gap-4 text-xs font-mono text-zinc-400"
+										>
 											<div>
-												<span class="text-[10px] text-zinc-500 block uppercase">Lutas</span>
-												<strong class="text-white text-sm">{conq.qtd_lutas}</strong>
+												<span
+													class="text-[10px] text-zinc-500 block uppercase"
+													>Lutas</span
+												>
+												<strong
+													class="text-white text-sm"
+													>{conq.qtd_lutas}</strong
+												>
 											</div>
-											<div class="h-6 w-px bg-zinc-800"></div>
+											<div
+												class="h-6 w-px bg-zinc-800"
+											></div>
 											<div>
-												<span class="text-[10px] text-zinc-500 block uppercase">Vitórias</span>
-												<strong class="text-emerald-400 text-sm">{conq.qtd_vitorias}</strong>
+												<span
+													class="text-[10px] text-zinc-500 block uppercase"
+													>Vitórias</span
+												>
+												<strong
+													class="text-emerald-400 text-sm"
+													>{conq.qtd_vitorias}</strong
+												>
 											</div>
 										</div>
 									</div>
@@ -575,11 +921,16 @@
 							{/each}
 						</div>
 					{:else}
-						<div class="p-8 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-2">
+						<div
+							class="p-8 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-2"
+						>
 							<Trophy class="w-8 h-8 text-zinc-600 mx-auto" />
-							<h4 class="text-sm font-bold text-white">Nenhum torneio oficial registrado</h4>
+							<h4 class="text-sm font-bold text-white">
+								Nenhum torneio oficial registrado
+							</h4>
 							<p class="text-xs text-zinc-400 max-w-sm mx-auto">
-								Os resultados e medalhas recebidas por {judoca.nome} aparecerão nesta galeria após a participação em torneios.
+								Os resultados e medalhas recebidas por {judoca.nome}
+								aparecerão nesta galeria após a participação em torneios.
 							</p>
 						</div>
 					{/if}
@@ -591,11 +942,17 @@
 			<!-- ===================================================================== -->
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				<!-- TREINOS SEMANAIS DO DEPENDENTE -->
-				<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div
+					class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4"
+				>
+					<div
+						class="flex items-center justify-between pb-3 border-b border-zinc-900"
+					>
 						<div class="flex items-center gap-2">
 							<Calendar class="w-4 h-4 text-emerald-500" />
-							<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+							<h3
+								class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold"
+							>
 								Agenda Semanal de Treinos ({judoca.nome})
 							</h3>
 						</div>
@@ -607,22 +964,38 @@
 					{#if treinos.length > 0}
 						<div class="space-y-3">
 							{#each treinos as treino}
-								<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 flex items-center justify-between gap-3">
+								<div
+									class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 flex items-center justify-between gap-3"
+								>
 									<div class="space-y-1">
-										<div class="flex items-center gap-2 flex-wrap">
-											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800 text-emerald-300">
+										<div
+											class="flex items-center gap-2 flex-wrap"
+										>
+											<span
+												class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800 text-emerald-300"
+											>
 												{treino.dia_semana}
 											</span>
-											<span class="text-xs font-mono text-zinc-400">
+											<span
+												class="text-xs font-mono text-zinc-400"
+											>
 												{treino.horario_inicio} às {treino.horario_fim}
 											</span>
 										</div>
-										<h4 class="text-sm font-bold text-white">{treino.descricao}</h4>
-										<p class="text-[11px] text-zinc-400">Sensei: {treino.professores}</p>
+										<h4
+											class="text-sm font-bold text-white"
+										>
+											{treino.descricao}
+										</h4>
+										<p class="text-[11px] text-zinc-400">
+											Sensei: {treino.professores}
+										</p>
 									</div>
 
 									<div class="shrink-0">
-										<span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-800 text-emerald-400">
+										<span
+											class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-800 text-emerald-400"
+										>
 											Matriculado
 										</span>
 									</div>
@@ -630,21 +1003,31 @@
 							{/each}
 						</div>
 					{:else}
-						<div class="p-6 rounded-xl bg-zinc-900/20 border border-dashed border-zinc-800 text-center space-y-2">
+						<div
+							class="p-6 rounded-xl bg-zinc-900/20 border border-dashed border-zinc-800 text-center space-y-2"
+						>
 							<Calendar class="w-7 h-7 text-zinc-600 mx-auto" />
 							<p class="text-xs text-zinc-400">
-								{judoca.nome} ainda não está matriculado(a) em nenhum horário de treino. Converse com o Sensei para definir as turmas semanais.
+								{judoca.nome} ainda não está matriculado(a) em nenhum
+								horário de treino. Converse com o Sensei para definir
+								as turmas semanais.
 							</p>
 						</div>
 					{/if}
 				</div>
 
 				<!-- PRÓXIMOS EVENTOS E CAMPEONATOS DA ACADEMIA -->
-				<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div
+					class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4"
+				>
+					<div
+						class="flex items-center justify-between pb-3 border-b border-zinc-900"
+					>
 						<div class="flex items-center gap-2">
 							<Swords class="w-4 h-4 text-amber-500" />
-							<h3 class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+							<h3
+								class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold"
+							>
 								Calendário & Campeonatos do Dojo
 							</h3>
 						</div>
@@ -660,26 +1043,50 @@
 					{#if proximosEventos.length > 0}
 						<div class="space-y-3">
 							{#each proximosEventos as evento}
-								<div class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 flex items-center justify-between gap-3">
+								<div
+									class="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 flex items-center justify-between gap-3"
+								>
 									<div class="space-y-1">
-										<div class="flex items-center gap-2 flex-wrap">
-											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase {evento.eh_campeonato ? 'bg-amber-950/60 border border-amber-800 text-amber-300' : 'bg-purple-950/60 border border-purple-800 text-purple-300'}">
-												{evento.eh_campeonato ? 'Campeonato' : 'Exame de Graduação'}
+										<div
+											class="flex items-center gap-2 flex-wrap"
+										>
+											<span
+												class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase {evento.eh_campeonato
+													? 'bg-amber-950/60 border border-amber-800 text-amber-300'
+													: 'bg-purple-950/60 border border-purple-800 text-purple-300'}"
+											>
+												{evento.eh_campeonato
+													? "Campeonato"
+													: "Exame de Graduação"}
 											</span>
-											<span class="text-xs font-mono text-zinc-400">
-												{evento.data_inicio || 'Data a definir'}
+											<span
+												class="text-xs font-mono text-zinc-400"
+											>
+												{evento.data_inicio ||
+													"Data a definir"}
 											</span>
 										</div>
-										<h4 class="text-sm font-bold text-white">{evento.nome}</h4>
+										<h4
+											class="text-sm font-bold text-white"
+										>
+											{evento.nome}
+										</h4>
 										{#if evento.valor_inscricao !== null && evento.valor_inscricao !== undefined}
-											<p class="text-[11px] font-mono text-zinc-400">
-												Taxa de inscrição: {evento.valor_inscricao === 0 ? 'Gratuito' : `R$ ${Number(evento.valor_inscricao).toFixed(2).replace('.', ',')}`}
+											<p
+												class="text-[11px] font-mono text-zinc-400"
+											>
+												Taxa de inscrição: {evento.valor_inscricao ===
+												0
+													? "Gratuito"
+													: `R$ ${Number(evento.valor_inscricao).toFixed(2).replace(".", ",")}`}
 											</p>
 										{/if}
 									</div>
 
 									<a
-										href={evento.eh_campeonato ? `/dashboard/campeonatos/${evento.id_evento}` : `/dashboard/graduacoes/${evento.id_evento}`}
+										href={evento.eh_campeonato
+											? `/dashboard/campeonatos/${evento.id_evento}`
+											: `/dashboard/graduacoes/${evento.id_evento}`}
 										class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 hover:text-white transition-colors shrink-0"
 									>
 										Detalhes
@@ -688,9 +1095,12 @@
 							{/each}
 						</div>
 					{:else}
-						<div class="p-6 rounded-xl bg-zinc-900/20 border border-dashed border-zinc-800 text-center space-y-2">
+						<div
+							class="p-6 rounded-xl bg-zinc-900/20 border border-dashed border-zinc-800 text-center space-y-2"
+						>
 							<p class="text-xs text-zinc-400">
-								Nenhum exame ou campeonato agendado no calendário no momento.
+								Nenhum exame ou campeonato agendado no
+								calendário no momento.
 							</p>
 						</div>
 					{/if}
@@ -703,9 +1113,13 @@
 			<div
 				class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-emerald-900/30 relative overflow-hidden space-y-5"
 			>
-				<div class="flex items-center gap-2 pb-3 border-b border-zinc-900">
+				<div
+					class="flex items-center gap-2 pb-3 border-b border-zinc-900"
+				>
 					<Sparkles class="w-4 h-4 text-emerald-400" />
-					<h3 class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">
+					<h3
+						class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold"
+					>
 						Valores e Formação Moral do Tatame
 					</h3>
 				</div>
@@ -713,25 +1127,40 @@
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 					<div class="space-y-2">
 						<div class="flex items-center gap-2">
-							<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 border border-emerald-800 text-emerald-300">
+							<span
+								class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 border border-emerald-800 text-emerald-300"
+							>
 								自他共栄
 							</span>
-							<h4 class="text-sm font-bold text-white">Jita Kyoei — Prosperidade e Benefício Mútuo</h4>
+							<h4 class="text-sm font-bold text-white">
+								Jita Kyoei — Prosperidade e Benefício Mútuo
+							</h4>
 						</div>
 						<p class="text-xs text-zinc-400 leading-relaxed">
-							O progresso individual só é legítimo quando contribui para o bem-estar coletivo. Na formação das crianças e jovens, o Judô cultiva o respeito aos parceiros de treino, aos Senseis e à comunidade.
+							O progresso individual só é legítimo quando
+							contribui para o bem-estar coletivo. Na formação das
+							crianças e jovens, o Judô cultiva o respeito aos
+							parceiros de treino, aos Senseis e à comunidade.
 						</p>
 					</div>
 
 					<div class="space-y-2">
 						<div class="flex items-center gap-2">
-							<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 border border-amber-800 text-amber-300">
+							<span
+								class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 border border-amber-800 text-amber-300"
+							>
 								精力善用
 							</span>
-							<h4 class="text-sm font-bold text-white">Seiryoku Zen'yo — Máxima Eficiência com Mínimo Esforço</h4>
+							<h4 class="text-sm font-bold text-white">
+								Seiryoku Zen'yo — Máxima Eficiência com Mínimo
+								Esforço
+							</h4>
 						</div>
 						<p class="text-xs text-zinc-400 leading-relaxed">
-							Empregar da melhor forma a energia mental e física em prol de causas nobres. Disciplina nos estudos, foco nas metas e autocontrole diante dos desafios da vida.
+							Empregar da melhor forma a energia mental e física
+							em prol de causas nobres. Disciplina nos estudos,
+							foco nas metas e autocontrole diante dos desafios da
+							vida.
 						</p>
 					</div>
 				</div>
