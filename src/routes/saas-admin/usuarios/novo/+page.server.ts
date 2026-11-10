@@ -19,7 +19,7 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals, getClientAddress }) => {
+	criar: async ({ request, locals, getClientAddress }) => {
 		if (!locals.superAdmin) {
 			return fail(401, { erro: 'Acesso restrito ao Super Admin.' });
 		}

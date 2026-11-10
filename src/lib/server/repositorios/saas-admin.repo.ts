@@ -749,6 +749,67 @@ export async function alternarBloqueioGlobalUsuario(
 /**
  * Vincula um usuário como Administrador de uma academia existente
  */
+export async function designarAdminAcademiaSaas(
+	idUsuario: number,
+	idAcademia: number,
+	idSuperAdminOperador: number,
+	ipOperador?: string | null
+): Promise<void> {
+	await executarTransacao(async (conn) => {
+		const [user] = await conn.execute<RowDataPacket[]>(
+			'SELECT id_usuario, nome FROM Usuario WHERE id_usuario = ? LIMIT 1',
+			[idUsuario]
+		);
+		if (user.length === 0) {
+			throw new Error('Usuário não encontrado.');
+		}
+
+		const [acad] = await conn.execute<RowDataPacket[]>(
+			'SELECT id_academia, nome FROM Academia WHERE id_academia = ? LIMIT 1',
+			[idAcademia]
+		);
+		if (acad.length === 0) {
+			throw new Error('Academia não encontrada.');
+		}
+
+		await conn.execute(
+			`INSERT INTO Usuario_Academia (id_usuario, id_academia, ativo)
+			 VALUES (?, ?, 1)
+			 ON DUPLICATE KEY UPDATE ativo = 1`,
+			[idUsuario, idAcademia]
+		);
+
+		const [perfis] = await conn.execute<RowDataPacket[]>(
+			`SELECT id_perfil FROM Perfil WHERE LOWER(role) = 'admin' LIMIT 1`
+		);
+		if (perfis.length > 0) {
+			const idPerfilAdmin = Number(perfis[0].id_perfil);
+			await conn.execute(
+				`INSERT IGNORE INTO Usuario_Academia_Perfil (id_usuario, id_academia, id_perfil)
+				 VALUES (?, ?, ?)`,
+				[idUsuario, idAcademia, idPerfilAdmin]
+			);
+		}
+
+		await conn.execute(
+			`INSERT INTO Auditoria_SaaS (
+				id_super_admin, acao, entidade, id_registro, detalhes_json, ip
+			) VALUES (?, 'DESIGNAR_ADMIN_ACADEMIA', 'Usuario_Academia', ?, ?, ?)`,
+			[
+				idSuperAdminOperador,
+				String(idUsuario),
+				JSON.stringify({
+					id_usuario: idUsuario,
+					id_academia: idAcademia,
+					nome_usuario: user[0].nome,
+					nome_academia: acad[0].nome
+				}),
+				ipOperador || null
+			]
+		);
+	});
+}
+
 export interface PerfilOpcao {
 	id_perfil: number;
 	role: string;
