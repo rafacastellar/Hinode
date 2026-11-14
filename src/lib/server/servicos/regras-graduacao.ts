@@ -1,4 +1,5 @@
 import { obterIndiceFaixa, formatarIntervaloFaixas } from '#lib/dominio/campeonato';
+import { extrairNumeroDan } from '#lib/dominio/ordenacao-atletas';
 
 export const FAIXAS_SEQUENCIA_OFICIAL = [
 	'Branca',
@@ -281,4 +282,54 @@ export function formatarPeriodoInscricaoGraduacao(
 		return `A partir de ${inicioBr}`;
 	}
 	return 'Aberto sem prazo limite';
+}
+
+/**
+ * Compara duas faixas de judô segundo a hierarquia oficial (Kyu e Dan).
+ * Retorna:
+ *  > 0 se faixaA for superior a faixaB
+ *  < 0 se faixaA for inferior a faixaB
+ *  = 0 se forem equivalentes
+ */
+export function compararHierarquiaFaixas(
+	faixaA?: string | null,
+	faixaB?: string | null
+): number {
+	const idxA = obterIndiceFaixa(faixaA);
+	const idxB = obterIndiceFaixa(faixaB);
+	if (idxA !== idxB) {
+		return idxA - idxB;
+	}
+	const danA = extrairNumeroDan(faixaA);
+	const danB = extrairNumeroDan(faixaB);
+	return danA - danB;
+}
+
+/**
+ * Decide se um lançamento no histórico de graduação deve atualizar a `graduacao_atual` do judoca.
+ * Regra:
+ * - Se `forcarAtualizacaoFaixaAtual` for explicitamente false, nunca rebaixa nem altera.
+ * - Se `forcarAtualizacaoFaixaAtual` for true (ex: promoção direta atual), atualiza.
+ * - No modo automático (histórico anterior / transferência), só atualiza `Aluno.graduacao_atual`
+ *   se a faixa lançada for estritamente SUPERIOR à faixa atual do judoca.
+ */
+export function deveAtualizarFaixaAtualDoAluno(params: {
+	faixaAtualAluno?: string | null;
+	novaFaixaLancada: string;
+	origemRegistro?: string | null;
+	atualizarFaixaAtual?: boolean | null;
+}): boolean {
+	if (params.atualizarFaixaAtual === false) {
+		return false;
+	}
+	if (params.atualizarFaixaAtual === true) {
+		return true;
+	}
+
+	const cmp = compararHierarquiaFaixas(params.novaFaixaLancada, params.faixaAtualAluno || 'Branca');
+	if (params.origemRegistro === 'HISTORICO_ANTERIOR' || params.origemRegistro === 'TRANSFERENCIA') {
+		return cmp > 0;
+	}
+
+	return cmp >= 0;
 }

@@ -6,7 +6,7 @@ import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo
 import { homologarTrocaDeFaixa } from '#lib/server/servicos/graduacao.service';
 import { graduacaoSchema } from '#lib/server/validacao/graduacao.schema';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const perfis = locals.perfis || [];
 	exigirPermissao(perfis, 'GRADUACOES_HOMOLOGAR');
 
@@ -16,9 +16,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listarProfessoresDoDojo(idAcademia)
 	]);
 
+	const alunoPreSelecionado = url.searchParams.get('alunoId');
+	const modoPreSelecionado = url.searchParams.get('modo');
+
 	return {
 		alunos,
-		professores
+		professores,
+		alunoPreSelecionado: alunoPreSelecionado ? Number(alunoPreSelecionado) : null,
+		modoPreSelecionado
 	};
 };
 
@@ -34,10 +39,13 @@ export const actions: Actions = {
 		const dadosBrutos = {
 			idAluno: formData.get('idAluno'),
 			novaFaixa: formData.get('novaFaixa'),
+			origemRegistro: formData.get('origemRegistro'),
 			idProfessorHomologador: formData.get('idProfessorHomologador'),
+			nomeExaminadorExterno: formData.get('nomeExaminadorExterno'),
 			dataGraduacao: formData.get('dataGraduacao'),
 			associacao: formData.get('associacao'),
-			nomeEvento: formData.get('nomeEvento')
+			nomeEvento: formData.get('nomeEvento'),
+			atualizarFaixaAtual: formData.get('atualizarFaixaAtual')
 		};
 
 		const resultadoValidacao = graduacaoSchema.safeParse(dadosBrutos);
@@ -64,6 +72,6 @@ export const actions: Actions = {
 			});
 		}
 
-		throw redirect(303, '/dashboard/graduacoes');
+		throw redirect(303, `/dashboard/graduacoes/historico/${resultadoValidacao.data.idAluno}`);
 	}
 };

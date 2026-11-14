@@ -194,35 +194,135 @@ export const homologacaoEventoSchema = z.object({
 export type HomologacaoEventoInput = z.infer<typeof homologacaoEventoSchema>;
 
 /**
- * Schema legado de homologação avulsa mantido para retrocompatibilidade
+ * Schema para registro de graduação avulsa, promoção direta, acervo histórico pré-sistema
+ * ou histórico de transferência vindo de outra academia (sem criar eventos fantasmas).
  */
-export const graduacaoSchema = z.object({
-	idAluno: z.coerce
-		.number()
-		.int()
-		.positive({ message: 'Selecione o judoca a ser promovido' }),
-	novaFaixa: z
-		.string()
-		.trim()
-		.min(1, { message: 'Selecione a nova faixa do judoca' }),
-	idProfessorHomologador: z.coerce
-		.number()
-		.int()
-		.positive({ message: 'Selecione o sensei responsável pela homologação' }),
-	dataGraduacao: z
-		.string()
-		.trim()
-		.regex(regexData, { message: 'Data de exame inválida (utilize AAAA-MM-DD)' }),
-	associacao: z
-		.string()
-		.trim()
-		.nullish()
-		.transform((val) => val || 'FPJ / Federação Paulista de Judô'),
-	nomeEvento: z
-		.string()
-		.trim()
-		.nullish()
-		.transform((val) => val || 'Cerimônia Oficial de Troca de Faixas')
-});
+export const graduacaoSchema = z
+	.object({
+		idAluno: z.coerce
+			.number()
+			.int()
+			.positive({ message: 'Selecione o judoca' }),
+		novaFaixa: z
+			.string()
+			.trim()
+			.min(1, { message: 'Selecione a faixa a ser registrada' }),
+		origemRegistro: z
+			.enum(['EXAME_DOJO', 'PROMOCAO_DIRETA', 'HISTORICO_ANTERIOR', 'TRANSFERENCIA'])
+			.nullish()
+			.transform((val) => val || 'PROMOCAO_DIRETA'),
+		idProfessorHomologador: z
+			.any()
+			.transform((val) => {
+				if (val === undefined || val === null || val === '' || val === '0' || val === 'externo') {
+					return null;
+				}
+				const n = Number(val);
+				return isNaN(n) || n <= 0 ? null : n;
+			}),
+		nomeExaminadorExterno: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => (val ? val.slice(0, 255) : null)),
+		dataGraduacao: z
+			.string()
+			.trim()
+			.regex(regexData, { message: 'Data de graduação inválida (utilize AAAA-MM-DD)' }),
+		associacao: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || 'FPJ / Federação Paulista de Judô'),
+		nomeEvento: z
+			.string()
+			.trim()
+			.nullish()
+			.transform((val) => val || null),
+		atualizarFaixaAtual: z
+			.any()
+			.optional()
+			.transform((val) => {
+				if (val === undefined || val === null || val === '') return undefined;
+				if (val === true || val === 'true' || val === '1' || val === 'on') return true;
+				if (val === false || val === 'false' || val === '0') return false;
+				return undefined;
+			})
+	})
+	.refine(
+		(dados) => {
+			if (dados.origemRegistro === 'PROMOCAO_DIRETA' || dados.origemRegistro === 'EXAME_DOJO') {
+				return Boolean(dados.idProfessorHomologador);
+			}
+			return Boolean(dados.idProfessorHomologador || dados.nomeExaminadorExterno);
+		},
+		{
+			message:
+				'Selecione um Sensei do dojo ou informe o nome do Sensei / Banca examinadora de origem',
+			path: ['idProfessorHomologador']
+		}
+	);
 
 export type GraduacaoInput = z.infer<typeof graduacaoSchema>;
+
+/**
+ * Schema para importação/lançamento em lote de histórico pregresso de faixas de um judoca
+ */
+export const loteHistoricoAlunoSchema = z.object({
+	idAluno: z.coerce.number().int().positive({ message: 'Judoca inválido' }),
+	origemRegistro: z
+		.enum(['HISTORICO_ANTERIOR', 'TRANSFERENCIA', 'PROMOCAO_DIRETA'])
+		.default('HISTORICO_ANTERIOR'),
+	idProfessorHomologador: z
+		.any()
+		.transform((val) => {
+			if (val === undefined || val === null || val === '' || val === '0' || val === 'externo') {
+				return null;
+			}
+			const n = Number(val);
+			return isNaN(n) || n <= 0 ? null : n;
+		}),
+	nomeExaminadorExterno: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => (val ? val.slice(0, 255) : null)),
+	associacaoPadrao: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || 'FPJ / CBJ'),
+	descricaoOrigemPadrao: z
+		.string()
+		.trim()
+		.nullish()
+		.transform((val) => val || null),
+	etapas: z
+		.array(
+			z.object({
+				faixa: z.string().trim().min(1, { message: 'Informe a faixa da etapa' }),
+				dataGraduacao: z
+					.string()
+					.trim()
+					.regex(regexData, { message: 'Informe uma data válida (AAAA-MM-DD) para cada faixa' }),
+				associacao: z
+					.string()
+					.trim()
+					.nullish()
+					.transform((val) => val || null),
+				descricaoOrigem: z
+					.string()
+					.trim()
+					.nullish()
+					.transform((val) => val || null),
+				nomeExaminadorExterno: z
+					.string()
+					.trim()
+					.nullish()
+					.transform((val) => val || null)
+			})
+		)
+		.min(1, { message: 'Adicione pelo menos uma faixa com data para registrar no histórico' })
+});
+
+export type LoteHistoricoAlunoInput = z.infer<typeof loteHistoricoAlunoSchema>;

@@ -348,10 +348,14 @@ export async function obterMetricasDoDojo(idAcademia: number): Promise<MetricasD
 	const sqlGraduacoes = `
 		SELECT COUNT(*) AS total
 		FROM Historico_Graduacao hg
-		INNER JOIN Evento e ON hg.id_evento_graduacao = e.id_evento
-		WHERE e.id_academia = ?
+		INNER JOIN Usuario_Academia ua ON hg.id_aluno = ua.id_usuario
+		LEFT JOIN Evento e ON hg.id_evento_graduacao = e.id_evento
+		WHERE ua.id_academia = ? AND (e.id_academia = ? OR hg.id_evento_graduacao IS NULL)
 	`;
-	const [linhasGraduacoes] = await pool.execute<RowDataPacket[]>(sqlGraduacoes, [idAcademia]);
+	const [linhasGraduacoes] = await pool.execute<RowDataPacket[]>(sqlGraduacoes, [
+		idAcademia,
+		idAcademia
+	]);
 	const totalGraduacoes = Number(linhasGraduacoes[0]?.total || 0);
 
 	// 5. Próximos Eventos cadastrados para o Tenant

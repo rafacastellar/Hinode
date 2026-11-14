@@ -15,7 +15,8 @@
 	} from '@lucide/svelte';
 	import {
 		formatarPeriodoInscricaoExame,
-		obterStatusPeriodoInscricao
+		obterStatusPeriodoInscricao,
+		obterRotuloOrigemGraduacao
 	} from '#lib/dominio/graduacao';
 	import { obterIndiceFaixa } from '#lib/dominio/campeonato';
 	import { extrairNumeroDan } from '#lib/dominio/ordenacao-atletas';
@@ -73,10 +74,10 @@
 				<a
 					href="/dashboard/graduacoes/nova"
 					class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 font-medium text-xs sm:text-sm transition-all"
-					title="Homologação avulsa ou extraordinária de aluno"
+					title="Promoção direta no dojo, importação de histórico anterior ou faixas de transferência"
 				>
 					<Award class="w-4 h-4 text-zinc-400" />
-					<span>Promoção Direta</span>
+					<span>Promoção Direta / Histórico</span>
 				</a>
 			{/if}
 		</div>
@@ -364,9 +365,17 @@
 										<span class="text-zinc-300 block">
 											{grad.associacao || 'Federação Paulista de Judô'}
 										</span>
-										<span class="text-[11px] font-mono text-zinc-500">
-											{grad.nome_evento}
-										</span>
+										<div class="flex items-center gap-1.5 flex-wrap mt-0.5">
+											<span class="text-[11px] font-mono text-zinc-500">
+												{grad.nome_evento}
+											</span>
+											{#if grad.origem_registro && grad.origem_registro !== 'EXAME_DOJO'}
+												{@const badgeInfo = obterRotuloOrigemGraduacao(grad.origem_registro)}
+												<span class="px-1.5 py-0.2 rounded text-[9px] font-mono border {badgeInfo.classeBadge}">
+													{badgeInfo.rotulo}
+												</span>
+											{/if}
+										</div>
 									</td>
 
 									<td class="px-6 py-4 text-right">

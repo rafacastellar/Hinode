@@ -17,6 +17,8 @@ export interface GraduacaoFeedItem {
 	nome_professor_homologador: string;
 	grau_faixa_professor: string | null;
 	nome_evento: string;
+	origem_registro?: 'EXAME_DOJO' | 'PROMOCAO_DIRETA' | 'HISTORICO_ANTERIOR' | 'TRANSFERENCIA';
+	descricao_origem?: string | null;
 }
 
 export interface DistribuicaoFaixaItem {
@@ -28,10 +30,13 @@ export interface HistoricoAlunoItem {
 	id_historico: number;
 	faixa: string;
 	data_graduacao: string;
+	data_graduacao_iso?: string | null;
 	associacao: string | null;
 	nome_professor_homologador: string;
 	grau_faixa_professor: string | null;
 	nome_evento: string;
+	origem_registro?: 'EXAME_DOJO' | 'PROMOCAO_DIRETA' | 'HISTORICO_ANTERIOR' | 'TRANSFERENCIA';
+	descricao_origem?: string | null;
 }
 
 export interface EventoGraduacaoResumo {
@@ -898,7 +903,7 @@ export async function homologarAprovacaoNoEventoEmTransacao(
 }
 
 /**
- * Lista as últimas homologações de troca de faixa realizadas na academia.
+ * Lista as últimas homologações de troca de faixa realizadas na academia (incluindo exames, promoções diretas e histórico).
  * SEGURANÇA MULTI-TENANT: idAcademia é o primeiro parâmetro obrigatório.
  */
 export async function listarGraduacoesDoDojo(
@@ -907,7 +912,7 @@ export async function listarGraduacoesDoDojo(
 ): Promise<GraduacaoFeedItem[]> {
 	const pool = getDbPool();
 
-	const sql = `
+	const sqlModerno = `
 		SELECT 
 			hg.id_historico,
 			hg.id_aluno,
@@ -916,23 +921,72 @@ export async function listarGraduacoesDoDojo(
 			hg.faixa,
 			DATE_FORMAT(hg.data_graduacao, '%d/%m/%Y') AS data_graduacao,
 			hg.associacao,
-			u_prof.nome AS nome_professor_homologador,
+			COALESCE(u_prof.nome, hg.nome_examinador_externo, 'Banca / Sensei Anterior') AS nome_professor_homologador,
 			p.grau_faixa AS grau_faixa_professor,
-			e.nome AS nome_evento
+			COALESCE(
+				e.nome,
+				hg.descricao_origem,
+				CASE hg.origem_registro
+					WHEN 'HISTORICO_ANTERIOR' THEN 'Acervo Histórico (Pré-Sistema)'
+					WHEN 'TRANSFERENCIA' THEN 'Transferência (Outra Academia)'
+					WHEN 'PROMOCAO_DIRETA' THEN 'Promoção Direta no Dojo'
+					ELSE 'Registro Oficial de Graduação'
+				END
+			) AS nome_evento,
+			COALESCE(hg.origem_registro, 'EXAME_DOJO') AS origem_registro,
+			hg.descricao_origem
 		FROM Historico_Graduacao hg
 		INNER JOIN Aluno a ON hg.id_aluno = a.id_usuario
 		INNER JOIN Usuario u_aluno ON a.id_usuario = u_aluno.id_usuario
 		INNER JOIN Usuario_Academia ua ON u_aluno.id_usuario = ua.id_usuario
-		INNER JOIN Professor p ON hg.id_professor_homologador = p.id_usuario
-		INNER JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
-		INNER JOIN Graduacao_Evento ge ON hg.id_evento_graduacao = ge.id_evento
-		INNER JOIN Evento e ON ge.id_evento = e.id_evento
-		WHERE ua.id_academia = ? AND e.id_academia = ?
+		LEFT JOIN Professor p ON hg.id_professor_homologador = p.id_usuario
+		LEFT JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
+		LEFT JOIN Graduacao_Evento ge ON hg.id_evento_graduacao = ge.id_evento
+		LEFT JOIN Evento e ON ge.id_evento = e.id_evento
+		WHERE ua.id_academia = ? AND (e.id_academia = ? OR hg.id_evento_graduacao IS NULL)
 		ORDER BY hg.data_graduacao DESC, hg.id_historico DESC
 		LIMIT ?
 	`;
 
-	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia, idAcademia, limite]);
+	const sqlFallback = `
+		SELECT 
+			hg.id_historico,
+			hg.id_aluno,
+			u_aluno.nome AS nome_aluno,
+			a.matricula AS matricula_aluno,
+			hg.faixa,
+			DATE_FORMAT(hg.data_graduacao, '%d/%m/%Y') AS data_graduacao,
+			hg.associacao,
+			COALESCE(u_prof.nome, 'Sensei do Dojo') AS nome_professor_homologador,
+			p.grau_faixa AS grau_faixa_professor,
+			COALESCE(e.nome, 'Registro Oficial de Graduação') AS nome_evento,
+			'EXAME_DOJO' AS origem_registro,
+			NULL AS descricao_origem
+		FROM Historico_Graduacao hg
+		INNER JOIN Aluno a ON hg.id_aluno = a.id_usuario
+		INNER JOIN Usuario u_aluno ON a.id_usuario = u_aluno.id_usuario
+		INNER JOIN Usuario_Academia ua ON u_aluno.id_usuario = ua.id_usuario
+		LEFT JOIN Professor p ON hg.id_professor_homologador = p.id_usuario
+		LEFT JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
+		LEFT JOIN Graduacao_Evento ge ON hg.id_evento_graduacao = ge.id_evento
+		LEFT JOIN Evento e ON ge.id_evento = e.id_evento
+		WHERE ua.id_academia = ? AND (e.id_academia = ? OR hg.id_evento_graduacao IS NULL)
+		ORDER BY hg.data_graduacao DESC, hg.id_historico DESC
+		LIMIT ?
+	`;
+
+	let linhas: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sqlModerno, [idAcademia, idAcademia, limite]);
+		linhas = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idAcademia, idAcademia, limite]);
+			linhas = res;
+		} else {
+			throw err;
+		}
+	}
 
 	return linhas.map((linha) => ({
 		id_historico: Number(linha.id_historico),
@@ -944,7 +998,9 @@ export async function listarGraduacoesDoDojo(
 		associacao: linha.associacao ? String(linha.associacao) : null,
 		nome_professor_homologador: String(linha.nome_professor_homologador),
 		grau_faixa_professor: linha.grau_faixa_professor ? String(linha.grau_faixa_professor) : null,
-		nome_evento: String(linha.nome_evento)
+		nome_evento: String(linha.nome_evento),
+		origem_registro: (linha.origem_registro || 'EXAME_DOJO') as GraduacaoFeedItem['origem_registro'],
+		descricao_origem: linha.descricao_origem ? String(linha.descricao_origem) : null
 	}));
 }
 
@@ -997,7 +1053,8 @@ export async function obterDistribuicaoFaixasDoDojo(
 }
 
 /**
- * Busca a trilha cronológica imutável completa de graduações de um aluno específico.
+ * Busca a trilha cronológica imutável completa de graduações de um aluno específico
+ * (incluindo exames do dojo, promoções diretas, acervo histórico e transferências).
  */
 export async function buscarHistoricoDoAluno(
 	idAcademia: number,
@@ -1005,36 +1062,101 @@ export async function buscarHistoricoDoAluno(
 ): Promise<HistoricoAlunoItem[]> {
 	const pool = getDbPool();
 
-	const sql = `
+	const sqlModerno = `
 		SELECT 
 			hg.id_historico,
 			hg.faixa,
 			DATE_FORMAT(hg.data_graduacao, '%d/%m/%Y') AS data_graduacao,
+			DATE_FORMAT(hg.data_graduacao, '%Y-%m-%d') AS data_graduacao_iso,
 			hg.associacao,
-			u_prof.nome AS nome_professor_homologador,
+			COALESCE(u_prof.nome, hg.nome_examinador_externo, 'Banca / Sensei Anterior') AS nome_professor_homologador,
 			p.grau_faixa AS grau_faixa_professor,
-			e.nome AS nome_evento
+			COALESCE(
+				e.nome,
+				hg.descricao_origem,
+				CASE hg.origem_registro
+					WHEN 'HISTORICO_ANTERIOR' THEN 'Acervo Histórico (Pré-Sistema)'
+					WHEN 'TRANSFERENCIA' THEN 'Transferência (Outra Academia)'
+					WHEN 'PROMOCAO_DIRETA' THEN 'Promoção Direta no Dojo'
+					ELSE 'Registro Oficial de Graduação'
+				END
+			) AS nome_evento,
+			COALESCE(hg.origem_registro, 'EXAME_DOJO') AS origem_registro,
+			hg.descricao_origem
 		FROM Historico_Graduacao hg
 		INNER JOIN Usuario_Academia ua ON hg.id_aluno = ua.id_usuario
-		INNER JOIN Professor p ON hg.id_professor_homologador = p.id_usuario
-		INNER JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
-		INNER JOIN Graduacao_Evento ge ON hg.id_evento_graduacao = ge.id_evento
-		INNER JOIN Evento e ON ge.id_evento = e.id_evento
+		LEFT JOIN Professor p ON hg.id_professor_homologador = p.id_usuario
+		LEFT JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
+		LEFT JOIN Graduacao_Evento ge ON hg.id_evento_graduacao = ge.id_evento
+		LEFT JOIN Evento e ON ge.id_evento = e.id_evento
 		WHERE hg.id_aluno = ? AND ua.id_academia = ?
 		ORDER BY hg.data_graduacao ASC, hg.id_historico ASC
 	`;
 
-	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAluno, idAcademia]);
+	const sqlFallback = `
+		SELECT 
+			hg.id_historico,
+			hg.faixa,
+			DATE_FORMAT(hg.data_graduacao, '%d/%m/%Y') AS data_graduacao,
+			DATE_FORMAT(hg.data_graduacao, '%Y-%m-%d') AS data_graduacao_iso,
+			hg.associacao,
+			COALESCE(u_prof.nome, 'Sensei do Dojo') AS nome_professor_homologador,
+			p.grau_faixa AS grau_faixa_professor,
+			COALESCE(e.nome, 'Registro Oficial de Graduação') AS nome_evento,
+			'EXAME_DOJO' AS origem_registro,
+			NULL AS descricao_origem
+		FROM Historico_Graduacao hg
+		INNER JOIN Usuario_Academia ua ON hg.id_aluno = ua.id_usuario
+		LEFT JOIN Professor p ON hg.id_professor_homologador = p.id_usuario
+		LEFT JOIN Usuario u_prof ON p.id_usuario = u_prof.id_usuario
+		LEFT JOIN Graduacao_Evento ge ON hg.id_evento_graduacao = ge.id_evento
+		LEFT JOIN Evento e ON ge.id_evento = e.id_evento
+		WHERE hg.id_aluno = ? AND ua.id_academia = ?
+		ORDER BY hg.data_graduacao ASC, hg.id_historico ASC
+	`;
+
+	let linhas: RowDataPacket[];
+	try {
+		const [res] = await pool.execute<RowDataPacket[]>(sqlModerno, [idAluno, idAcademia]);
+		linhas = res;
+	} catch (err: any) {
+		if (err.code === 'ER_BAD_FIELD_ERROR') {
+			const [res] = await pool.execute<RowDataPacket[]>(sqlFallback, [idAluno, idAcademia]);
+			linhas = res;
+		} else {
+			throw err;
+		}
+	}
 
 	return linhas.map((linha) => ({
 		id_historico: Number(linha.id_historico),
 		faixa: String(linha.faixa),
 		data_graduacao: String(linha.data_graduacao),
+		data_graduacao_iso: linha.data_graduacao_iso ? String(linha.data_graduacao_iso) : null,
 		associacao: linha.associacao ? String(linha.associacao) : null,
 		nome_professor_homologador: String(linha.nome_professor_homologador),
 		grau_faixa_professor: linha.grau_faixa_professor ? String(linha.grau_faixa_professor) : null,
-		nome_evento: String(linha.nome_evento)
+		nome_evento: String(linha.nome_evento),
+		origem_registro: (linha.origem_registro || 'EXAME_DOJO') as HistoricoAlunoItem['origem_registro'],
+		descricao_origem: linha.descricao_origem ? String(linha.descricao_origem) : null
 	}));
+}
+
+/**
+ * Obtém a data ISO (AAAA-MM-DD) da última graduação registrada no histórico do judoca.
+ */
+export async function obterDataUltimaGraduacaoAlunoIso(idAluno: number): Promise<string | null> {
+	const pool = getDbPool();
+	const [linhas] = await pool.execute<RowDataPacket[]>(
+		`SELECT DATE_FORMAT(MAX(data_graduacao), '%Y-%m-%d') AS ultima_data_iso
+		 FROM Historico_Graduacao
+		 WHERE id_aluno = ?`,
+		[idAluno]
+	);
+	if (linhas.length === 0 || !linhas[0].ultima_data_iso) {
+		return null;
+	}
+	return String(linhas[0].ultima_data_iso);
 }
 
 /**
@@ -1095,39 +1217,109 @@ export async function atualizarFaixaAlunoEmTransacao(
 
 /**
  * Insere um novo registro no histórico imutável (Insert-Only).
+ * Suporta tanto exames do dojo (com `idEventoGraduacao`) quanto registros avulsos,
+ * acervo histórico pré-sistema e transferências de outras academias (`idEventoGraduacao: null`).
  */
 export async function inserirHistoricoGraduacaoEmTransacao(
 	conn: PoolConnection,
 	dados: {
-		idEventoGraduacao: number;
+		idEventoGraduacao?: number | null;
 		idAluno: number;
-		idProfessorHomologador: number;
+		idProfessorHomologador?: number | null;
 		dataGraduacao: string;
 		associacao: string;
 		faixa: string;
+		origemRegistro?: 'EXAME_DOJO' | 'PROMOCAO_DIRETA' | 'HISTORICO_ANTERIOR' | 'TRANSFERENCIA';
+		descricaoOrigem?: string | null;
+		nomeExaminadorExterno?: string | null;
+		idAcademiaFallback?: number;
 	}
 ): Promise<number> {
-	const sql = `
-		INSERT INTO Historico_Graduacao (
-			id_evento_graduacao,
-			id_aluno,
-			id_professor_homologador,
-			data_graduacao,
-			associacao,
-			faixa
-		) VALUES (?, ?, ?, ?, ?, ?)
-	`;
+	const origem =
+		dados.origemRegistro || (dados.idEventoGraduacao ? 'EXAME_DOJO' : 'PROMOCAO_DIRETA');
 
-	const [res] = await conn.execute<ResultSetHeader>(sql, [
-		dados.idEventoGraduacao,
-		dados.idAluno,
-		dados.idProfessorHomologador,
-		dados.dataGraduacao,
-		dados.associacao,
-		dados.faixa
-	]);
+	try {
+		const sqlModerno = `
+			INSERT INTO Historico_Graduacao (
+				id_evento_graduacao,
+				id_aluno,
+				id_professor_homologador,
+				data_graduacao,
+				associacao,
+				faixa,
+				origem_registro,
+				descricao_origem,
+				nome_examinador_externo
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`;
 
-	return res.insertId;
+		const [res] = await conn.execute<ResultSetHeader>(sqlModerno, [
+			dados.idEventoGraduacao ?? null,
+			dados.idAluno,
+			dados.idProfessorHomologador ?? null,
+			dados.dataGraduacao,
+			dados.associacao,
+			dados.faixa,
+			origem,
+			dados.descricaoOrigem ?? null,
+			dados.nomeExaminadorExterno ?? null
+		]);
+
+		return res.insertId;
+	} catch (err: any) {
+		// Fallback caso o banco ainda não tenha rodado a Migration 009
+		if (
+			err.code === 'ER_BAD_FIELD_ERROR' ||
+			err.code === 'ER_BAD_NULL_ERROR' ||
+			err.code === 'ER_NO_DEFAULT_FOR_FIELD'
+		) {
+			let idEventoLegado: number | null = dados.idEventoGraduacao ?? null;
+			if (!idEventoLegado && dados.idAcademiaFallback) {
+				idEventoLegado = await obterOuCriarEventoGraduacaoEmTransacao(
+					conn,
+					dados.idAcademiaFallback,
+					dados.descricaoOrigem || 'Acervo Histórico de Graduações',
+					dados.dataGraduacao
+				);
+			}
+
+			let idProfLegado: number | null = dados.idProfessorHomologador ?? null;
+			if (!idProfLegado && dados.idAcademiaFallback) {
+				const [profs] = await conn.execute<RowDataPacket[]>(
+					`SELECT p.id_usuario FROM Professor p
+					 INNER JOIN Usuario_Academia ua ON p.id_usuario = ua.id_usuario
+					 WHERE ua.id_academia = ? LIMIT 1`,
+					[dados.idAcademiaFallback]
+				);
+				if (profs.length > 0) {
+					idProfLegado = Number(profs[0].id_usuario);
+				}
+			}
+
+			const sqlLegado = `
+				INSERT INTO Historico_Graduacao (
+					id_evento_graduacao,
+					id_aluno,
+					id_professor_homologador,
+					data_graduacao,
+					associacao,
+					faixa
+				) VALUES (?, ?, ?, ?, ?, ?)
+			`;
+
+			const [resLegado] = await conn.execute<ResultSetHeader>(sqlLegado, [
+				idEventoLegado,
+				dados.idAluno,
+				idProfLegado,
+				dados.dataGraduacao,
+				dados.associacao,
+				dados.faixa
+			]);
+
+			return resLegado.insertId;
+		}
+		throw err;
+	}
 }
 
 /**

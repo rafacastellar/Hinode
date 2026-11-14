@@ -8,7 +8,7 @@ import {
 	inscreverAlunoNoEventoEmTransacao,
 	cancelarInscricaoDoEvento,
 	homologarAprovacaoNoEventoEmTransacao,
-	obterOuCriarEventoGraduacaoEmTransacao,
+	obterDataUltimaGraduacaoAlunoIso,
 	atualizarFaixaAlunoEmTransacao,
 	inserirHistoricoGraduacaoEmTransacao,
 	registrarLogAuditoriaEmTransacao
@@ -18,13 +18,16 @@ import { listarProfessoresDoDojo } from '../repositorios/professor.repo';
 import { obterFrequenciaAluno } from '../repositorios/presenca.repo';
 import {
 	validarElegibilidadeGraduacao,
-	validarPeriodoInscricaoGraduacao
+	validarPeriodoInscricaoGraduacao,
+	compararHierarquiaFaixas,
+	deveAtualizarFaixaAtualDoAluno
 } from './regras-graduacao';
 import type {
 	EventoGraduacaoInput,
 	InscricaoGraduacaoInput,
 	HomologacaoEventoInput,
-	GraduacaoInput
+	GraduacaoInput,
+	LoteHistoricoAlunoInput
 } from '../validacao/graduacao.schema';
 
 export interface ResultadoGraduacao {
@@ -32,6 +35,7 @@ export interface ResultadoGraduacao {
 	idHistorico: number;
 	faixaAnterior: string;
 	novaFaixa: string;
+	atualizouFaixaAtual: boolean;
 	mensagem: string;
 }
 
@@ -107,14 +111,17 @@ export async function inscreverAlunoNoExame(
 	}
 
 	// 4. Validação de elegibilidade pedagógica e presença
-	const frequencia = await obterFrequenciaAluno(idAcademia, dados.idAluno);
+	const [frequencia, dataUltimaGradIso] = await Promise.all([
+		obterFrequenciaAluno(idAcademia, dados.idAluno),
+		obterDataUltimaGraduacaoAlunoIso(dados.idAluno)
+	]);
 
 	const checagem = validarElegibilidadeGraduacao({
 		faixaAtleta: aluno.graduacao_atual || 'Branca',
 		faixaInicioEvento: evento.faixa_inicio,
 		faixaFimEvento: evento.faixa_fim,
 		dataInicioJudoAtleta: aluno.data_inicio,
-		dataUltimaGraduacaoAtleta: null,
+		dataUltimaGraduacaoAtleta: dataUltimaGradIso,
 		dataPrimeiraGraduacaoAtleta: aluno.data_primeira_graduacao,
 		tempoMinimoJudoMeses: evento.tempo_minimo_judo_meses,
 		tempoMinimoUltimaGraduacaoMeses: evento.tempo_minimo_ultima_graduacao_meses,
@@ -222,7 +229,9 @@ export async function homologarAprovadosEmLote(
 }
 
 /**
- * Homologa atomicamente a troca de faixa de um judoca com histórico imutável (modo legado).
+ * Registra atomicamente uma graduação avulsa, promoção direta no dojo, acervo histórico pré-sistema
+ * ou histórico de transferência de outra academia — SEM criar eventos fantasmas no painel de exames.
+ * Respeita a hierarquia de faixas para não rebaixar `Aluno.graduacao_atual` em lançamentos retroativos.
  */
 export async function homologarTrocaDeFaixa(
 	idAcademia: number,
@@ -235,68 +244,213 @@ export async function homologarTrocaDeFaixa(
 		throw error(404, { message: 'Judoca não encontrado nesta academia.' });
 	}
 
-	// 2. Valida se o professor homologador pertence à academia ativa
-	const professores = await listarProfessoresDoDojo(idAcademia);
-	const professorValido = professores.some(
-		(p) => p.id_usuario === dados.idProfessorHomologador
-	);
-	if (!professorValido) {
-		throw error(400, {
-			message: 'O sensei homologador selecionado não pertence a este dojo.'
-		});
-	}
+	const origemRegistro = dados.origemRegistro || 'PROMOCAO_DIRETA';
 
-	// 3. Validação de mudança real de faixa
-	const faixaAnterior = aluno.graduacao_atual || 'Branca';
-	if (faixaAnterior.trim().toLowerCase() === dados.novaFaixa.trim().toLowerCase()) {
-		throw error(400, {
-			message: `O judoca já possui a faixa ${dados.novaFaixa}. Selecione uma graduação diferente.`
-		});
-	}
-
-	// 4. Execução da Transação ACID
-	return await executarTransacao(async (conn) => {
-		const idEvento = await obterOuCriarEventoGraduacaoEmTransacao(
-			conn,
-			idAcademia,
-			dados.nomeEvento || 'Cerimônia Oficial de Troca de Faixas',
-			dados.dataGraduacao
+	// 2. Valida se o professor homologador (quando selecionado do dojo) pertence à academia ativa
+	if (dados.idProfessorHomologador) {
+		const professores = await listarProfessoresDoDojo(idAcademia);
+		const professorValido = professores.some(
+			(p) => p.id_usuario === dados.idProfessorHomologador
 		);
+		if (!professorValido) {
+			throw error(400, {
+				message: 'O sensei homologador selecionado não pertence a este dojo.'
+			});
+		}
+	} else if (origemRegistro === 'PROMOCAO_DIRETA' || origemRegistro === 'EXAME_DOJO') {
+		throw error(400, {
+			message: 'Para promoção direta no dojo, selecione o Sensei homologador responsável.'
+		});
+	}
 
-		await atualizarFaixaAlunoEmTransacao(conn, dados.idAluno, dados.novaFaixa);
+	// 3. Verifica se é mudança de faixa atual ou lançamento de histórico retroativo
+	const faixaAnterior = aluno.graduacao_atual || 'Branca';
+	const ehRegistroHistorico =
+		origemRegistro === 'HISTORICO_ANTERIOR' || origemRegistro === 'TRANSFERENCIA';
+
+	if (
+		!ehRegistroHistorico &&
+		faixaAnterior.trim().toLowerCase() === dados.novaFaixa.trim().toLowerCase()
+	) {
+		throw error(400, {
+			message: `O judoca já possui a faixa ${dados.novaFaixa}. Selecione uma graduação diferente ou escolha o modo "Acervo Histórico / Transferência" para registrar a data de conquista desta faixa.`
+		});
+	}
+
+	const deveAtualizarAtual = deveAtualizarFaixaAtualDoAluno({
+		faixaAtualAluno: faixaAnterior,
+		novaFaixaLancada: dados.novaFaixa,
+		origemRegistro,
+		atualizarFaixaAtual: dados.atualizarFaixaAtual
+	});
+
+	// 4. Execução da Transação ACID sem criar Evento fantasma
+	return await executarTransacao(async (conn) => {
+		if (deveAtualizarAtual) {
+			await atualizarFaixaAlunoEmTransacao(conn, dados.idAluno, dados.novaFaixa);
+		}
+
+		const descricaoOrigemPadrao =
+			dados.nomeEvento ||
+			(origemRegistro === 'HISTORICO_ANTERIOR'
+				? 'Acervo Histórico (Pré-Sistema)'
+				: origemRegistro === 'TRANSFERENCIA'
+					? 'Transferência de Academia Anterior'
+					: 'Promoção Direta no Dojo');
 
 		const idHistorico = await inserirHistoricoGraduacaoEmTransacao(conn, {
-			idEventoGraduacao: idEvento,
+			idEventoGraduacao: null,
 			idAluno: dados.idAluno,
-			idProfessorHomologador: dados.idProfessorHomologador,
+			idProfessorHomologador: dados.idProfessorHomologador ?? null,
 			dataGraduacao: dados.dataGraduacao,
 			associacao: dados.associacao || 'FPJ / Federação Paulista de Judô',
-			faixa: dados.novaFaixa
+			faixa: dados.novaFaixa,
+			origemRegistro,
+			descricaoOrigem: descricaoOrigemPadrao,
+			nomeExaminadorExterno: dados.nomeExaminadorExterno ?? null,
+			idAcademiaFallback: idAcademia
 		});
 
 		await registrarLogAuditoriaEmTransacao(conn, {
 			idAcademia,
 			idUsuario: idUsuarioExecutor,
-			acao: 'HOMOLOGAR_GRADUACAO',
+			acao: ehRegistroHistorico ? 'REGISTRAR_HISTORICO_GRADUACAO' : 'HOMOLOGAR_GRADUACAO',
 			entidade: 'Aluno',
 			idEntidade: String(dados.idAluno),
 			dadosAntes: {
 				faixa_anterior: faixaAnterior
 			},
 			dadosDepois: {
-				nova_faixa: dados.novaFaixa,
-				id_professor_homologador: dados.idProfessorHomologador,
+				faixa_registrada: dados.novaFaixa,
+				origem_registro: origemRegistro,
+				descricao_origem: descricaoOrigemPadrao,
+				id_professor_homologador: dados.idProfessorHomologador ?? null,
+				nome_examinador_externo: dados.nomeExaminadorExterno ?? null,
 				data_graduacao: dados.dataGraduacao,
+				atualizou_graduacao_atual: deveAtualizarAtual,
 				id_historico: idHistorico
 			}
 		});
+
+		const mensagem = deveAtualizarAtual
+			? `Graduação de ${aluno.nome} homologada com sucesso para a faixa ${dados.novaFaixa}!`
+			: `Faixa ${dados.novaFaixa} (${dados.dataGraduacao}) adicionada à linha do tempo de ${aluno.nome} (graduação atual mantida em ${faixaAnterior}).`;
 
 		return {
 			sucesso: true,
 			idHistorico,
 			faixaAnterior,
-			novaFaixa: dados.novaFaixa,
-			mensagem: `Graduação de ${aluno.nome} homologada com sucesso para a faixa ${dados.novaFaixa}!`
+			novaFaixa: deveAtualizarAtual ? dados.novaFaixa : faixaAnterior,
+			atualizouFaixaAtual: deveAtualizarAtual,
+			mensagem
+		};
+	});
+}
+
+/**
+ * Registra em lote a linha do tempo de faixas anteriores de um judoca
+ * (importação pré-sistema ou histórico trazido de outra academia) com datas controladas,
+ * sem criar eventos fantasmas e atualizando a faixa atual apenas se alguma etapa superar a atual.
+ */
+export async function registrarLoteHistoricoAluno(
+	idAcademia: number,
+	idUsuarioExecutor: number,
+	dados: LoteHistoricoAlunoInput
+): Promise<{
+	sucesso: boolean;
+	totalInseridos: number;
+	faixaAtualFinal: string;
+	mensagem: string;
+}> {
+	const aluno = await buscarAlunoPorId(idAcademia, dados.idAluno);
+	if (!aluno) {
+		throw error(404, { message: 'Judoca não encontrado nesta academia.' });
+	}
+
+	if (dados.idProfessorHomologador) {
+		const professores = await listarProfessoresDoDojo(idAcademia);
+		const professorValido = professores.some(
+			(p) => p.id_usuario === dados.idProfessorHomologador
+		);
+		if (!professorValido) {
+			throw error(400, {
+				message: 'O sensei selecionado não pertence a este dojo.'
+			});
+		}
+	} else if (!dados.nomeExaminadorExterno) {
+		throw error(400, {
+			message:
+				'Selecione um Sensei do dojo ou informe o Sensei / Academia / Banca examinadora de origem.'
+		});
+	}
+
+	// Ordena as etapas cronologicamente pela data de graduação
+	const etapasOrdenadas = [...dados.etapas].sort((a, b) =>
+		a.dataGraduacao.localeCompare(b.dataGraduacao)
+	);
+
+	return await executarTransacao(async (conn) => {
+		let faixaMaisAlta = aluno.graduacao_atual || 'Branca';
+		const idsGerados: number[] = [];
+
+		for (const etapa of etapasOrdenadas) {
+			const descricaoOrigem =
+				etapa.descricaoOrigem ||
+				dados.descricaoOrigemPadrao ||
+				(dados.origemRegistro === 'TRANSFERENCIA'
+					? 'Transferência (Outra Academia)'
+					: 'Acervo Histórico (Pré-Sistema)');
+
+			const idHist = await inserirHistoricoGraduacaoEmTransacao(conn, {
+				idEventoGraduacao: null,
+				idAluno: dados.idAluno,
+				idProfessorHomologador: dados.idProfessorHomologador ?? null,
+				dataGraduacao: etapa.dataGraduacao,
+				associacao: etapa.associacao || dados.associacaoPadrao || 'FPJ / CBJ',
+				faixa: etapa.faixa,
+				origemRegistro: dados.origemRegistro,
+				descricaoOrigem,
+				nomeExaminadorExterno:
+					etapa.nomeExaminadorExterno || dados.nomeExaminadorExterno || null,
+				idAcademiaFallback: idAcademia
+			});
+
+			idsGerados.push(idHist);
+
+			if (compararHierarquiaFaixas(etapa.faixa, faixaMaisAlta) > 0) {
+				faixaMaisAlta = etapa.faixa;
+			}
+		}
+
+		const faixaAnterior = aluno.graduacao_atual || 'Branca';
+		const atualizouAtual = compararHierarquiaFaixas(faixaMaisAlta, faixaAnterior) > 0;
+		if (atualizouAtual) {
+			await atualizarFaixaAlunoEmTransacao(conn, dados.idAluno, faixaMaisAlta);
+		}
+
+		await registrarLogAuditoriaEmTransacao(conn, {
+			idAcademia,
+			idUsuario: idUsuarioExecutor,
+			acao: 'IMPORTAR_HISTORICO_GRADUACAO_LOTE',
+			entidade: 'Aluno',
+			idEntidade: String(dados.idAluno),
+			dadosAntes: {
+				faixa_anterior: faixaAnterior
+			},
+			dadosDepois: {
+				origem_registro: dados.origemRegistro,
+				total_etapas: etapasOrdenadas.length,
+				ids_historico: idsGerados,
+				faixa_atual_final: faixaMaisAlta,
+				atualizou_graduacao_atual: atualizouAtual
+			}
+		});
+
+		return {
+			sucesso: true,
+			totalInseridos: etapasOrdenadas.length,
+			faixaAtualFinal: faixaMaisAlta,
+			mensagem: `${etapasOrdenadas.length} ${etapasOrdenadas.length === 1 ? 'graduação histórica registrada' : 'graduações históricas registradas'} com sucesso no prontuário de ${aluno.nome}!`
 		};
 	});
 }

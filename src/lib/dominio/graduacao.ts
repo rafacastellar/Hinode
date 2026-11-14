@@ -56,6 +56,72 @@ export const OPCOES_FAIXAS_CADASTRO: readonly OpcaoFaixaCadastro[] = [
 
 export const LISTA_TODAS_FAIXAS_VALORES: string[] = OPCOES_FAIXAS_CADASTRO.map((f) => f.valor);
 
+export type OrigemRegistroGraduacao =
+	| 'EXAME_DOJO'
+	| 'PROMOCAO_DIRETA'
+	| 'HISTORICO_ANTERIOR'
+	| 'TRANSFERENCIA';
+
+export const OPCOES_ORIGEM_REGISTRO_GRADUACAO: readonly {
+	valor: OrigemRegistroGraduacao;
+	rotulo: string;
+	descricao: string;
+}[] = [
+	{
+		valor: 'PROMOCAO_DIRETA',
+		rotulo: 'Promoção Direta no Dojo',
+		descricao: 'Graduação avulsa ou extraordinária homologada diretamente pelo Sensei do dojo'
+	},
+	{
+		valor: 'HISTORICO_ANTERIOR',
+		rotulo: 'Acervo Histórico (Pré-Sistema)',
+		descricao: 'Importação ou lançamento de faixas conquistadas no dojo antes da implantação do sistema'
+	},
+	{
+		valor: 'TRANSFERENCIA',
+		rotulo: 'Transferência (Outra Academia / Federação)',
+		descricao: 'Registro de faixas conquistadas pelo judoca em outra academia ou associação anterior'
+	},
+	{
+		valor: 'EXAME_DOJO',
+		rotulo: 'Exame Oficial do Dojo',
+		descricao: 'Cerimônia oficial de exame agendada no painel de eventos do dojo'
+	}
+] as const;
+
+export function obterRotuloOrigemGraduacao(origem?: string | null): {
+	rotulo: string;
+	classeBadge: string;
+} {
+	switch (origem) {
+		case 'MARCO_INICIAL':
+			return {
+				rotulo: 'Início no Tatame',
+				classeBadge: 'bg-zinc-900 text-zinc-200 border-zinc-700'
+			};
+		case 'HISTORICO_ANTERIOR':
+			return {
+				rotulo: 'Acervo Histórico',
+				classeBadge: 'bg-amber-950/50 text-amber-300 border-amber-800/60'
+			};
+		case 'TRANSFERENCIA':
+			return {
+				rotulo: 'Outra Academia / Transferência',
+				classeBadge: 'bg-purple-950/50 text-purple-300 border-purple-800/60'
+			};
+		case 'PROMOCAO_DIRETA':
+			return {
+				rotulo: 'Promoção Direta',
+				classeBadge: 'bg-blue-950/50 text-blue-300 border-blue-800/60'
+			};
+		default:
+			return {
+				rotulo: 'Exame Oficial do Dojo',
+				classeBadge: 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60'
+			};
+	}
+}
+
 /**
  * Normaliza qualquer graduação legado (ex: "Preta (1º Dan)", "Coral (6º Dan)", "Preta")
  * para os padrões diretos solicitados pelo dojo ("Preta Shodan", "Kodansha Rokudan", etc.).
