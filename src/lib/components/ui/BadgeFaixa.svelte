@@ -293,15 +293,15 @@
 	// Largura padronizada para todas as faixas terem rigorosamente o mesmo tamanho
 	const larguraContainer = $derived.by(() => {
 		if (customWidth) return customWidth;
-		if (!uniformWidth) return "w-auto min-w-[70px]";
+		if (!uniformWidth) return "w-auto min-w-[84px]";
 		switch (size) {
 			case "sm":
-				return "w-[125px]";
+				return "w-[145px]";
 			case "lg":
-				return "w-[220px]";
+				return "w-[230px]";
 			case "md":
 			default:
-				return "w-[170px]";
+				return "w-[180px]";
 		}
 	});
 
@@ -309,12 +309,12 @@
 	const dimensoesBarra = $derived.by(() => {
 		switch (size) {
 			case "sm":
-				return "h-[22px] text-[10px] px-1.5";
+				return "h-[24px] text-[10px] px-2.5";
 			case "lg":
-				return "h-[34px] text-xs px-3";
+				return "h-[34px] text-xs px-3.5";
 			case "md":
 			default:
-				return "h-[26px] text-[11px] px-2";
+				return "h-[28px] text-[11px] px-3";
 		}
 	});
 
@@ -337,7 +337,7 @@
 >
 	<!-- Barra da Faixa de Judô (Obi com acabamento de pesponto) -->
 	<div
-		class="w-full relative overflow-hidden flex items-center justify-center rounded-md border shadow-xs transition-all duration-150 select-none {estilosPorFaixa.bg} {estilosPorFaixa.text} {estilosPorFaixa.border} {dimensoesBarra}"
+		class="w-full relative overflow-hidden flex items-center justify-center gap-2 rounded-md border shadow-xs transition-all duration-150 select-none {estilosPorFaixa.bg} {estilosPorFaixa.text} {estilosPorFaixa.border} {dimensoesBarra}"
 		style={estilosPorFaixa.style}
 		title={legendaOficial}
 	>
@@ -351,7 +351,7 @@
 
 		<!-- Texto Principal da Faixa (Centralizado com Alta Legibilidade) -->
 		<span
-			class="relative z-10 truncate tracking-wider font-black uppercase text-center block px-1"
+			class="relative z-10 truncate tracking-wider font-black uppercase text-center block"
 			style="color: inherit;"
 		>
 			{rotuloPrincipal}
@@ -360,7 +360,7 @@
 		<!-- Riscos Vermelhos Oficiais (#ED1C24) para cada Dan na extremidade direita da faixa preta -->
 		{#if numeroDan > 0 && estilosPorFaixa.isPreta}
 			<div
-				class="absolute right-1.5 top-0 bottom-0 flex items-center gap-[2px] z-10"
+				class="relative z-10 flex items-center gap-[2px] shrink-0"
 				title="{numeroDan}º Dan ({numeroDan} {numeroDan === 1
 					? 'risco vermelho'
 					: 'riscos vermelhos'})"

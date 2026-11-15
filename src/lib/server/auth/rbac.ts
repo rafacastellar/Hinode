@@ -160,6 +160,7 @@ export interface ItemMenu {
 
 export interface ContextoMenu {
 	totalDependentes?: number;
+	temFichaAluno?: boolean;
 }
 
 /**
@@ -214,6 +215,12 @@ const CATALOGO_MENU: readonly ItemMenu[] = [
 		descricao: 'Dados cadastrais e técnicos dos judocas sob sua tutela'
 	},
 	{
+		titulo: 'Minhas Graduações',
+		href: '/dashboard/minhas-graduacoes',
+		icone: 'award',
+		descricao: 'Minha faixa atual, elegibilidade e linha do tempo'
+	},
+	{
 		titulo: 'Equipe & Usuários',
 		href: '/dashboard/usuarios',
 		icone: 'users-cog',
@@ -244,6 +251,19 @@ export function obterMenuAutorizado(perfis: string[], contexto?: ContextoMenu): 
 		if (item.href === '/dashboard/responsavel') {
 			// Visível exclusivamente para quem tem pelo menos um judoca para se responsabilizar
 			return Boolean(contexto?.totalDependentes && contexto.totalDependentes > 0);
+		}
+		if (item.href === '/dashboard/minhas-graduacoes') {
+			// Página universal para todo usuário que é Aluno (perfil único ou multi-perfil)
+			// ou Responsável acompanhando judocas
+			return (
+				ehAluno ||
+				Boolean(contexto?.temFichaAluno) ||
+				(!ehGestorOuProfessor && Boolean(contexto?.totalDependentes && contexto.totalDependentes > 0))
+			);
+		}
+		if (item.href === '/dashboard/graduacoes') {
+			// Gestão de Graduações & Faixas fica restrita a Admin / Professor / Recepção
+			return ehGestorOuProfessor && permissoesAtivas.has('GRADUACOES_VER');
 		}
 		if (!item.permissao) return true;
 		return permissoesAtivas.has(item.permissao);

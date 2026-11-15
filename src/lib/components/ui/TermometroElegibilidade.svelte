@@ -1,57 +1,31 @@
 <script lang="ts">
 	import BadgeFaixa from './BadgeFaixa.svelte';
+	import {
+		obterRegrasOficiaisProximaFaixa,
+		obterProximaFaixaCliente
+	} from '#lib/dominio/graduacao';
 	import { CheckCircle2, Clock, Sparkles, ArrowRight } from '@lucide/svelte';
 
 	interface Props {
 		faixaAtual: string;
 		dataInicioOuUltimaGraduacao?: string | null;
 		proximaFaixaSugerida?: string | null;
+		idadeAluno?: number | null;
 	}
 
 	let {
 		faixaAtual = 'Branca',
 		dataInicioOuUltimaGraduacao = null,
-		proximaFaixaSugerida = null
+		proximaFaixaSugerida = null,
+		idadeAluno = null
 	}: Props = $props();
 
-	const ORDEM_PROGRESSAO = [
-		'Branca',
-		'Cinza',
-		'Azul',
-		'Amarela',
-		'Laranja',
-		'Verde',
-		'Roxa',
-		'Marrom',
-		'Preta (1º Dan)'
-	];
-
-	function obterCarenciaMesesOficial(faixa: string): number {
-		const f = faixa.toLowerCase();
-		if (f.includes('branca') || f.includes('cinza')) return 6;
-		if (f.includes('azul') || f.includes('amarel')) return 6;
-		if (f.includes('laranja') || f.includes('verde')) return 12;
-		if (f.includes('roxa')) return 12;
-		if (f.includes('marrom')) return 24;
-		return 36;
-	}
-
-	function obterProximaFaixa(faixa: string): string {
-		if (proximaFaixaSugerida) return proximaFaixaSugerida;
-		const f = faixa.toLowerCase();
-		if (f.includes('branca')) return 'Cinza / Azul';
-		if (f.includes('cinza')) return 'Azul';
-		if (f.includes('azul')) return 'Amarela';
-		if (f.includes('amarel')) return 'Laranja';
-		if (f.includes('laranja')) return 'Verde';
-		if (f.includes('verde')) return 'Roxa';
-		if (f.includes('roxa')) return 'Marrom';
-		if (f.includes('marrom')) return 'Preta (1º Dan)';
-		return 'Próximo Dan';
-	}
-
-	const mesesCarencia = $derived(obterCarenciaMesesOficial(faixaAtual));
-	const proximaFaixa = $derived(obterProximaFaixa(faixaAtual));
+	const regraOficial = $derived(obterRegrasOficiaisProximaFaixa(faixaAtual));
+	const mesesCarencia = $derived(regraOficial.carenciaMeses);
+	const idadeMinima = $derived(regraOficial.idadeMinima);
+	const proximaFaixa = $derived(
+		proximaFaixaSugerida || regraOficial.proximaFaixa || obterProximaFaixaCliente(faixaAtual)
+	);
 
 	const mesesCumpridos = $derived.by(() => {
 		if (!dataInicioOuUltimaGraduacao) return Math.round(mesesCarencia * 0.75);
@@ -74,7 +48,13 @@
 	const percentual = $derived(
 		Math.min(100, Math.round((mesesCumpridos / Math.max(1, mesesCarencia)) * 100))
 	);
-	const aptoParaExame = $derived(percentual >= 100);
+	const atendeIdadeMinima = $derived(
+		idadeMinima === null ||
+			idadeAluno === null ||
+			idadeAluno === undefined ||
+			idadeAluno >= idadeMinima
+	);
+	const aptoParaExame = $derived(percentual >= 100 && atendeIdadeMinima);
 </script>
 
 <div class="p-4 sm:p-5 rounded-2xl bg-zinc-950 border border-zinc-800/90 space-y-4">
@@ -97,6 +77,13 @@
 			>
 				<CheckCircle2 class="w-3.5 h-3.5 text-emerald-400" />
 				<span>Apto para Exame</span>
+			</span>
+		{:else if percentual >= 100 && !atendeIdadeMinima}
+			<span
+				class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-700/70 text-amber-300 text-xs font-mono font-bold self-start sm:self-auto"
+			>
+				<Clock class="w-3.5 h-3.5 text-amber-400" />
+				<span>Idade mínima: {idadeMinima} anos</span>
 			</span>
 		{:else}
 			<span
@@ -140,6 +127,18 @@
 				style="width: {percentual}%"
 			></div>
 		</div>
+
+		{#if idadeMinima !== null}
+			<div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-zinc-400 pt-1">
+				<span>Regra oficial: {regraOficial.descricaoCarencia}</span>
+				<span class={atendeIdadeMinima ? 'text-emerald-400' : 'text-amber-400'}>
+					Idade mínima exigida: {idadeMinima} anos
+					{#if idadeAluno !== null && idadeAluno !== undefined}
+						(atual: {idadeAluno} anos)
+					{/if}
+				</span>
+			</div>
+		{/if}
 	</div>
 </div>
 

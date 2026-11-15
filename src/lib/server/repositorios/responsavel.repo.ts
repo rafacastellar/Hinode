@@ -359,6 +359,25 @@ export async function contarAlunosDoResponsavel(
 	return Number(linhas[0]?.total || 0);
 }
 
+/**
+ * Retorna os IDs de usuário de todos os alunos tutelados por um responsável no dojo ativo.
+ */
+export async function listarIdsAlunosDoResponsavel(
+	idAcademia: number,
+	idResponsavel: number
+): Promise<number[]> {
+	const pool = getDbPool();
+	const sql = `
+		SELECT DISTINCT ra.id_aluno
+		FROM Responsavel_Aluno ra
+		INNER JOIN Aluno a ON ra.id_aluno = a.id_usuario
+		INNER JOIN Usuario_Academia ua ON a.id_usuario = ua.id_usuario
+		WHERE ua.id_academia = ? AND ra.id_responsavel = ?
+	`;
+	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia, idResponsavel]);
+	return linhas.map((l) => Number(l.id_aluno));
+}
+
 export interface AlunoDoResponsavelDetalhado {
 	id_usuario: number;
 	nome: string;

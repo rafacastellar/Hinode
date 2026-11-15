@@ -32,12 +32,18 @@
 		obterStatusPeriodoInscricao,
 		obterProximaFaixaCliente,
 		formatarDataBr,
-		FAIXAS_GRADUACAO_LISTA
+		OPCOES_FAIXAS_CADASTRO
 	} from '#lib/dominio/graduacao';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let abaAtiva = $state<'candidatos' | 'tatame' | 'homologados'>('tatame');
+
+	$effect(() => {
+		if (!data.ehGestorOuProfessor && abaAtiva === 'tatame') {
+			abaAtiva = 'candidatos';
+		}
+	});
 	let termoBusca = $state('');
 	let filtroElegibilidade = $state<'todos' | 'aptos' | 'inscritos' | 'inaptos'>('todos');
 	let carregandoAcao = $state(false);
@@ -119,6 +125,14 @@
 		selecionadosLote[idAluno] = !selecionadosLote[idAluno];
 	}
 
+	$effect(() => {
+		for (const cand of data.inscricoes) {
+			if (!faixasPersonalizadas[cand.id_aluno]) {
+				faixasPersonalizadas[cand.id_aluno] = obterProximaFaixaCliente(cand.faixa_atual);
+			}
+		}
+	});
+
 	function obterNovaFaixaParaAluno(idAluno: number, faixaAtual: string): string {
 		return faixasPersonalizadas[idAluno] || obterProximaFaixaCliente(faixaAtual);
 	}
@@ -191,17 +205,17 @@
 		</div>
 
 		<div class="flex items-center gap-2.5 shrink-0 flex-wrap">
-			<button
-				type="button"
-				onclick={() => (modalImpressaoAberto = true)}
-				class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 font-semibold text-xs sm:text-sm shadow-sm hover:border-zinc-500 cursor-pointer active:scale-95 transition-all"
-				title="Imprimir ficha de avaliação da banca examinadora"
-			>
-				<Printer class="w-4 h-4 text-red-500" />
-				<span>Imprimir Ficha da Banca</span>
-			</button>
-
 			{#if data.podeGerenciar}
+				<button
+					type="button"
+					onclick={() => (modalImpressaoAberto = true)}
+					class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 font-semibold text-xs sm:text-sm shadow-sm hover:border-zinc-500 cursor-pointer active:scale-95 transition-all"
+					title="Imprimir ficha de avaliação da banca examinadora"
+				>
+					<Printer class="w-4 h-4 text-red-500" />
+					<span>Imprimir Ficha da Banca</span>
+				</button>
+
 				<a
 					href="/dashboard/graduacoes/{data.evento.id_evento}/editar"
 					class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 font-medium text-xs sm:text-sm transition-colors"
@@ -248,7 +262,7 @@
 	{/if}
 
 	<!-- CARDS DE REGRAS E ESTATÍSTICAS DO EXAME -->
-	<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+	<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
 		<!-- Intervalo de Faixas -->
 		<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
 			<span class="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">
@@ -323,16 +337,16 @@
 		</div>
 
 		<!-- Inscritos e Homologados -->
-		<div class="col-span-2 sm:col-span-1 lg:col-span-1 p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
+		<div class="col-span-2 sm:col-span-1 min-w-0 p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-1">
 			<span class="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">
 				Inscrições & Homologação
 			</span>
-			<div class="flex items-center gap-2">
-				<span class="text-sm sm:text-base font-extrabold text-white font-mono">
+			<div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 leading-tight">
+				<span class="text-sm font-extrabold text-white font-mono whitespace-nowrap">
 					{data.inscricoes.length} inscritos
 				</span>
-				<span class="text-zinc-600">•</span>
-				<span class="text-sm sm:text-base font-extrabold text-emerald-400 font-mono">
+				<span class="text-zinc-600 text-xs">•</span>
+				<span class="text-sm font-extrabold text-emerald-400 font-mono whitespace-nowrap">
 					{inscritosHomologados.length} aprovados
 				</span>
 			</div>
@@ -344,17 +358,19 @@
 
 	<!-- TAB NAVIGATION -->
 	<div class="border-b border-zinc-900 flex items-center gap-2 sm:gap-6 overflow-x-auto">
-		<button
-			type="button"
-			onclick={() => (abaAtiva = 'tatame')}
-			class="pb-3 px-1 border-b-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 {abaAtiva === 'tatame' ? 'border-red-500 text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}"
-		>
-			<Award class="w-4 h-4 text-red-500" />
-			<span>Tatame & Banca Examinadora</span>
-			<span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-red-950/60 text-red-300 border border-red-900/60">
-				{inscritosPendentes.length}
-			</span>
-		</button>
+		{#if data.ehGestorOuProfessor}
+			<button
+				type="button"
+				onclick={() => (abaAtiva = 'tatame')}
+				class="pb-3 px-1 border-b-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 {abaAtiva === 'tatame' ? 'border-red-500 text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}"
+			>
+				<Award class="w-4 h-4 text-red-500" />
+				<span>Tatame & Banca Examinadora</span>
+				<span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-red-950/60 text-red-300 border border-red-900/60">
+					{inscritosPendentes.length}
+				</span>
+			</button>
+		{/if}
 
 		<button
 			type="button"
@@ -362,7 +378,7 @@
 			class="pb-3 px-1 border-b-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 {abaAtiva === 'candidatos' ? 'border-red-500 text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}"
 		>
 			<Users class="w-4 h-4 text-zinc-400" />
-			<span>Candidatos & Aptidão do Dojo</span>
+			<span>{data.ehGestorOuProfessor ? 'Candidatos & Aptidão do Dojo' : 'Minha Elegibilidade & Inscrição'}</span>
 			<span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-900 text-zinc-300 border border-zinc-800">
 				{data.candidatos.length}
 			</span>
@@ -374,7 +390,7 @@
 			class="pb-3 px-1 border-b-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 {abaAtiva === 'homologados' ? 'border-red-500 text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}"
 		>
 			<ShieldCheck class="w-4 h-4 text-emerald-400" />
-			<span>Graduados Oficiais na Cerimônia</span>
+			<span>{data.ehGestorOuProfessor ? 'Graduados Oficiais na Cerimônia' : 'Resultado na Cerimônia'}</span>
 			<span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-900/60">
 				{inscritosHomologados.length}
 			</span>
@@ -556,8 +572,8 @@
 													bind:value={faixasPersonalizadas[cand.id_aluno]}
 													class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-red-500"
 												>
-													{#each FAIXAS_GRADUACAO_LISTA as f}
-														<option value={f} selected={f === novaFaixa}>{f}</option>
+													{#each OPCOES_FAIXAS_CADASTRO as op}
+														<option value={op.valor}>{op.rotulo}</option>
 													{/each}
 												</select>
 											{:else}

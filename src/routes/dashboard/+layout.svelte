@@ -132,6 +132,9 @@
 		if (caminho.startsWith("/dashboard/graduacoes")) {
 			return { titulo: "Graduações & Faixas", corTexto: "text-red-400" };
 		}
+		if (caminho.startsWith("/dashboard/minhas-graduacoes")) {
+			return { titulo: "Minhas Graduações", corTexto: "text-red-400" };
+		}
 		if (caminho.startsWith("/dashboard/campeonatos")) {
 			return {
 				titulo: "Campeonatos & Torneios",
@@ -221,6 +224,47 @@
 
 	const abaPerfilAtiva = $derived(
 		page.url.searchParams.get("aba") || "dados",
+	);
+
+	// Sub-menus dinâmicos do item "Graduações & Faixas" na Sidebar Lateral (Gestão)
+	const subMenusGraduacoes = [
+		{
+			chave: "exames",
+			titulo: "Exames & Cerimônias",
+			icone: Calendar,
+		},
+		{
+			chave: "historico",
+			titulo: "Homologações & Prontuários",
+			icone: Award,
+		},
+		{
+			chave: "censo",
+			titulo: "Censo de Faixas",
+			icone: Users,
+		},
+	];
+
+	const abaGraduacoesAtiva = $derived(
+		page.url.searchParams.get("aba") || "exames",
+	);
+
+	// Sub-menus dinâmicos do item universal "Minhas Graduações" na Sidebar Lateral
+	const subMenusMinhasGraduacoes = [
+		{
+			chave: "jornada",
+			titulo: "Minha Faixa & Linha do Tempo",
+			icone: Award,
+		},
+		{
+			chave: "exames",
+			titulo: "Exames & Cerimônias",
+			icone: Calendar,
+		},
+	];
+
+	const abaMinhasGraduacoesAtiva = $derived(
+		page.url.searchParams.get("aba") || "jornada",
 	);
 
 	function rotaAtiva(href: string): boolean {
@@ -377,6 +421,9 @@
 				{@const Icone = mapaIcones[item.icone] || LayoutDashboard}
 				{@const ativo = rotaAtiva(item.href)}
 				{@const ehItemPerfil = item.href === "/dashboard/perfil"}
+				{@const ehItemGraduacoes = item.href === "/dashboard/graduacoes"}
+				{@const ehItemMinhasGraduacoes = item.href === "/dashboard/minhas-graduacoes"}
+				{@const temSubmenu = ehItemPerfil || ehItemGraduacoes || ehItemMinhasGraduacoes}
 
 				<div class="space-y-1">
 					<a
@@ -399,7 +446,7 @@
 							{/if}
 						</div>
 
-						{#if ehItemPerfil && !sidebarMinimizada}
+						{#if temSubmenu && !sidebarMinimizada}
 							<ChevronDown
 								class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 {ativo
 									? 'rotate-0 text-red-400'
@@ -444,6 +491,60 @@
 								{@const subAtivo = abaPerfilAtiva === sub.chave}
 								<a
 									href="/dashboard/perfil?aba={sub.chave}"
+									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
+										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+								>
+									<SubIcone
+										class="w-3.5 h-3.5 shrink-0 {subAtivo
+											? 'text-red-400'
+											: 'text-zinc-500'}"
+									/>
+									<span class="truncate">{sub.titulo}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Sub-menus de Graduações na Sidebar (Exibidos quando a rota /dashboard/graduacoes está ativa) -->
+					{#if ehItemGraduacoes && ativo && !sidebarMinimizada}
+						<div
+							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
+						>
+							{#each subMenusGraduacoes as sub}
+								{@const SubIcone = sub.icone}
+								{@const subAtivo =
+									page.url.pathname === "/dashboard/graduacoes" &&
+									abaGraduacoesAtiva === sub.chave}
+								<a
+									href="/dashboard/graduacoes?aba={sub.chave}"
+									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
+										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+								>
+									<SubIcone
+										class="w-3.5 h-3.5 shrink-0 {subAtivo
+											? 'text-red-400'
+											: 'text-zinc-500'}"
+									/>
+									<span class="truncate">{sub.titulo}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Sub-menus de Minhas Graduações na Sidebar -->
+					{#if ehItemMinhasGraduacoes && ativo && !sidebarMinimizada}
+						<div
+							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
+						>
+							{#each subMenusMinhasGraduacoes as sub}
+								{@const SubIcone = sub.icone}
+								{@const subAtivo =
+									page.url.pathname === "/dashboard/minhas-graduacoes" &&
+									abaMinhasGraduacoesAtiva === sub.chave}
+								<a
+									href="/dashboard/minhas-graduacoes?aba={sub.chave}"
 									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
 										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
 										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
@@ -638,11 +739,14 @@
 							mapaIcones[item.icone] || LayoutDashboard}
 						{@const ativo = rotaAtiva(item.href)}
 						{@const ehItemPerfil = item.href === "/dashboard/perfil"}
+						{@const ehItemGraduacoes = item.href === "/dashboard/graduacoes"}
+						{@const ehItemMinhasGraduacoes = item.href === "/dashboard/minhas-graduacoes"}
+						{@const temSubmenu = ehItemPerfil || ehItemGraduacoes || ehItemMinhasGraduacoes}
 
 						<div class="space-y-1">
 							<a
 								href={item.href}
-								onclick={() => !ehItemPerfil && (menuAberto = false)}
+								onclick={() => !temSubmenu && (menuAberto = false)}
 								class="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-xs font-medium {ativo
 									? 'bg-red-950/40 border border-red-800/70 text-white font-semibold'
 									: 'text-zinc-400 hover:text-white hover:bg-zinc-900'}"
@@ -655,7 +759,7 @@
 									/>
 									<span>{item.titulo}</span>
 								</div>
-								{#if ehItemPerfil}
+								{#if temSubmenu}
 									<ChevronDown
 										class="w-3.5 h-3.5 transition-transform duration-200 {ativo
 											? 'rotate-0 text-red-400'
@@ -688,6 +792,56 @@
 										{@const subAtivo = abaPerfilAtiva === sub.chave}
 										<a
 											href="/dashboard/perfil?aba={sub.chave}"
+											onclick={() => (menuAberto = false)}
+											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
+												: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+										>
+											<SubIcone
+												class="w-3.5 h-3.5 shrink-0 {subAtivo
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+											/>
+											<span class="truncate">{sub.titulo}</span>
+										</a>
+									{/each}
+								</div>
+							{/if}
+
+							{#if ehItemGraduacoes && ativo}
+								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
+									{#each subMenusGraduacoes as sub}
+										{@const SubIcone = sub.icone}
+										{@const subAtivo =
+											page.url.pathname === "/dashboard/graduacoes" &&
+											abaGraduacoesAtiva === sub.chave}
+										<a
+											href="/dashboard/graduacoes?aba={sub.chave}"
+											onclick={() => (menuAberto = false)}
+											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
+												: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+										>
+											<SubIcone
+												class="w-3.5 h-3.5 shrink-0 {subAtivo
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+											/>
+											<span class="truncate">{sub.titulo}</span>
+										</a>
+									{/each}
+								</div>
+							{/if}
+
+							{#if ehItemMinhasGraduacoes && ativo}
+								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
+									{#each subMenusMinhasGraduacoes as sub}
+										{@const SubIcone = sub.icone}
+										{@const subAtivo =
+											page.url.pathname === "/dashboard/minhas-graduacoes" &&
+											abaMinhasGraduacoesAtiva === sub.chave}
+										<a
+											href="/dashboard/minhas-graduacoes?aba={sub.chave}"
 											onclick={() => (menuAberto = false)}
 											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
 												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'

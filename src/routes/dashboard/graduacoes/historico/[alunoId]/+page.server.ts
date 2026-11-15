@@ -1,9 +1,10 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao, normalizarNomePapel } from '#lib/server/auth/rbac';
 import { buscarAlunoPorId } from '#lib/server/repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
 import { buscarHistoricoDoAluno } from '#lib/server/repositorios/graduacao.repo';
+import { listarIdsAlunosDoResponsavel } from '#lib/server/repositorios/responsavel.repo';
 import { registrarLoteHistoricoAluno } from '#lib/server/servicos/graduacao.service';
 import { loteHistoricoAlunoSchema } from '#lib/server/validacao/graduacao.schema';
 
@@ -12,16 +13,39 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	exigirPermissao(perfis, 'GRADUACOES_VER');
 
 	const idAcademia = locals.idAcademia!;
+	const idUsuarioLogado = locals.usuario?.id;
 	const idAluno = Number(params.alunoId);
 
 	if (isNaN(idAluno) || idAluno <= 0) {
 		throw error(404, 'Judoca inválido');
 	}
 
+	const ehGestorOuProfessor = perfis.some((p) => {
+		const norm = normalizarNomePapel(p);
+		return norm === 'admin' || norm === 'professor' || norm === 'recepcao';
+	});
+
+	// Trava de segurança (LGPD): Aluno e Responsável só podem visualizar seu próprio prontuário
+	// ou o prontuário de seus dependentes tutelados.
+	if (!ehGestorOuProfessor) {
+		const idsPermitidos = new Set<number>();
+		if (idUsuarioLogado) {
+			idsPermitidos.add(idUsuarioLogado);
+			const idsTutelados = await listarIdsAlunosDoResponsavel(idAcademia, idUsuarioLogado);
+			for (const idTut of idsTutelados) {
+				idsPermitidos.add(idTut);
+			}
+		}
+
+		if (!idsPermitidos.has(idAluno)) {
+			throw error(403, 'Acesso restrito: você só pode consultar o seu próprio prontuário de faixas ou o dos judocas sob sua tutela.');
+		}
+	}
+
 	const [aluno, historico, professores] = await Promise.all([
 		buscarAlunoPorId(idAcademia, idAluno),
 		buscarHistoricoDoAluno(idAcademia, idAluno),
-		listarProfessoresDoDojo(idAcademia)
+		ehGestorOuProfessor ? listarProfessoresDoDojo(idAcademia) : Promise.resolve([])
 	]);
 
 	if (!aluno) {
