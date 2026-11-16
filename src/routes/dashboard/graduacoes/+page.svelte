@@ -21,12 +21,17 @@
 
 	let { data }: PageProps = $props();
 
-	// Navegação controlada exclusivamente pela Sidebar Lateral (?aba=exames | historico | censo)
+	// Navegação controlada exclusivamente pela Sidebar Lateral (?aba=exames | exames-historico | historico | censo)
 	const abaUrl = $derived(page.url.searchParams.get('aba'));
-	let subMenuAtivo = $state<'exames' | 'historico' | 'censo'>('exames');
+	let subMenuAtivo = $state<'exames' | 'exames-historico' | 'historico' | 'censo'>('exames');
 
 	$effect(() => {
-		if (abaUrl === 'historico' || abaUrl === 'censo' || abaUrl === 'exames') {
+		if (
+			abaUrl === 'exames-historico' ||
+			abaUrl === 'historico' ||
+			abaUrl === 'censo' ||
+			abaUrl === 'exames'
+		) {
 			subMenuAtivo = abaUrl;
 		} else {
 			subMenuAtivo = 'exames';
@@ -37,7 +42,6 @@
 	// EXAMES & CERIMÔNIAS (ATUAIS / EXERCÍCIO VS HISTÓRICO PASSADO)
 	// ============================================================================
 	const anoAtual = new Date().getFullYear();
-	let filtroExames = $state<'atuais' | 'passados'>('atuais');
 	let filtroAnoPassado = $state<string>('todos');
 
 	function extrairAnoEvento(ev: { data_inicio_iso?: string | null; data_inicio?: string | null }): number {
@@ -68,7 +72,7 @@
 	);
 
 	const eventosExibidos = $derived.by(() => {
-		if (filtroExames === 'atuais') return eventosAtuais;
+		if (subMenuAtivo === 'exames') return eventosAtuais;
 		if (filtroAnoPassado === 'todos') return eventosPassados;
 		const anoAlvo = parseInt(filtroAnoPassado, 10);
 		return eventosPassados.filter((ev) => extrairAnoEvento(ev) === anoAlvo);
@@ -205,59 +209,41 @@
 	</div>
 
 	<!-- ========================================================================= -->
-	<!-- SUB-MENU "EXAMES & CERIMÔNIAS"                                           -->
+	<!-- SUB-MENUS "EXAMES & CERIMÔNIAS" E "HISTÓRICO DE EXAMES"                   -->
 	<!-- ========================================================================= -->
-	{#if subMenuAtivo === 'exames'}
+	{#if subMenuAtivo === 'exames' || subMenuAtivo === 'exames-historico'}
 		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm animate-in fade-in duration-200">
 			<div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-900">
 				<div class="flex items-center gap-2.5">
 					<div
 						class="w-8 h-8 rounded-lg bg-amber-950/50 border border-amber-900/50 flex items-center justify-center text-amber-400"
 					>
-						<Calendar class="w-4 h-4" />
+						{#if subMenuAtivo === 'exames'}
+							<Calendar class="w-4 h-4" />
+						{:else}
+							<History class="w-4 h-4" />
+						{/if}
 					</div>
 					<div>
 						<h3 class="text-sm font-semibold text-white">
-							Exames & Cerimônias de Graduação do Dojo
+							{subMenuAtivo === 'exames'
+								? `Exames & Cerimônias — Exercício ${anoAtual}`
+								: 'Histórico de Exames de Graduação'}
 						</h3>
 						<p class="text-[11px] text-zinc-500">
-							Separação entre exames do exercício atual ({anoAtual}) e arquivo histórico de exames anteriores
+							{subMenuAtivo === 'exames'
+								? `Exames agendados e realizados no exercício atual (${anoAtual})`
+								: 'Arquivo histórico de exames encerrados de anos anteriores'}
 						</p>
 					</div>
 				</div>
 
 				<div class="flex flex-wrap items-center gap-2">
-					<div class="inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800">
-						<button
-							type="button"
-							onclick={() => (filtroExames = 'atuais')}
-							class="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 {filtroExames ===
-							'atuais'
-								? 'bg-amber-600 text-white shadow-sm'
-								: 'text-zinc-400 hover:text-zinc-200'}"
-						>
-							<span>Atuais / Exercício {anoAtual}</span>
-							<span class="px-1.5 py-0.2 rounded bg-black/25 font-mono text-[10px]">
-								{eventosAtuais.length}
-							</span>
-						</button>
-						<button
-							type="button"
-							onclick={() => (filtroExames = 'passados')}
-							class="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 {filtroExames ===
-							'passados'
-								? 'bg-zinc-800 text-white shadow-sm'
-								: 'text-zinc-400 hover:text-zinc-200'}"
-						>
-							<History class="w-3.5 h-3.5" />
-							<span>Histórico Passado</span>
-							<span class="px-1.5 py-0.2 rounded bg-black/25 font-mono text-[10px]">
-								{eventosPassados.length}
-							</span>
-						</button>
-					</div>
+					<span class="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-400">
+						{eventosExibidos.length} {eventosExibidos.length === 1 ? 'exame' : 'exames'}
+					</span>
 
-					{#if filtroExames === 'passados' && anosPassadosDisponiveis.length > 0}
+					{#if subMenuAtivo === 'exames-historico' && anosPassadosDisponiveis.length > 0}
 						<select
 							bind:value={filtroAnoPassado}
 							class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:outline-none focus:border-amber-600"
@@ -273,15 +259,19 @@
 
 			{#if eventosExibidos.length === 0}
 				<div class="p-8 rounded-xl bg-zinc-900/30 border border-zinc-900 text-center space-y-3">
-					<Calendar class="w-8 h-8 text-zinc-600 mx-auto" />
+					{#if subMenuAtivo === 'exames'}
+						<Calendar class="w-8 h-8 text-zinc-600 mx-auto" />
+					{:else}
+						<History class="w-8 h-8 text-zinc-600 mx-auto" />
+					{/if}
 					<div class="space-y-1">
 						<p class="text-sm font-semibold text-zinc-300">
-							{filtroExames === 'atuais'
+							{subMenuAtivo === 'exames'
 								? `Nenhum exame agendado ou do exercício ${anoAtual}`
 								: 'Nenhum exame passado encontrado no histórico'}
 						</p>
 						<p class="text-xs text-zinc-500 max-w-md mx-auto">
-							{#if filtroExames === 'atuais' && data.podeHomologar}
+							{#if subMenuAtivo === 'exames' && data.podeHomologar}
 								Crie um novo evento de exame para convocar candidatos elegíveis, registrar notas da banca e homologar faixas em lote.
 							{:else}
 								Os exames já encerrados de anos anteriores ficam arquivados nesta guia para consulta de auditoria.

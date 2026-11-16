@@ -12,8 +12,11 @@ export interface CampeonatoResumo {
 	nome: string;
 	edicao: string | null;
 	data_inicio: string;
+	data_inicio_iso: string;
 	data_inicio_inscricao: string | null;
+	data_inicio_inscricao_iso: string | null;
 	data_fim_inscricao: string | null;
+	data_fim_inscricao_iso: string | null;
 	tipo_campeonato: string | null;
 	classificacao_academia: string | null;
 	limite_graduacao: string | null;
@@ -28,6 +31,27 @@ export interface CampeonatoResumo {
 	total_inscritos: number;
 	total_confirmados: number;
 	total_medalhas: number;
+	total_ouro: number;
+	total_prata: number;
+	total_bronze: number;
+	total_lutas: number;
+	total_vitorias: number;
+}
+
+export interface DesempenhoPessoalCampeonatoItem {
+	id_evento: number;
+	nome_campeonato: string;
+	edicao: string | null;
+	data_inicio: string;
+	data_inicio_iso: string;
+	tipo_campeonato: string | null;
+	cidade: string;
+	uf: string;
+	id_aluno: number;
+	nome_aluno: string;
+	classificacao_aluno: string;
+	qtd_lutas: number;
+	qtd_vitorias: number;
 }
 
 export interface CampeonatoDetalhado {
@@ -107,8 +131,11 @@ export async function listarCampeonatosDoDojo(
 			e.nome,
 			e.edicao,
 			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
+			DATE_FORMAT(e.data_inicio, '%Y-%m-%d') AS data_inicio_iso,
 			DATE_FORMAT(c.data_inicio_inscricao, '%d/%m/%Y') AS data_inicio_inscricao,
+			DATE_FORMAT(c.data_inicio_inscricao, '%Y-%m-%d') AS data_inicio_inscricao_iso,
 			DATE_FORMAT(c.data_fim_inscricao, '%d/%m/%Y') AS data_fim_inscricao,
+			DATE_FORMAT(c.data_fim_inscricao, '%Y-%m-%d') AS data_fim_inscricao_iso,
 			c.tipo_campeonato,
 			c.classificacao_academia,
 			c.limite_graduacao,
@@ -134,7 +161,32 @@ export async function listarCampeonatosDoDojo(
 				SELECT COUNT(*) 
 				FROM Classificacao cl 
 				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Ouro%' OR cl.classificacao_aluno LIKE '%Prata%' OR cl.classificacao_aluno LIKE '%Bronze%' OR cl.classificacao_aluno LIKE '%Campeão%')
-			) AS total_medalhas
+			) AS total_medalhas,
+			(
+				SELECT COUNT(*) 
+				FROM Classificacao cl 
+				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Ouro%' OR cl.classificacao_aluno LIKE '%Campeão%' OR cl.classificacao_aluno LIKE '%1º%')
+			) AS total_ouro,
+			(
+				SELECT COUNT(*) 
+				FROM Classificacao cl 
+				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Prata%' OR cl.classificacao_aluno LIKE '%2º%')
+			) AS total_prata,
+			(
+				SELECT COUNT(*) 
+				FROM Classificacao cl 
+				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Bronze%' OR cl.classificacao_aluno LIKE '%3º%')
+			) AS total_bronze,
+			(
+				SELECT COALESCE(SUM(cl.qtd_lutas), 0)
+				FROM Classificacao cl
+				WHERE cl.id_campeonato = e.id_evento
+			) AS total_lutas,
+			(
+				SELECT COALESCE(SUM(cl.qtd_vitorias), 0)
+				FROM Classificacao cl
+				WHERE cl.id_campeonato = e.id_evento
+			) AS total_vitorias
 		FROM Evento e
 		INNER JOIN Campeonato c ON e.id_evento = c.id_evento
 		LEFT JOIN Endereco_Evento ee ON e.id_evento = ee.id_evento
@@ -149,8 +201,11 @@ export async function listarCampeonatosDoDojo(
 		nome: String(linha.nome),
 		edicao: linha.edicao ? String(linha.edicao) : null,
 		data_inicio: String(linha.data_inicio),
+		data_inicio_iso: String(linha.data_inicio_iso),
 		data_inicio_inscricao: linha.data_inicio_inscricao ? String(linha.data_inicio_inscricao) : null,
+		data_inicio_inscricao_iso: linha.data_inicio_inscricao_iso ? String(linha.data_inicio_inscricao_iso) : null,
 		data_fim_inscricao: linha.data_fim_inscricao ? String(linha.data_fim_inscricao) : null,
+		data_fim_inscricao_iso: linha.data_fim_inscricao_iso ? String(linha.data_fim_inscricao_iso) : null,
 		tipo_campeonato: linha.tipo_campeonato ? String(linha.tipo_campeonato) : null,
 		classificacao_academia: linha.classificacao_academia ? String(linha.classificacao_academia) : null,
 		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
@@ -164,7 +219,68 @@ export async function listarCampeonatosDoDojo(
 		uf: String(linha.uf),
 		total_inscritos: Number(linha.total_inscritos || 0),
 		total_confirmados: Number(linha.total_confirmados || 0),
-		total_medalhas: Number(linha.total_medalhas || 0)
+		total_medalhas: Number(linha.total_medalhas || 0),
+		total_ouro: Number(linha.total_ouro || 0),
+		total_prata: Number(linha.total_prata || 0),
+		total_bronze: Number(linha.total_bronze || 0),
+		total_lutas: Number(linha.total_lutas || 0),
+		total_vitorias: Number(linha.total_vitorias || 0)
+	}));
+}
+
+/**
+ * Lista o desempenho individual em campeonatos para um conjunto específico de alunos
+ * (usado na visão de Aluno / Responsável na aba Desempenho).
+ */
+export async function listarDesempenhoPessoalCampeonatos(
+	idAcademia: number,
+	idsAlunos: number[]
+): Promise<DesempenhoPessoalCampeonatoItem[]> {
+	if (idsAlunos.length === 0) return [];
+	const pool = getDbPool();
+	const placeholders = idsAlunos.map(() => '?').join(', ');
+
+	const sql = `
+		SELECT
+			e.id_evento,
+			e.nome AS nome_campeonato,
+			e.edicao,
+			DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
+			DATE_FORMAT(e.data_inicio, '%Y-%m-%d') AS data_inicio_iso,
+			c.tipo_campeonato,
+			COALESCE(ee.cidade, 'São Paulo') AS cidade,
+			COALESCE(ee.uf, 'SP') AS uf,
+			cl.id_aluno,
+			u.nome AS nome_aluno,
+			cl.classificacao_aluno,
+			COALESCE(cl.qtd_lutas, 0) AS qtd_lutas,
+			COALESCE(cl.qtd_vitorias, 0) AS qtd_vitorias
+		FROM Classificacao cl
+		INNER JOIN Evento e ON cl.id_campeonato = e.id_evento
+		INNER JOIN Campeonato c ON e.id_evento = c.id_evento
+		INNER JOIN Usuario u ON cl.id_aluno = u.id_usuario
+		LEFT JOIN Endereco_Evento ee ON e.id_evento = ee.id_evento
+		WHERE e.id_academia = ?
+			AND cl.id_aluno IN (${placeholders})
+		ORDER BY e.data_inicio DESC, e.id_evento DESC
+	`;
+
+	const [linhas] = await pool.execute<RowDataPacket[]>(sql, [idAcademia, ...idsAlunos]);
+
+	return linhas.map((l) => ({
+		id_evento: Number(l.id_evento),
+		nome_campeonato: String(l.nome_campeonato),
+		edicao: l.edicao ? String(l.edicao) : null,
+		data_inicio: String(l.data_inicio),
+		data_inicio_iso: String(l.data_inicio_iso),
+		tipo_campeonato: l.tipo_campeonato ? String(l.tipo_campeonato) : null,
+		cidade: String(l.cidade),
+		uf: String(l.uf),
+		id_aluno: Number(l.id_aluno),
+		nome_aluno: String(l.nome_aluno),
+		classificacao_aluno: String(l.classificacao_aluno),
+		qtd_lutas: Number(l.qtd_lutas || 0),
+		qtd_vitorias: Number(l.qtd_vitorias || 0)
 	}));
 }
 
