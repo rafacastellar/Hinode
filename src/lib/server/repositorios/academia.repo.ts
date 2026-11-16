@@ -339,9 +339,10 @@ export async function buscarMetricasGestaoDojo(
 	const [resGrad] = await pool.query<RowDataPacket[]>(
 		`SELECT COUNT(*) AS total
 		 FROM Historico_Graduacao hg
-		 INNER JOIN Evento e ON hg.id_evento_graduacao = e.id_evento
-		 WHERE e.id_academia = ?`,
-		[idAcademia]
+		 INNER JOIN Usuario_Academia ua ON hg.id_aluno = ua.id_usuario
+		 LEFT JOIN Evento e ON hg.id_evento_graduacao = e.id_evento
+		 WHERE ua.id_academia = ? AND (e.id_academia = ? OR hg.id_evento_graduacao IS NULL)`,
+		[idAcademia, idAcademia]
 	);
 	const totalGraduacoesHomologadas = Number(resGrad[0]?.total || 0);
 

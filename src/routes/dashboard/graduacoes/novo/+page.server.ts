@@ -3,11 +3,17 @@ import type { PageServerLoad, Actions } from './$types';
 import { exigirPermissao } from '#lib/server/auth/rbac';
 import { cadastrarEventoGraduacao } from '#lib/server/servicos/graduacao.service';
 import { eventoGraduacaoSchema } from '#lib/server/validacao/graduacao.schema';
+import { buscarDadosAcademia } from '#lib/server/repositorios/academia.repo';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const perfis = locals.perfis || [];
 	exigirPermissao(perfis, 'GRADUACOES_HOMOLOGAR');
-	return {};
+
+	const academia = locals.idAcademia ? await buscarDadosAcademia(locals.idAcademia) : null;
+
+	return {
+		enderecoAcademia: academia?.endereco ?? null
+	};
 };
 
 export const actions: Actions = {

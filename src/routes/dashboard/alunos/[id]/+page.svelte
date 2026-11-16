@@ -230,8 +230,16 @@
 				</p>
 			</div>
 
-			<div class="flex items-center gap-3">
+			<div class="flex items-center gap-3 flex-wrap">
 				<BadgeFaixa faixa={aluno.graduacao_atual} size="lg" />
+				<a
+					href="/dashboard/graduacoes/historico/{aluno.id_usuario}"
+					class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-amber-300 transition-colors"
+					title="Consultar e registrar linha do tempo de graduações (inclusive histórico anterior ou de outra academia)"
+				>
+					<Award class="w-3.5 h-3.5 text-amber-400" />
+					<span>Histórico de Faixas</span>
+				</a>
 				{#if data.podeGerenciarUsuario}
 					<a
 						href="/dashboard/usuarios/{aluno.id_usuario}"
@@ -249,7 +257,7 @@
 	<!-- Termômetro de Elegibilidade Pedagógica para Próxima Faixa -->
 	<TermometroElegibilidade
 		faixaAtual={aluno.graduacao_atual}
-		dataInicioOuUltimaGraduacao={aluno.data_primeira_graduacao || aluno.data_inicio}
+		dataInicioOuUltimaGraduacao={data.dataUltimaGraduacaoIso || aluno.data_primeira_graduacao || aluno.data_inicio}
 	/>
 
 	<!-- ========================================================================= -->

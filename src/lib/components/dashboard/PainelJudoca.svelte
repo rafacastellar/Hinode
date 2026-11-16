@@ -36,6 +36,41 @@
 	// Aba ativa para alternar entre Linha do Tempo de Graduações e Linha do Tempo de Conquistas
 	let abaTimeline = $state<"graduacoes" | "conquistas">("graduacoes");
 
+	let indiceGradSelecionado = $state<number | null>(null);
+
+	const trilhaGraduacoesCompacta = $derived.by(() => {
+		const lista = [...painel.graduacoes];
+		const jaTemBranca = lista.some((g) =>
+			g.faixa.toLowerCase().includes("branca"),
+		);
+
+		if (!jaTemBranca) {
+			lista.unshift({
+				faixa: "Branca",
+				data_graduacao:
+					(painel.judoca as Record<string, any>).data_inicio_br ||
+					"Início no Tatame",
+				nome_evento: "Ingresso no Tatame (Faixa Inicial)",
+				nome_professor_homologador:
+					painel.judoca.nome_professor_responsavel || "Sensei do Dojo",
+				grau_faixa_professor: null,
+			} as (typeof painel.graduacoes)[number]);
+		}
+
+		return lista;
+	});
+
+	const gradSelecionada = $derived.by(() => {
+		if (trilhaGraduacoesCompacta.length === 0) return null;
+		const idx =
+			indiceGradSelecionado !== null &&
+			indiceGradSelecionado >= 0 &&
+			indiceGradSelecionado < trilhaGraduacoesCompacta.length
+				? indiceGradSelecionado
+				: trilhaGraduacoesCompacta.length - 1;
+		return { item: trilhaGraduacoesCompacta[idx], idx };
+	});
+
 	// Classificação inteligente de pendências
 	const pendenciasAcaoAluno = $derived(
 		painel.pendencias?.filter((p) => p.dependeDoAluno) || [],
@@ -402,78 +437,86 @@
 			</div>
 		</div>
 
-		<!-- ABA 1: LINHA DO TEMPO COM AS GRADUAÇÕES (DAN/KYU) -->
+		<!-- ABA 1: TRILHA HORIZONTAL COMPACTA DE GRADUAÇÕES (DAN/KYU) -->
 		{#if abaTimeline === "graduacoes"}
-			{#if painel.graduacoes.length > 0}
-				<div
-					class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-zinc-800"
-				>
-					{#each painel.graduacoes as grad}
-						<div class="relative group">
-							<!-- Ponto da linha do tempo -->
-							<div
-								class="absolute -left-6 top-1.5 w-5 h-5 rounded-full bg-zinc-950 border-2 border-red-600 flex items-center justify-center transition-transform group-hover:scale-125"
-							>
-								<div
-									class="w-1.5 h-1.5 rounded-full bg-red-500"
-								></div>
-							</div>
+			<div class="space-y-4">
+				<!-- Esteira Horizontal de Faixas -->
+				<div class="overflow-x-auto pb-2">
+					<div class="inline-flex items-start min-w-full px-1 pt-1">
+						{#each trilhaGraduacoesCompacta as grad, idx}
+							{@const selecionada = gradSelecionada?.idx === idx}
+							{@const ehUltima = idx === trilhaGraduacoesCompacta.length - 1}
 
-							<div
-								class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-							>
-								<div class="flex items-center gap-3">
-									<BadgeFaixa faixa={grad.faixa} size="md" />
-									<div>
+							<div class="flex items-center shrink-0">
+								<button
+									type="button"
+									onclick={() => (indiceGradSelecionado = idx)}
+									class="group flex flex-col items-center gap-2 px-2.5 py-2 rounded-xl border transition-all cursor-pointer {selecionada
+										? 'bg-red-950/30 border-red-700/70 shadow-sm'
+										: 'bg-zinc-900/30 border-transparent hover:bg-zinc-900/70 hover:border-zinc-800'}"
+								>
+									<div class="flex items-center gap-1.5">
 										<span
-											class="text-xs text-zinc-400 font-mono block"
-										>
-											Homologado em {grad.data_graduacao}
-										</span>
-										<span
-											class="text-sm font-bold text-white"
-										>
-											{grad.nome_evento ||
-												"Exame Oficial de Graduação"}
+											class="w-2.5 h-2.5 rounded-full transition-transform group-hover:scale-125 {selecionada
+												? 'bg-red-500 ring-4 ring-red-500/20'
+												: ehUltima
+													? 'bg-amber-400'
+													: 'bg-zinc-600'}"
+										></span>
+										<span class="text-[10px] font-mono text-zinc-500">
+											#{idx + 1}
 										</span>
 									</div>
-								</div>
 
-								<div
-									class="text-xs font-mono text-zinc-400 sm:text-right"
-								>
-									<span
-										class="text-[10px] uppercase text-zinc-500 block"
-										>Sensei Examinador</span
-									>
-									<span class="text-zinc-200 font-medium"
-										>{grad.nome_professor_homologador}</span
-									>
-									{#if grad.grau_faixa_professor}
-										<span class="text-[10px] text-zinc-500"
-											>({grad.grau_faixa_professor})</span
-										>
-									{/if}
-								</div>
+									<BadgeFaixa faixa={grad.faixa} size="sm" uniformWidth={false} />
+
+									<span class="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
+										{grad.data_graduacao}
+									</span>
+								</button>
+
+								{#if idx < trilhaGraduacoesCompacta.length - 1}
+									<div class="w-5 sm:w-8 h-[2px] bg-zinc-800 shrink-0 mx-0.5"></div>
+								{/if}
 							</div>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Rodapé Compacto com Detalhes da Faixa Selecionada + Atalho -->
+				{#if gradSelecionada}
+					{@const g = gradSelecionada.item}
+					<div
+						class="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+					>
+						<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+							<div class="flex items-center gap-2">
+								<BadgeFaixa faixa={g.faixa} size="sm" uniformWidth={false} />
+								<span class="font-bold text-white">
+									{g.nome_evento || "Exame Oficial de Graduação"}
+								</span>
+							</div>
+							<span class="text-zinc-400 font-mono text-[11px]">
+								Data: <strong class="text-zinc-200">{g.data_graduacao}</strong>
+							</span>
+							<span class="text-zinc-400 font-mono text-[11px]">
+								Sensei: <strong class="text-zinc-200">{g.nome_professor_homologador}</strong>
+								{#if g.grau_faixa_professor}
+									<span class="text-zinc-500">({g.grau_faixa_professor})</span>
+								{/if}
+							</span>
 						</div>
-					{/each}
-				</div>
-			{:else}
-				<div
-					class="p-8 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-2"
-				>
-					<Award class="w-8 h-8 text-zinc-600 mx-auto" />
-					<h3 class="text-sm font-bold text-white">
-						Graduação Inicial ({painel.judoca.graduacao_atual})
-					</h3>
-					<p class="text-xs text-zinc-400 max-w-sm mx-auto">
-						Você está iniciando sua caminhada no tatame. Conforme
-						prestar os exames de graduação do dojo, suas promoções
-						de Dan/Kyu aparecerão aqui nesta linha do tempo.
-					</p>
-				</div>
-			{/if}
+
+						<a
+							href="/dashboard/minhas-graduacoes"
+							class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition-colors shrink-0"
+						>
+							<span>Ver linha completa</span>
+							<ArrowRight class="w-3.5 h-3.5" />
+						</a>
+					</div>
+				{/if}
+			</div>
 		{/if}
 
 		<!-- ABA 2: LINHA DO TEMPO COM AS CONQUISTAS (CAMPEONATOS) -->

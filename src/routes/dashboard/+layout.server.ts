@@ -64,7 +64,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		}
 	}
 
-	const itensMenu = obterMenuAutorizado(perfis, { totalDependentes }).map((item) => {
+	const itensMenu = obterMenuAutorizado(perfis, {
+		totalDependentes,
+		temFichaAluno: Boolean(resumoCredenciais.aluno)
+	}).map((item) => {
 		if (ehAluno && !ehGestorOuProfessor && item.href === '/dashboard' && totalAcoesPendentes > 0) {
 			return {
 				...item,

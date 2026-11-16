@@ -1,41 +1,164 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { PageProps } from './$types';
+	import { page } from '$app/state';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
-	import {
-		Award,
-		Calendar,
-		Users,
-		ShieldCheck,
-		ArrowRight,
-		Clock,
-		MapPin,
-		Plus,
-		CheckCircle2,
-		AlertCircle
-	} from '@lucide/svelte';
-	import {
-		formatarPeriodoInscricaoExame,
-		obterStatusPeriodoInscricao
-	} from '#lib/dominio/graduacao';
+	import { obterRotuloOrigemGraduacao } from '#lib/dominio/graduacao';
 	import { obterIndiceFaixa } from '#lib/dominio/campeonato';
 	import { extrairNumeroDan } from '#lib/dominio/ordenacao-atletas';
+	import {
+		Award,
+		Plus,
+		Calendar,
+		Users,
+		ArrowRight,
+		History,
+		CheckCircle2,
+		Search,
+		FileSpreadsheet,
+		Filter,
+		X
+	} from '@lucide/svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data }: PageProps = $props();
 
-	const totalHomologacoes = $derived(data.graduacoes.length);
-	const totalEventos = $derived(data.eventos.length);
+	// Navegação controlada exclusivamente pela Sidebar Lateral (?aba=exames | historico | censo)
+	const abaUrl = $derived(page.url.searchParams.get('aba'));
+	let subMenuAtivo = $state<'exames' | 'historico' | 'censo'>('exames');
 
+	$effect(() => {
+		if (abaUrl === 'historico' || abaUrl === 'censo' || abaUrl === 'exames') {
+			subMenuAtivo = abaUrl;
+		} else {
+			subMenuAtivo = 'exames';
+		}
+	});
+
+	// ============================================================================
+	// EXAMES & CERIMÔNIAS (ATUAIS / EXERCÍCIO VS HISTÓRICO PASSADO)
+	// ============================================================================
+	const anoAtual = new Date().getFullYear();
+	let filtroExames = $state<'atuais' | 'passados'>('atuais');
+	let filtroAnoPassado = $state<string>('todos');
+
+	function extrairAnoEvento(ev: { data_inicio_iso?: string | null; data_inicio?: string | null }): number {
+		if (ev.data_inicio_iso && ev.data_inicio_iso.length >= 4) {
+			const n = parseInt(ev.data_inicio_iso.slice(0, 4), 10);
+			if (!isNaN(n)) return n;
+		}
+		if (ev.data_inicio && ev.data_inicio.length >= 10) {
+			const partes = ev.data_inicio.split('/');
+			if (partes.length === 3) {
+				const n = parseInt(partes[2], 10);
+				if (!isNaN(n)) return n;
+			}
+		}
+		return anoAtual;
+	}
+
+	const eventosAtuais = $derived(
+		data.eventos.filter((ev) => extrairAnoEvento(ev) >= anoAtual)
+	);
+
+	const eventosPassados = $derived(
+		data.eventos.filter((ev) => extrairAnoEvento(ev) < anoAtual)
+	);
+
+	const anosPassadosDisponiveis = $derived(
+		Array.from(new Set(eventosPassados.map((ev) => extrairAnoEvento(ev)))).sort((a, b) => b - a)
+	);
+
+	const eventosExibidos = $derived.by(() => {
+		if (filtroExames === 'atuais') return eventosAtuais;
+		if (filtroAnoPassado === 'todos') return eventosPassados;
+		const anoAlvo = parseInt(filtroAnoPassado, 10);
+		return eventosPassados.filter((ev) => extrairAnoEvento(ev) === anoAlvo);
+	});
+
+	// ============================================================================
+	// HOMOLOGAÇÕES & PRONTUÁRIOS (LIMPO + PESQUISA / PERÍODO)
+	// ============================================================================
+	let buscaAluno = $state('');
+	let mostrarTodosAlunos = $state(false);
+
+	const alunosFiltrados = $derived.by(() => {
+		const termo = buscaAluno.trim().toLowerCase();
+		if (!termo && !mostrarTodosAlunos) return [];
+		if (!termo && mostrarTodosAlunos) return data.alunosDojo;
+		return data.alunosDojo.filter(
+			(a) =>
+				a.nome.toLowerCase().includes(termo) ||
+				(a.matricula && a.matricula.toLowerCase().includes(termo)) ||
+				a.graduacao_atual.toLowerCase().includes(termo)
+		);
+	});
+
+	let buscaHistorico = $state('');
+	let dataPeriodoInicio = $state('');
+	let dataPeriodoFim = $state('');
+	let mostrarTodasGraduacoes = $state(false);
+
+	function brParaIso(dataBr: string | null | undefined): string {
+		if (!dataBr) return '';
+		const partes = dataBr.trim().split('/');
+		if (partes.length === 3) {
+			return `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+		}
+		return dataBr.slice(0, 10);
+	}
+
+	const temFiltroHistoricoAtivo = $derived(
+		Boolean(buscaHistorico.trim() || dataPeriodoInicio || dataPeriodoFim)
+	);
+
+	const graduacoesFiltradas = $derived.by(() => {
+		const termo = buscaHistorico.trim().toLowerCase();
+
+		const filtradas = data.graduacoes.filter((item) => {
+			if (termo) {
+				const bateTexto =
+					item.nome_aluno.toLowerCase().includes(termo) ||
+					item.faixa.toLowerCase().includes(termo) ||
+					item.nome_professor_homologador.toLowerCase().includes(termo) ||
+					(item.nome_evento && item.nome_evento.toLowerCase().includes(termo)) ||
+					(item.descricao_origem && item.descricao_origem.toLowerCase().includes(termo));
+				if (!bateTexto) return false;
+			}
+
+			if (dataPeriodoInicio || dataPeriodoFim) {
+				const iso = brParaIso(item.data_graduacao);
+				if (dataPeriodoInicio && iso < dataPeriodoInicio) return false;
+				if (dataPeriodoFim && iso > dataPeriodoFim) return false;
+			}
+
+			return true;
+		});
+
+		if (!temFiltroHistoricoAtivo && !mostrarTodasGraduacoes) {
+			return filtradas.slice(0, 5);
+		}
+		return filtradas;
+	});
+
+	function limparFiltrosHistorico() {
+		buscaHistorico = '';
+		dataPeriodoInicio = '';
+		dataPeriodoFim = '';
+		mostrarTodasGraduacoes = false;
+	}
+
+	// ============================================================================
+	// CENSO DE FAIXAS
+	// ============================================================================
 	const distribuicaoOrdenada = $derived(
 		[...data.distribuicao].sort((a, b) => {
-			const idxA = obterIndiceFaixa(a.faixa);
-			const idxB = obterIndiceFaixa(b.faixa);
-			if (idxA !== idxB) return idxA - idxB;
+			const diffFaixa = obterIndiceFaixa(a.faixa) - obterIndiceFaixa(b.faixa);
+			if (diffFaixa !== 0) return diffFaixa;
 			return extrairNumeroDan(a.faixa) - extrairNumeroDan(b.faixa);
 		})
 	);
 
-	const totalGeralJudocasCenso = $derived(
-		data.distribuicao.reduce((acc, curr) => acc + curr.total, 0)
+	const totalAlunosGraduados = $derived(
+		distribuicaoOrdenada.reduce((acc, item) => acc + item.total, 0)
 	);
 </script>
 
@@ -43,351 +166,528 @@
 	<title>Graduações & Faixas - Judô Hinodê</title>
 </svelte:head>
 
-<div class="space-y-10">
-	<!-- HEADER DA PÁGINA -->
-	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="max-w-5xl mx-auto space-y-6">
+	<!-- Cabeçalho no padrão "Meu Perfil" (sem menu horizontal superior; navegação via Sidebar) -->
+	<div
+		class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-900"
+	>
 		<div>
-			<div class="flex items-center gap-2 mb-1">
-				<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
-					Pedagogia & Tradição
-				</span>
+			<div class="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-red-500">
+				<Award class="w-3.5 h-3.5" />
+				<span>Banca Técnica & Prontuários</span>
 			</div>
-			<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
-				Graduações & Faixas
-			</h1>
-			<p class="text-xs sm:text-sm text-zinc-400 mt-1">
-				Exames oficiais de graduação, controle de carências pedagógicas, inscrições e trilha imutável (Insert-Only).
+			<h2 class="text-2xl font-bold tracking-tight text-white mt-1">
+				Graduações & Exames de Faixa
+			</h2>
+			<p class="text-xs text-zinc-400 mt-1">
+				Gerencie cerimônias de troca de faixa, consulte prontuários por pesquisa ou período e acompanhe o censo oficial CBJ/FPJ.
 			</p>
 		</div>
 
-		<div class="flex items-center gap-3 shrink-0 flex-wrap">
-			{#if data.podeHomologar}
+		{#if data.podeHomologar}
+			<div class="flex flex-wrap items-center gap-2.5 shrink-0">
 				<a
 					href="/dashboard/graduacoes/novo"
-					class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
+					class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white transition-colors shadow-lg shadow-amber-950/50 cursor-pointer"
 				>
-					<Plus class="w-4 h-4" />
+					<Calendar class="w-4 h-4" />
 					<span>Novo Exame de Graduação</span>
 				</a>
-
 				<a
 					href="/dashboard/graduacoes/nova"
-					class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 font-medium text-xs sm:text-sm transition-all"
-					title="Homologação avulsa ou extraordinária de aluno"
+					class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-zinc-200 transition-colors cursor-pointer"
 				>
-					<Award class="w-4 h-4 text-zinc-400" />
-					<span>Promoção Direta</span>
+					<Plus class="w-4 h-4 text-red-400" />
+					<span>Promoção Direta / Histórico</span>
 				</a>
-			{/if}
-		</div>
-	</div>
-
-	<!-- SEÇÃO 1: EVENTOS E EXAMES DE GRADUAÇÃO -->
-	<div class="space-y-4">
-		<div class="flex items-center justify-between">
-			<div class="flex items-center gap-2">
-				<Award class="w-4 h-4 text-red-500" />
-				<h2 class="text-sm font-mono uppercase tracking-wider text-zinc-300 font-bold">
-					Exames e Cerimônias de Graduação ({totalEventos})
-				</h2>
-			</div>
-			<span class="text-xs text-zinc-500 font-mono">Critérios e Carências Oficiais</span>
-		</div>
-
-		{#if data.eventos.length > 0}
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-				{#each data.eventos as evento}
-					{@const statusInsc = obterStatusPeriodoInscricao(evento.data_inicio_inscricao, evento.data_fim_inscricao)}
-					<div
-						class="p-5 rounded-2xl bg-zinc-950 border border-zinc-900 hover:border-zinc-800 transition-all flex flex-col justify-between gap-5 group"
-					>
-						<div class="space-y-3">
-							<!-- Topo do Card: Título, Edição e Status de Inscrição -->
-							<div class="flex items-start justify-between gap-3">
-								<div class="min-w-0">
-									<div class="flex items-center gap-2 flex-wrap">
-										<h3 class="text-base sm:text-lg font-bold text-white group-hover:text-red-400 transition-colors">
-											{evento.nome}
-										</h3>
-										{#if evento.edicao}
-											<span class="px-2 py-0.5 rounded-md bg-zinc-900 text-zinc-400 text-[11px] font-mono border border-zinc-800">
-												{evento.edicao}
-											</span>
-										{/if}
-									</div>
-									<div class="flex items-center gap-3 text-xs text-zinc-400 mt-1 flex-wrap">
-										<span class="inline-flex items-center gap-1 text-zinc-300">
-											<Calendar class="w-3.5 h-3.5 text-red-400" />
-											{evento.data_inicio}
-										</span>
-										<span class="text-zinc-600">•</span>
-										<span class="inline-flex items-center gap-1">
-											<MapPin class="w-3.5 h-3.5 text-zinc-500" />
-											{evento.cidade} / {evento.uf}
-										</span>
-									</div>
-								</div>
-
-								<span
-									class="px-2.5 py-1 rounded-full text-[10px] font-mono font-medium border shrink-0 {statusInsc.classeCor}"
-								>
-									{statusInsc.rotulo}
-								</span>
-							</div>
-
-							<!-- Badges de Regras: Faixas Elegíveis e Carências Temporais -->
-							<div class="pt-2 border-t border-zinc-900 flex flex-wrap gap-2 text-xs">
-								<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800">
-									<span class="text-[11px] text-zinc-400">Faixas:</span>
-									<span class="font-medium text-white font-mono">
-										{evento.faixa_inicio} até {evento.faixa_fim}
-									</span>
-								</div>
-
-								{#if evento.tempo_minimo_judo_meses > 0}
-									<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800" title="Tempo mínimo de prática no judô">
-										<Clock class="w-3 h-3 text-amber-400" />
-										<span class="text-[11px] text-zinc-400">Min. Judô:</span>
-										<span class="font-bold text-amber-300 font-mono">
-											{evento.tempo_minimo_judo_meses} {evento.tempo_minimo_judo_meses === 1 ? 'mês' : 'meses'}
-										</span>
-									</div>
-								{/if}
-
-								{#if evento.tempo_minimo_ultima_graduacao_meses > 0}
-									<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800" title="Carência mínima na faixa atual">
-										<Clock class="w-3 h-3 text-blue-400" />
-										<span class="text-[11px] text-zinc-400">Min. na Faixa:</span>
-										<span class="font-bold text-blue-300 font-mono">
-											{evento.tempo_minimo_ultima_graduacao_meses} {evento.tempo_minimo_ultima_graduacao_meses === 1 ? 'mês' : 'meses'}
-										</span>
-									</div>
-								{/if}
-
-								{#if (evento.percentual_minimo_presenca || 0) > 0 || (evento.qtd_minima_aulas_presentes || 0) > 0}
-									<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800" title="Critério de presença mínima no tatame">
-										<ShieldCheck class="w-3 h-3 text-red-400" />
-										<span class="text-[11px] text-zinc-400">Presença:</span>
-										<span class="font-bold text-red-300 font-mono">
-											{#if (evento.percentual_minimo_presenca || 0) > 0 && (evento.qtd_minima_aulas_presentes || 0) > 0}
-												{evento.percentual_minimo_presenca}% ({evento.qtd_minima_aulas_presentes} aulas)
-											{:else if (evento.percentual_minimo_presenca || 0) > 0}
-												{evento.percentual_minimo_presenca}%
-											{:else}
-												{evento.qtd_minima_aulas_presentes} aulas
-											{/if}
-										</span>
-									</div>
-								{/if}
-
-								<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/60 border border-zinc-800">
-									<span class="text-[11px] text-zinc-400">Taxa:</span>
-									<span class="font-bold text-emerald-400 font-mono">
-										{evento.taxa_graduacao > 0 ? `R$ ${evento.taxa_graduacao.toFixed(2).replace('.', ',')}` : 'Isento'}
-									</span>
-								</div>
-							</div>
-
-							{#if evento.data_inicio_inscricao || evento.data_fim_inscricao}
-								<div class="text-[11px] text-zinc-400 font-mono flex items-center gap-1.5">
-									<span class="text-zinc-500">Período de Inscrição:</span>
-									<span class="text-zinc-300">
-										{formatarPeriodoInscricaoExame(evento.data_inicio_inscricao, evento.data_fim_inscricao)}
-									</span>
-								</div>
-							{/if}
-						</div>
-
-						<!-- Rodapé do Card: Estatísticas de Inscritos/Homologados e Botão de Ação -->
-						<div class="pt-3 border-t border-zinc-900/80 flex items-center justify-between gap-3">
-							<div class="flex items-center gap-4 text-xs font-mono">
-								<div>
-									<span class="text-zinc-500 block text-[10px] uppercase">Inscritos</span>
-									<span class="text-white font-bold text-sm">{evento.total_inscritos}</span>
-								</div>
-								<div class="h-6 w-px bg-zinc-800"></div>
-								<div>
-									<span class="text-zinc-500 block text-[10px] uppercase">Homologados</span>
-									<span class="text-emerald-400 font-bold text-sm">{evento.total_homologados}</span>
-								</div>
-							</div>
-
-							<a
-								href="/dashboard/graduacoes/{evento.id_evento}"
-								class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs border border-zinc-800 transition-all group-hover:border-red-900/60 group-hover:bg-red-950/20"
-							>
-								<span>{data.podeHomologar ? 'Gerenciar Exame' : 'Consultar Exame'}</span>
-								<ArrowRight class="w-3.5 h-3.5 text-zinc-400 group-hover:text-red-400 transition-transform group-hover:translate-x-0.5" />
-							</a>
-						</div>
-					</div>
-				{/each}
-			</div>
-		{:else}
-			<div class="p-8 rounded-2xl bg-zinc-950 border border-zinc-900 text-center space-y-3">
-				<Award class="w-8 h-8 text-zinc-600 mx-auto" />
-				<h3 class="text-sm font-bold text-white">Nenhum exame de graduação agendado</h3>
-				<p class="text-xs text-zinc-400 max-w-md mx-auto">
-					Crie o primeiro exame de graduação do dojo com data, requisitos de carência por meses no judô e na faixa atual para verificar automaticamente a aptidão dos atletas.
-				</p>
-				{#if data.podeHomologar}
-					<a
-						href="/dashboard/graduacoes/novo"
-						class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs mt-2"
-					>
-						<Plus class="w-3.5 h-3.5" />
-						<span>Criar Exame de Graduação</span>
-					</a>
-				{/if}
 			</div>
 		{/if}
 	</div>
 
-	<!-- SEÇÃO 2: CENSO DE GRADUAÇÃO DO DOJO -->
-	<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5">
-		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-900">
-			<div class="flex items-center gap-2.5 flex-wrap">
-				<Users class="w-4 h-4 text-red-500" />
-				<h2 class="text-xs font-mono uppercase tracking-wider text-white font-bold">
-					Censo de Graduação do Dojo
-				</h2>
-				<span class="text-zinc-600">•</span>
-				<span class="text-xs font-mono text-zinc-400">
-					{totalGeralJudocasCenso} {totalGeralJudocasCenso === 1 ? 'judoca ativo' : 'judocas ativos'} em {distribuicaoOrdenada.length} {distribuicaoOrdenada.length === 1 ? 'graduação' : 'graduações'}
-				</span>
-			</div>
-			<div class="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 self-start sm:self-auto">
-				<ShieldCheck class="w-3.5 h-3.5" />
-				<span>Ordem Oficial CBJ / FPJ</span>
-			</div>
-		</div>
-
-		{#if distribuicaoOrdenada.length > 0}
-			<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-				{#each distribuicaoOrdenada as item}
-					{@const pct = totalGeralJudocasCenso > 0 ? Math.round((item.total / totalGeralJudocasCenso) * 100) : 0}
+	<!-- ========================================================================= -->
+	<!-- SUB-MENU "EXAMES & CERIMÔNIAS"                                           -->
+	<!-- ========================================================================= -->
+	{#if subMenuAtivo === 'exames'}
+		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm animate-in fade-in duration-200">
+			<div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2.5">
 					<div
-						class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700/80 transition-all flex flex-col justify-between gap-3.5 shadow-xs group"
+						class="w-8 h-8 rounded-lg bg-amber-950/50 border border-amber-900/50 flex items-center justify-center text-amber-400"
 					>
-						<div class="flex items-center justify-between border-b border-zinc-800/60 pb-2">
-							<div class="flex items-baseline gap-1">
-								<span class="text-base font-black text-white font-mono group-hover:text-red-400 transition-colors">
-									{item.total}
-								</span>
-								<span class="text-[11px] font-mono text-zinc-400">
-									{item.total === 1 ? 'judoca' : 'judocas'}
-								</span>
-							</div>
-							<span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-400">
-								{pct}%
+						<Calendar class="w-4 h-4" />
+					</div>
+					<div>
+						<h3 class="text-sm font-semibold text-white">
+							Exames & Cerimônias de Graduação do Dojo
+						</h3>
+						<p class="text-[11px] text-zinc-500">
+							Separação entre exames do exercício atual ({anoAtual}) e arquivo histórico de exames anteriores
+						</p>
+					</div>
+				</div>
+
+				<div class="flex flex-wrap items-center gap-2">
+					<div class="inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800">
+						<button
+							type="button"
+							onclick={() => (filtroExames = 'atuais')}
+							class="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 {filtroExames ===
+							'atuais'
+								? 'bg-amber-600 text-white shadow-sm'
+								: 'text-zinc-400 hover:text-zinc-200'}"
+						>
+							<span>Atuais / Exercício {anoAtual}</span>
+							<span class="px-1.5 py-0.2 rounded bg-black/25 font-mono text-[10px]">
+								{eventosAtuais.length}
 							</span>
-						</div>
-
-						<div class="flex items-center justify-center py-1">
-							<BadgeFaixa faixa={item.faixa} size="sm" />
-						</div>
-
-						<!-- Barra Gráfica Proporcional do Censo -->
-						<div class="w-full h-1.5 rounded-full bg-zinc-950 border border-zinc-800/80 overflow-hidden">
-							<div
-								class="h-full rounded-full bg-gradient-to-r from-red-600 to-amber-500 transition-all duration-500"
-								style="width: {Math.max(4, pct)}%"
-							></div>
-						</div>
+						</button>
+						<button
+							type="button"
+							onclick={() => (filtroExames = 'passados')}
+							class="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 {filtroExames ===
+							'passados'
+								? 'bg-zinc-800 text-white shadow-sm'
+								: 'text-zinc-400 hover:text-zinc-200'}"
+						>
+							<History class="w-3.5 h-3.5" />
+							<span>Histórico Passado</span>
+							<span class="px-1.5 py-0.2 rounded bg-black/25 font-mono text-[10px]">
+								{eventosPassados.length}
+							</span>
+						</button>
 					</div>
-				{/each}
-			</div>
-		{:else}
-			<div class="p-4 rounded-xl bg-zinc-900/20 text-xs text-zinc-500 italic">
-				Nenhum judoca cadastrado para cálculo de distribuição.
-			</div>
-		{/if}
-	</div>
 
-	<!-- SEÇÃO 3: FEED DE HOMOLOGAÇÕES RECENTES -->
-	<div class="space-y-4">
-		<div class="flex items-center justify-between">
-			<h2 class="text-xs font-mono uppercase tracking-wider text-zinc-400 font-bold">
-				Registro Cronológico de Promoções ({totalHomologacoes})
-			</h2>
-			<span class="text-[11px] font-mono text-zinc-500">Insert-Only</span>
-		</div>
-
-		{#if data.graduacoes.length > 0}
-			<div class="overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-900">
-				<div class="overflow-x-auto">
-					<table class="w-full text-left text-xs sm:text-sm text-zinc-300">
-						<thead class="bg-zinc-900/60 text-[11px] uppercase font-mono text-zinc-400 border-b border-zinc-900">
-							<tr>
-								<th class="px-6 py-4">Judoca Promovido</th>
-								<th class="px-6 py-4">Nova Faixa</th>
-								<th class="px-6 py-4">Data do Exame</th>
-								<th class="px-6 py-4">Sensei Homologador</th>
-								<th class="px-6 py-4">Associação / Cerimônia</th>
-								<th class="px-6 py-4 text-right">Histórico</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-zinc-900">
-							{#each data.graduacoes as grad}
-								<tr class="hover:bg-zinc-900/30 transition-colors group">
-									<td class="px-6 py-4">
-										<div class="font-semibold text-white group-hover:text-red-400 transition-colors">
-											{grad.nome_aluno}
-										</div>
-										{#if grad.matricula_aluno}
-											<div class="text-[11px] font-mono text-zinc-500 mt-0.5">
-												Matrícula: {grad.matricula_aluno}
-											</div>
-										{/if}
-									</td>
-
-									<td class="px-6 py-4">
-										<BadgeFaixa faixa={grad.faixa} size="sm" />
-									</td>
-
-									<td class="px-6 py-4 font-mono text-zinc-300">
-										{grad.data_graduacao}
-									</td>
-
-									<td class="px-6 py-4">
-										<span class="text-white font-medium block leading-tight">
-											{grad.nome_professor_homologador}
-										</span>
-										{#if grad.grau_faixa_professor}
-											<span class="text-[11px] font-mono text-zinc-500">
-												{grad.grau_faixa_professor}
-											</span>
-										{/if}
-									</td>
-
-									<td class="px-6 py-4">
-										<span class="text-zinc-300 block">
-											{grad.associacao || 'Federação Paulista de Judô'}
-										</span>
-										<span class="text-[11px] font-mono text-zinc-500">
-											{grad.nome_evento}
-										</span>
-									</td>
-
-									<td class="px-6 py-4 text-right">
-										<a
-											href="/dashboard/graduacoes/historico/{grad.id_aluno}"
-											class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-xs font-mono transition-colors"
-										>
-											<span>Trilha</span>
-											<ArrowRight class="w-3 h-3" />
-										</a>
-									</td>
-								</tr>
+					{#if filtroExames === 'passados' && anosPassadosDisponiveis.length > 0}
+						<select
+							bind:value={filtroAnoPassado}
+							class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:outline-none focus:border-amber-600"
+						>
+							<option value="todos">Todos os anos</option>
+							{#each anosPassadosDisponiveis as ano}
+								<option value={String(ano)}>Exercício {ano}</option>
 							{/each}
-						</tbody>
-					</table>
+						</select>
+					{/if}
 				</div>
 			</div>
-		{:else}
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 text-center text-xs text-zinc-500 italic">
-				Nenhum registro de graduação homologado recentemente no dojo.
+
+			{#if eventosExibidos.length === 0}
+				<div class="p-8 rounded-xl bg-zinc-900/30 border border-zinc-900 text-center space-y-3">
+					<Calendar class="w-8 h-8 text-zinc-600 mx-auto" />
+					<div class="space-y-1">
+						<p class="text-sm font-semibold text-zinc-300">
+							{filtroExames === 'atuais'
+								? `Nenhum exame agendado ou do exercício ${anoAtual}`
+								: 'Nenhum exame passado encontrado no histórico'}
+						</p>
+						<p class="text-xs text-zinc-500 max-w-md mx-auto">
+							{#if filtroExames === 'atuais' && data.podeHomologar}
+								Crie um novo evento de exame para convocar candidatos elegíveis, registrar notas da banca e homologar faixas em lote.
+							{:else}
+								Os exames já encerrados de anos anteriores ficam arquivados nesta guia para consulta de auditoria.
+							{/if}
+						</p>
+					</div>
+				</div>
+			{:else}
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{#each eventosExibidos as ev}
+						<a
+							href="/dashboard/graduacoes/{ev.id_evento}"
+							class="group p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-700/60 transition-all flex flex-col justify-between gap-4"
+						>
+							<div class="space-y-2.5">
+								<div class="flex items-center justify-between gap-2">
+									<span
+										class="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider border {ev.status ===
+										'Realizado'
+											? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+											: ev.status === 'Agendado' || ev.status === 'Em Andamento'
+												? 'bg-amber-950/60 border-amber-800/60 text-amber-300'
+												: 'bg-zinc-900 border-zinc-800 text-zinc-400'}"
+									>
+										{ev.status || 'Agendado'}
+									</span>
+									<span class="text-xs font-mono text-zinc-400">
+										{ev.data_inicio}
+									</span>
+								</div>
+
+								<h4
+									class="text-sm font-bold text-white group-hover:text-amber-400 transition-colors"
+								>
+									{ev.nome}
+								</h4>
+
+								<div class="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+									<span>
+										Faixas: <strong class="text-zinc-200">{ev.faixa_inicio}</strong> a
+										<strong class="text-zinc-200">{ev.faixa_fim}</strong>
+									</span>
+									{#if ev.cidade}
+										<span>• {ev.cidade}/{ev.uf}</span>
+									{/if}
+								</div>
+							</div>
+
+							<div class="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+								<div class="flex items-center gap-3 text-zinc-400">
+									<span>
+										<strong class="text-white font-mono">{ev.total_inscritos}</strong> inscritos
+									</span>
+									{#if ev.total_homologados > 0}
+										<span class="text-emerald-400 flex items-center gap-1">
+											<CheckCircle2 class="w-3.5 h-3.5" />
+											{ev.total_homologados} homologados
+										</span>
+									{/if}
+								</div>
+								<span
+									class="inline-flex items-center gap-1 font-semibold text-amber-400 group-hover:translate-x-0.5 transition-transform"
+								>
+									<span>Gerenciar Banca</span>
+									<ArrowRight class="w-3.5 h-3.5" />
+								</span>
+							</div>
+						</a>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- ========================================================================= -->
+	<!-- SUB-MENU "HOMOLOGAÇÕES & PRONTUÁRIOS"                                     -->
+	<!-- ========================================================================= -->
+	{#if subMenuAtivo === 'historico'}
+		<div class="space-y-6 animate-in fade-in duration-200">
+			<!-- Card 1: Busca Limpa de Prontuários Individuais -->
+			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+				<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-900">
+					<div class="flex items-center gap-2.5">
+						<div
+							class="w-8 h-8 rounded-lg bg-sky-950/50 border border-sky-900/50 flex items-center justify-center text-sky-400"
+						>
+							<FileSpreadsheet class="w-4 h-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-semibold text-white">
+								Prontuários Individuais & Importação de Histórico
+							</h3>
+							<p class="text-[11px] text-zinc-500">
+								Pesquise um judoca por nome, matrícula ou faixa, ou clique em "Listar Todos"
+							</p>
+						</div>
+					</div>
+					<button
+						type="button"
+						onclick={() => (mostrarTodosAlunos = !mostrarTodosAlunos)}
+						class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-semibold text-zinc-300 transition-colors cursor-pointer"
+					>
+						{mostrarTodosAlunos
+							? 'Recolher Lista'
+							: `Listar Todos (${data.alunosDojo.length})`}
+					</button>
+				</div>
+
+				<div class="relative">
+					<Search class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+					<input
+						type="text"
+						bind:value={buscaAluno}
+						placeholder="Digite o nome do judoca, matrícula ou faixa para localizar o prontuário..."
+						class="w-full pl-10 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600"
+					/>
+					{#if buscaAluno}
+						<button
+							type="button"
+							onclick={() => (buscaAluno = '')}
+							class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200 cursor-pointer"
+							title="Limpar pesquisa"
+						>
+							<X class="w-4 h-4" />
+						</button>
+					{/if}
+				</div>
+
+				{#if !buscaAluno.trim() && !mostrarTodosAlunos}
+					<div class="p-5 rounded-xl bg-zinc-900/25 border border-dashed border-zinc-800 text-center text-xs text-zinc-500">
+						Use o campo de pesquisa acima para abrir rapidamente a linha do tempo de um judoca, ou clique em <strong class="text-zinc-300">Listar Todos</strong>.
+					</div>
+				{:else if alunosFiltrados.length === 0}
+					<div class="p-4 rounded-xl bg-zinc-900/40 border border-zinc-900 text-center text-xs text-zinc-500">
+						Nenhum judoca encontrado para "{buscaAluno}".
+					</div>
+				{:else}
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+						{#each alunosFiltrados as aluno}
+							<div
+								class="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 hover:border-zinc-700 transition-all flex flex-col justify-between gap-3"
+							>
+								<div class="flex items-start justify-between gap-2">
+									<div class="min-w-0">
+										<div class="text-xs font-bold text-white truncate">{aluno.nome}</div>
+										<div class="text-[11px] text-zinc-500 font-mono mt-0.5">
+											{aluno.idade} anos
+											{#if aluno.matricula}
+												• Mat. {aluno.matricula}
+											{/if}
+										</div>
+									</div>
+									<BadgeFaixa faixa={aluno.graduacao_atual} size="sm" />
+								</div>
+
+								<div class="pt-2.5 border-t border-zinc-800/70 flex items-center justify-between gap-2">
+									<a
+										href="/dashboard/graduacoes/historico/{aluno.id_usuario}"
+										class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 hover:text-sky-300"
+									>
+										<History class="w-3.5 h-3.5" />
+										<span>Linha do Tempo / Importar</span>
+									</a>
+									{#if data.podeHomologar}
+										<a
+											href="/dashboard/graduacoes/nova?alunoId={aluno.id_usuario}"
+											class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-semibold text-zinc-300"
+										>
+											<Plus class="w-3 h-3 text-red-400" />
+											<span>Promover</span>
+										</a>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
 			</div>
-		{/if}
-	</div>
+
+			<!-- Card 2: Registro Cronológico de Promoções do Dojo -->
+			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+				<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-900">
+					<div class="flex items-center gap-2.5">
+						<div
+							class="w-8 h-8 rounded-lg bg-red-950/50 border border-red-900/50 flex items-center justify-center text-red-400"
+						>
+							<History class="w-4 h-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-semibold text-white">
+								Registro Cronológico de Promoções do Dojo
+							</h3>
+							<p class="text-[11px] text-zinc-500">
+								Exibição enxuta por padrão — pesquise por nome/faixa, filtre por período ou carregue todos
+							</p>
+						</div>
+					</div>
+					<div class="flex items-center gap-2">
+						<span
+							class="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400"
+						>
+							Exibindo {graduacoesFiltradas.length} de {data.graduacoes.length}
+						</span>
+						{#if data.graduacoes.length > 5 && !temFiltroHistoricoAtivo}
+							<button
+								type="button"
+								onclick={() => (mostrarTodasGraduacoes = !mostrarTodasGraduacoes)}
+								class="px-3 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-semibold text-zinc-300 transition-colors cursor-pointer"
+							>
+								{mostrarTodasGraduacoes ? 'Mostrar Apenas 5' : 'Carregar Todos'}
+							</button>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Barra de Pesquisa + Filtro por Período -->
+				<div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+					<div class="md:col-span-6 space-y-1">
+						<label
+							for="busca-historico-promocoes"
+							class="block text-[10px] font-mono uppercase tracking-wider text-zinc-500"
+						>
+							Pesquisar (Judoca, Faixa, Examinador ou Origem)
+						</label>
+						<div class="relative">
+							<Search class="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+							<input
+								id="busca-historico-promocoes"
+								type="text"
+								bind:value={buscaHistorico}
+								placeholder="Ex.: Rafael, Faixa Azul, Exame..."
+								class="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600"
+							/>
+						</div>
+					</div>
+
+					<div class="md:col-span-3 space-y-1">
+						<label
+							for="periodo-inicio"
+							class="block text-[10px] font-mono uppercase tracking-wider text-zinc-500"
+						>
+							Período (De)
+						</label>
+						<input
+							id="periodo-inicio"
+							type="date"
+							bind:value={dataPeriodoInicio}
+							class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
+						/>
+					</div>
+
+					<div class="md:col-span-3 space-y-1">
+						<label
+							for="periodo-fim"
+							class="block text-[10px] font-mono uppercase tracking-wider text-zinc-500"
+						>
+							Período (Até)
+						</label>
+						<div class="flex items-center gap-2">
+							<input
+								id="periodo-fim"
+								type="date"
+								bind:value={dataPeriodoFim}
+								class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600"
+							/>
+							{#if temFiltroHistoricoAtivo || mostrarTodasGraduacoes}
+								<button
+									type="button"
+									onclick={limparFiltrosHistorico}
+									class="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white cursor-pointer shrink-0"
+									title="Limpar filtros"
+								>
+									<Filter class="w-3.5 h-3.5" />
+								</button>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				{#if graduacoesFiltradas.length === 0}
+					<div class="p-8 rounded-xl bg-zinc-900/30 border border-zinc-900 text-center text-xs text-zinc-500">
+						{data.graduacoes.length === 0
+							? 'Nenhuma promoção de faixa registrada no histórico até o momento.'
+							: 'Nenhum registro encontrado para os filtros informados.'}
+					</div>
+				{:else}
+					<div class="rounded-xl border border-zinc-900 overflow-hidden">
+						<div class="overflow-x-auto">
+							<table class="w-full text-left border-collapse">
+								<thead>
+									<tr
+										class="border-b border-zinc-900 bg-zinc-900/40 text-[11px] font-mono uppercase tracking-wider text-zinc-500"
+									>
+										<th class="py-3 px-4">Data</th>
+										<th class="py-3 px-4">Judoca</th>
+										<th class="py-3 px-4">Graduação Outorgada</th>
+										<th class="py-3 px-4 hidden md:table-cell">Origem / Cerimônia</th>
+										<th class="py-3 px-4 hidden sm:table-cell">Sensei / Examinador</th>
+										<th class="py-3 px-4 text-right">Prontuário</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-zinc-900 text-sm">
+									{#each graduacoesFiltradas as item}
+										{@const infoOrigem = obterRotuloOrigemGraduacao(item.origem_registro)}
+										<tr class="hover:bg-zinc-900/30 transition-colors">
+											<td class="py-3.5 px-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+												{item.data_graduacao}
+											</td>
+											<td class="py-3.5 px-4 font-semibold text-white">
+												{item.nome_aluno}
+											</td>
+											<td class="py-3.5 px-4">
+												<BadgeFaixa faixa={item.faixa} size="sm" />
+											</td>
+											<td class="py-3.5 px-4 text-xs text-zinc-400 hidden md:table-cell">
+												<div class="flex flex-wrap items-center gap-1.5">
+													<span class="px-2 py-0.5 rounded border text-[10px] font-mono {infoOrigem.classeBadge}">
+														{infoOrigem.rotulo}
+													</span>
+													{#if item.descricao_origem}
+														<span class="text-zinc-400 text-[11px]">{item.descricao_origem}</span>
+													{:else if item.nome_evento}
+														<span class="text-zinc-400 text-[11px]">{item.nome_evento}</span>
+													{/if}
+												</div>
+											</td>
+											<td class="py-3.5 px-4 text-xs text-zinc-400 hidden sm:table-cell">
+												{item.nome_professor_homologador}
+											</td>
+											<td class="py-3.5 px-4 text-right">
+												<a
+													href="/dashboard/graduacoes/historico/{item.id_aluno}"
+													class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-medium text-zinc-300 transition-colors"
+												>
+													<span>Linha do Tempo</span>
+													<ArrowRight class="w-3 h-3" />
+												</a>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- ========================================================================= -->
+	<!-- SUB-MENU "CENSO DE FAIXAS"                                                -->
+	<!-- ========================================================================= -->
+	{#if subMenuAtivo === 'censo'}
+		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm animate-in fade-in duration-200">
+			<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2.5">
+					<div
+						class="w-8 h-8 rounded-lg bg-red-950/50 border border-red-900/50 flex items-center justify-center text-red-400"
+					>
+						<Users class="w-4 h-4" />
+					</div>
+					<div>
+						<h3 class="text-sm font-semibold text-white">
+							Censo de Graduação do Dojo
+						</h3>
+						<p class="text-[11px] text-zinc-500">
+							Distribuição oficial de judocas ativos por faixa (Ordem Hierárquica CBJ / FPJ)
+						</p>
+					</div>
+				</div>
+				<span
+					class="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400"
+				>
+					{totalAlunosGraduados} Judocas no Censo
+				</span>
+			</div>
+
+			{#if distribuicaoOrdenada.length === 0}
+				<div class="p-8 rounded-xl bg-zinc-900/30 border border-zinc-900 text-center text-xs text-zinc-500">
+					Nenhum judoca cadastrado no censo de faixas.
+				</div>
+			{:else}
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+					{#each distribuicaoOrdenada as item}
+						{@const percentual =
+							totalAlunosGraduados > 0
+								? Math.round((item.total / totalAlunosGraduados) * 100)
+								: 0}
+						<div class="p-4 rounded-xl bg-zinc-900/40 border border-zinc-900 space-y-3">
+							<div class="flex items-center justify-between gap-2">
+								<BadgeFaixa faixa={item.faixa} size="sm" />
+								<div class="text-right">
+									<span class="text-lg font-bold font-mono text-white">{item.total}</span>
+									<span class="text-[11px] font-mono text-zinc-500 ml-1">({percentual}%)</span>
+								</div>
+							</div>
+							<div class="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
+								<div
+									class="h-full rounded-full bg-red-600 transition-all"
+									style="width: {Math.max(4, percentual)}%"
+								></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
 </div>

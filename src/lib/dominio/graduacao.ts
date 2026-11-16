@@ -56,6 +56,72 @@ export const OPCOES_FAIXAS_CADASTRO: readonly OpcaoFaixaCadastro[] = [
 
 export const LISTA_TODAS_FAIXAS_VALORES: string[] = OPCOES_FAIXAS_CADASTRO.map((f) => f.valor);
 
+export type OrigemRegistroGraduacao =
+	| 'EXAME_DOJO'
+	| 'PROMOCAO_DIRETA'
+	| 'HISTORICO_ANTERIOR'
+	| 'TRANSFERENCIA';
+
+export const OPCOES_ORIGEM_REGISTRO_GRADUACAO: readonly {
+	valor: OrigemRegistroGraduacao;
+	rotulo: string;
+	descricao: string;
+}[] = [
+	{
+		valor: 'PROMOCAO_DIRETA',
+		rotulo: 'Promoção Direta no Dojo',
+		descricao: 'Graduação avulsa ou extraordinária homologada diretamente pelo Sensei do dojo'
+	},
+	{
+		valor: 'HISTORICO_ANTERIOR',
+		rotulo: 'Acervo Histórico (Pré-Sistema)',
+		descricao: 'Importação ou lançamento de faixas conquistadas no dojo antes da implantação do sistema'
+	},
+	{
+		valor: 'TRANSFERENCIA',
+		rotulo: 'Transferência (Outra Academia / Federação)',
+		descricao: 'Registro de faixas conquistadas pelo judoca em outra academia ou associação anterior'
+	},
+	{
+		valor: 'EXAME_DOJO',
+		rotulo: 'Exame Oficial do Dojo',
+		descricao: 'Cerimônia oficial de exame agendada no painel de eventos do dojo'
+	}
+] as const;
+
+export function obterRotuloOrigemGraduacao(origem?: string | null): {
+	rotulo: string;
+	classeBadge: string;
+} {
+	switch (origem) {
+		case 'MARCO_INICIAL':
+			return {
+				rotulo: 'Início no Tatame',
+				classeBadge: 'bg-zinc-900 text-zinc-200 border-zinc-700'
+			};
+		case 'HISTORICO_ANTERIOR':
+			return {
+				rotulo: 'Acervo Histórico',
+				classeBadge: 'bg-amber-950/50 text-amber-300 border-amber-800/60'
+			};
+		case 'TRANSFERENCIA':
+			return {
+				rotulo: 'Outra Academia / Transferência',
+				classeBadge: 'bg-purple-950/50 text-purple-300 border-purple-800/60'
+			};
+		case 'PROMOCAO_DIRETA':
+			return {
+				rotulo: 'Promoção Direta',
+				classeBadge: 'bg-blue-950/50 text-blue-300 border-blue-800/60'
+			};
+		default:
+			return {
+				rotulo: 'Exame Oficial do Dojo',
+				classeBadge: 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60'
+			};
+	}
+}
+
 /**
  * Normaliza qualquer graduação legado (ex: "Preta (1º Dan)", "Coral (6º Dan)", "Preta")
  * para os padrões diretos solicitados pelo dojo ("Preta Shodan", "Kodansha Rokudan", etc.).
@@ -250,6 +316,121 @@ export function obterProximaFaixaCliente(faixaAtual?: string | null): string {
 	if (normalizada.includes('vermelha')) return 'Kodansha Judan';
 
 	return 'Preta Shodan';
+}
+
+export interface RegraOficialGraduacao {
+	proximaFaixa: string;
+	carenciaMeses: number;
+	idadeMinima: number | null;
+	descricaoCarencia: string;
+}
+
+/**
+ * Regras oficiais CBJ / FPJ de carência mínima e idade mínima por graduação alvo
+ * (incluindo todas as faixas Kyu e Yudansha / Kodansha de 1º ao 10º Dan).
+ */
+export function obterRegrasOficiaisProximaFaixa(faixaAtual?: string | null): RegraOficialGraduacao {
+	const proximaFaixa = obterProximaFaixaCliente(faixaAtual);
+	const alvo = proximaFaixa
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '');
+
+	if (alvo.includes('judan') || alvo.includes('10')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 96,
+			idadeMinima: 76,
+			descricaoCarencia: '8 anos (96 meses) no 9º Dan'
+		};
+	}
+	if ((alvo.includes('kudan') && !alvo.includes('rokudan')) || alvo.includes('9')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 96,
+			idadeMinima: 68,
+			descricaoCarencia: '8 anos (96 meses) no 8º Dan'
+		};
+	}
+	if (alvo.includes('hachidan') || alvo.includes('8')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 96,
+			idadeMinima: 60,
+			descricaoCarencia: '8 anos (96 meses) no 7º Dan'
+		};
+	}
+	if (alvo.includes('shichidan') || alvo.includes('nanadan') || alvo.includes('7')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 96,
+			idadeMinima: 52,
+			descricaoCarencia: '8 anos (96 meses) no 6º Dan'
+		};
+	}
+	if (alvo.includes('rokudan') || alvo.includes('6')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 84,
+			idadeMinima: 44,
+			descricaoCarencia: '7 anos (84 meses) no 5º Dan'
+		};
+	}
+	if (alvo.includes('godan') || alvo.includes('5')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 72,
+			idadeMinima: 37,
+			descricaoCarencia: '6 anos (72 meses) no 4º Dan'
+		};
+	}
+	if (alvo.includes('yondan') || alvo.includes('4')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 72,
+			idadeMinima: 31,
+			descricaoCarencia: '6 anos (72 meses) no 3º Dan'
+		};
+	}
+	if (alvo.includes('sandan') || alvo.includes('3')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 60,
+			idadeMinima: 25,
+			descricaoCarencia: '5 anos (60 meses) no 2º Dan'
+		};
+	}
+	if (alvo.includes('nidan') || alvo.includes('2')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 48,
+			idadeMinima: 20,
+			descricaoCarencia: '4 anos (48 meses) no 1º Dan'
+		};
+	}
+	if (alvo.includes('shodan') || alvo.includes('preta')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 24,
+			idadeMinima: 16,
+			descricaoCarencia: '2 anos (24 meses) como Faixa Marrom'
+		};
+	}
+	if (alvo.includes('marrom') || alvo.includes('roxa') || alvo.includes('verde') || alvo.includes('laranja')) {
+		return {
+			proximaFaixa,
+			carenciaMeses: 12,
+			idadeMinima: null,
+			descricaoCarencia: '1 ano (12 meses) na faixa anterior'
+		};
+	}
+
+	return {
+		proximaFaixa,
+		carenciaMeses: 6,
+		idadeMinima: null,
+		descricaoCarencia: '6 meses na faixa anterior'
+	};
 }
 
 export function formatarDataBr(dataIso?: string | null): string {

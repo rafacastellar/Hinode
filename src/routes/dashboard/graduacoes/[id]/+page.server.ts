@@ -1,12 +1,13 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
+import { exigirPermissao, temPermissao, normalizarNomePapel } from '#lib/server/auth/rbac';
 import {
 	buscarEventoGraduacaoPorId,
 	listarCandidatosDoDojoComElegibilidade,
 	listarInscricoesDoEventoGraduacao
 } from '#lib/server/repositorios/graduacao.repo';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
+import { listarIdsAlunosDoResponsavel } from '#lib/server/repositorios/responsavel.repo';
 import {
 	inscreverAlunoNoExame,
 	cancelarInscricaoAlunoNoExame,
@@ -21,20 +22,44 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	exigirPermissao(perfis, 'GRADUACOES_VER');
 
 	const idAcademia = locals.idAcademia!;
+	const idUsuarioLogado = locals.usuario?.id;
 	const idEvento = parseInt(params.id, 10);
 	if (isNaN(idEvento) || idEvento <= 0) {
 		throw error(404, { message: 'Evento de graduação não encontrado.' });
 	}
 
-	const [evento, candidatos, inscricoes, professores] = await Promise.all([
+	const ehGestorOuProfessor = perfis.some((p) => {
+		const norm = normalizarNomePapel(p);
+		return norm === 'admin' || norm === 'professor' || norm === 'recepcao';
+	});
+
+	const [evento, todosCandidatos, todasInscricoes, professores] = await Promise.all([
 		buscarEventoGraduacaoPorId(idAcademia, idEvento),
 		listarCandidatosDoDojoComElegibilidade(idAcademia, idEvento),
 		listarInscricoesDoEventoGraduacao(idAcademia, idEvento),
-		listarProfessoresDoDojo(idAcademia)
+		ehGestorOuProfessor ? listarProfessoresDoDojo(idAcademia) : Promise.resolve([])
 	]);
 
 	if (!evento) {
 		throw error(404, { message: 'Exame de graduação não encontrado nesta academia.' });
+	}
+
+	// Se for Aluno ou Responsável, filtra candidatos e inscrições APENAS para o próprio judoca ou seus tutelados
+	let candidatos = todosCandidatos;
+	let inscricoes = todasInscricoes;
+
+	if (!ehGestorOuProfessor) {
+		const idsPermitidos = new Set<number>();
+		if (idUsuarioLogado) {
+			idsPermitidos.add(idUsuarioLogado);
+			const idsTutelados = await listarIdsAlunosDoResponsavel(idAcademia, idUsuarioLogado);
+			for (const idTut of idsTutelados) {
+				idsPermitidos.add(idTut);
+			}
+		}
+
+		candidatos = todosCandidatos.filter((c) => idsPermitidos.has(c.id_aluno));
+		inscricoes = todasInscricoes.filter((i) => idsPermitidos.has(i.id_aluno));
 	}
 
 	return {
@@ -42,6 +67,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		candidatos,
 		inscricoes,
 		professores,
+		ehGestorOuProfessor,
 		podeGerenciar: temPermissao(perfis, 'GRADUACOES_HOMOLOGAR')
 	};
 };

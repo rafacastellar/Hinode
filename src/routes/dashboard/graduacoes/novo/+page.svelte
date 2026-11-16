@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ActionData } from './$types';
+	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import {
 		Award,
@@ -17,7 +17,7 @@
 	} from '@lucide/svelte';
 	import { FAIXAS_GRADUACAO_LISTA } from '#lib/dominio/graduacao';
 
-	let { form }: { form: ActionData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let carregando = $state(false);
 
@@ -33,8 +33,24 @@
 	let uf = $state('SP');
 	let buscandoCep = $state(false);
 	let cepMensagem = $state('');
+	let enderecoInicializado = $state(false);
+
+	function aplicarEnderecoAcademia() {
+		if (!data.enderecoAcademia) return;
+		cep = data.enderecoAcademia.cep || '';
+		logradouro = data.enderecoAcademia.logradouro || '';
+		numero = data.enderecoAcademia.numero || '';
+		complemento = data.enderecoAcademia.complemento || '';
+		bairro = data.enderecoAcademia.bairro || '';
+		cidade = data.enderecoAcademia.cidade || 'São Paulo';
+		uf = data.enderecoAcademia.uf || 'SP';
+	}
 
 	$effect(() => {
+		if (!enderecoInicializado && !form?.valores && data.enderecoAcademia) {
+			aplicarEnderecoAcademia();
+			enderecoInicializado = true;
+		}
 		if (form?.valores?.faixaInicio) faixaInicio = form.valores.faixaInicio as string;
 		if (form?.valores?.faixaFim) faixaFim = form.valores.faixaFim as string;
 		if (form?.valores?.cep) cep = String(form.valores.cep);

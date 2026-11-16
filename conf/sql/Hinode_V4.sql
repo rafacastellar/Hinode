@@ -353,12 +353,15 @@ CREATE TABLE Graduacao_Evento (
 --  - Triggers abaixo bloqueiam UPDATE e DELETE. Correção = inserir novo registro.
 CREATE TABLE Historico_Graduacao (
     id_historico INT AUTO_INCREMENT PRIMARY KEY,
-    id_evento_graduacao INT NOT NULL,
+    id_evento_graduacao INT NULL,
     id_aluno INT NOT NULL,
-    id_professor_homologador INT NOT NULL,
+    id_professor_homologador INT NULL,
     data_graduacao DATE,
     associacao VARCHAR(100),
     faixa VARCHAR(50),
+    origem_registro ENUM('EXAME_DOJO', 'PROMOCAO_DIRETA', 'HISTORICO_ANTERIOR', 'TRANSFERENCIA') NOT NULL DEFAULT 'EXAME_DOJO',
+    descricao_origem VARCHAR(255) NULL,
+    nome_examinador_externo VARCHAR(255) NULL,
     CONSTRAINT fk_hist_grad_evento
         FOREIGN KEY (id_evento_graduacao) REFERENCES Graduacao_Evento(id_evento) ON DELETE RESTRICT,
     CONSTRAINT fk_hist_grad_aluno

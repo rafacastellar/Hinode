@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { exigirPermissao, temPermissao } from '#lib/server/auth/rbac';
 import { buscarAlunoPorId } from '#lib/server/repositorios/aluno.repo';
 import { listarProfessoresDoDojo } from '#lib/server/repositorios/professor.repo';
+import { obterDataUltimaGraduacaoAlunoIso } from '#lib/server/repositorios/graduacao.repo';
 import { atualizarDadosAluno } from '#lib/server/servicos/aluno.service';
 import {
 	listarHistoricoPresencasAluno,
@@ -22,12 +23,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, { message: 'Judoca não encontrado' });
 	}
 
-	const [aluno, professores, presencas, metricasPresenca, turmasMatriculadas] = await Promise.all([
+	const [aluno, professores, presencas, metricasPresenca, turmasMatriculadas, dataUltimaGraduacaoIso] = await Promise.all([
 		buscarAlunoPorId(idAcademia, idAluno),
 		listarProfessoresDoDojo(idAcademia),
 		listarHistoricoPresencasAluno(idAcademia, idAluno, 200),
 		obterMetricasDetalhadasPresencaAluno(idAcademia, idAluno),
-		listarTurmasMatriculadasDoAluno(idAcademia, idAluno)
+		listarTurmasMatriculadasDoAluno(idAcademia, idAluno),
+		obterDataUltimaGraduacaoAlunoIso(idAluno)
 	]);
 
 	if (!aluno) {
@@ -44,6 +46,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		presencas,
 		metricasPresenca,
 		turmasMatriculadas,
+		dataUltimaGraduacaoIso,
 		podeEditar,
 		podeGerenciarUsuario,
 		podeGerenciarPresenca
