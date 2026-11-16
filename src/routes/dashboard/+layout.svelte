@@ -24,6 +24,7 @@
 		MapPin,
 		KeyRound,
 		ChevronDown,
+		History,
 	} from "@lucide/svelte";
 	import { page } from "$app/state";
 
@@ -234,6 +235,11 @@
 			icone: Calendar,
 		},
 		{
+			chave: "exames-historico",
+			titulo: "Histórico de Exames",
+			icone: History,
+		},
+		{
 			chave: "historico",
 			titulo: "Homologações & Prontuários",
 			icone: Award,
@@ -265,6 +271,29 @@
 
 	const abaMinhasGraduacoesAtiva = $derived(
 		page.url.searchParams.get("aba") || "jornada",
+	);
+
+	// Sub-menus dinâmicos do item "Campeonatos" na Sidebar Lateral
+	const subMenusCampeonatos = [
+		{
+			chave: "proximos",
+			titulo: "Campeonatos",
+			icone: Trophy,
+		},
+		{
+			chave: "historico",
+			titulo: "Histórico de Campeonatos",
+			icone: Calendar,
+		},
+		{
+			chave: "desempenho",
+			titulo: "Desempenho",
+			icone: Award,
+		},
+	];
+
+	const abaCampeonatosAtiva = $derived(
+		page.url.searchParams.get("aba") || "proximos",
 	);
 
 	function rotaAtiva(href: string): boolean {
@@ -423,7 +452,12 @@
 				{@const ehItemPerfil = item.href === "/dashboard/perfil"}
 				{@const ehItemGraduacoes = item.href === "/dashboard/graduacoes"}
 				{@const ehItemMinhasGraduacoes = item.href === "/dashboard/minhas-graduacoes"}
-				{@const temSubmenu = ehItemPerfil || ehItemGraduacoes || ehItemMinhasGraduacoes}
+				{@const ehItemCampeonatos = item.href === "/dashboard/campeonatos"}
+				{@const temSubmenu =
+					ehItemPerfil ||
+					ehItemGraduacoes ||
+					ehItemMinhasGraduacoes ||
+					ehItemCampeonatos}
 
 				<div class="space-y-1">
 					<a
@@ -545,6 +579,33 @@
 									abaMinhasGraduacoesAtiva === sub.chave}
 								<a
 									href="/dashboard/minhas-graduacoes?aba={sub.chave}"
+									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
+										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+								>
+									<SubIcone
+										class="w-3.5 h-3.5 shrink-0 {subAtivo
+											? 'text-red-400'
+											: 'text-zinc-500'}"
+									/>
+									<span class="truncate">{sub.titulo}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Sub-menus de Campeonatos na Sidebar -->
+					{#if ehItemCampeonatos && ativo && !sidebarMinimizada}
+						<div
+							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
+						>
+							{#each subMenusCampeonatos as sub}
+								{@const SubIcone = sub.icone}
+								{@const subAtivo =
+									page.url.pathname === "/dashboard/campeonatos" &&
+									abaCampeonatosAtiva === sub.chave}
+								<a
+									href="/dashboard/campeonatos?aba={sub.chave}"
 									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
 										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
 										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
@@ -741,7 +802,12 @@
 						{@const ehItemPerfil = item.href === "/dashboard/perfil"}
 						{@const ehItemGraduacoes = item.href === "/dashboard/graduacoes"}
 						{@const ehItemMinhasGraduacoes = item.href === "/dashboard/minhas-graduacoes"}
-						{@const temSubmenu = ehItemPerfil || ehItemGraduacoes || ehItemMinhasGraduacoes}
+						{@const ehItemCampeonatos = item.href === "/dashboard/campeonatos"}
+						{@const temSubmenu =
+							ehItemPerfil ||
+							ehItemGraduacoes ||
+							ehItemMinhasGraduacoes ||
+							ehItemCampeonatos}
 
 						<div class="space-y-1">
 							<a
@@ -842,6 +908,31 @@
 											abaMinhasGraduacoesAtiva === sub.chave}
 										<a
 											href="/dashboard/minhas-graduacoes?aba={sub.chave}"
+											onclick={() => (menuAberto = false)}
+											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
+												: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+										>
+											<SubIcone
+												class="w-3.5 h-3.5 shrink-0 {subAtivo
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+											/>
+											<span class="truncate">{sub.titulo}</span>
+										</a>
+									{/each}
+								</div>
+							{/if}
+
+							{#if ehItemCampeonatos && ativo}
+								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
+									{#each subMenusCampeonatos as sub}
+										{@const SubIcone = sub.icone}
+										{@const subAtivo =
+											page.url.pathname === "/dashboard/campeonatos" &&
+											abaCampeonatosAtiva === sub.chave}
+										<a
+											href="/dashboard/campeonatos?aba={sub.chave}"
 											onclick={() => (menuAberto = false)}
 											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
 												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
