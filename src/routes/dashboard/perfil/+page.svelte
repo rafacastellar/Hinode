@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData, ActionData } from './$types';
-	import BadgePerfil from '#lib/components/ui/BadgePerfil.svelte';
+	import { page } from '$app/state';
 	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
 	import CalendarioTatameMensal from '#lib/components/ui/CalendarioTatameMensal.svelte';
 	import {
@@ -22,10 +22,8 @@
 		Award,
 		Calendar,
 		Building2,
-		Flame,
 		Sparkles,
-		Check,
-		Globe
+		Check
 	} from '@lucide/svelte';
 	import { analisarForcaSenha } from '#lib/dominio/validacao';
 
@@ -35,6 +33,30 @@
 	}
 
 	let { data, form }: Props = $props();
+
+	type SubMenuPerfil = 'dados' | 'endereco' | 'tecnico' | 'frequencia' | 'seguranca';
+
+	let subMenuAtivo = $state<SubMenuPerfil>('dados');
+
+	// Sincroniza com ?aba=... se presente na URL
+	$effect(() => {
+		const abaUrl = page.url.searchParams.get('aba') as SubMenuPerfil | null;
+		if (
+			abaUrl &&
+			['dados', 'endereco', 'tecnico', 'frequencia', 'seguranca'].includes(abaUrl)
+		) {
+			subMenuAtivo = abaUrl;
+		} else {
+			subMenuAtivo = 'dados';
+		}
+	});
+
+	// Se retornar feedback da action de senha, abre automaticamente a aba de segurança
+	$effect(() => {
+		if (form?.sucessoSenha || form?.erroSenha) {
+			subMenuAtivo = 'seguranca';
+		}
+	});
 
 	// Estados reativos para busca de CEP e alternância de senha
 	let buscandoCep = $state(false);
@@ -128,90 +150,7 @@
 	<title>Meu Perfil - Judô Hinodê</title>
 </svelte:head>
 
-<div class="space-y-8 animate-in fade-in duration-300">
-	<!-- ========================================================================= -->
-	<!-- 1. HEADER DO PERFIL & IDENTIFICAÇÃO RÁPIDA                                 -->
-	<!-- ========================================================================= -->
-	<header
-		class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-950 via-zinc-900 to-red-950/25 border border-zinc-800 p-6 sm:p-8 shadow-[0_0_35px_rgba(220,38,38,0.08)]"
-	>
-		<!-- Glow sutil de fundo -->
-		<div
-			class="absolute -top-24 -right-24 w-72 h-72 bg-red-600/10 rounded-full blur-3xl pointer-events-none"
-		></div>
-
-		<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-			<div class="flex items-start sm:items-center gap-5">
-				<!-- Avatar com Inicial do Nome -->
-				<div
-					class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-zinc-900 border-2 border-red-600/60 flex items-center justify-center text-2xl sm:text-3xl font-display font-extrabold text-white shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.25)]"
-				>
-					{data.perfil.nome.charAt(0).toUpperCase()}
-				</div>
-
-				<div class="space-y-2">
-					<div class="flex items-center gap-2 flex-wrap">
-						<span
-							class="px-2.5 py-0.5 rounded-full bg-red-950/80 border border-red-800/80 text-[10px] font-mono font-bold uppercase tracking-wider text-red-400 flex items-center gap-1.5"
-						>
-							<User class="w-3 h-3 text-red-500" />
-							<span>Minha Conta</span>
-						</span>
-						<span class="text-xs text-zinc-600">•</span>
-						<span class="text-xs text-zinc-400 font-mono">
-							ID #{data.perfil.id_usuario}
-						</span>
-						{#if data.perfil.dados_aluno?.matricula}
-							<span class="text-xs text-zinc-600">•</span>
-							<span class="text-xs text-zinc-400 font-mono">
-								Matrícula: {data.perfil.dados_aluno.matricula}
-							</span>
-						{/if}
-						<span class="text-xs text-zinc-600">•</span>
-						<span class="text-xs text-zinc-400 font-mono">
-							{data.nomeAcademia || 'Judô Hinodê'}
-						</span>
-					</div>
-
-					<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
-						{data.perfil.nome}
-					</h1>
-
-					<div class="flex items-center gap-2 flex-wrap pt-0.5">
-						{#each data.perfil.perfis as perfil}
-							{@const chave = perfil.role.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()}
-							<BadgePerfil perfil={perfil.role} tamanho="sm" href="/dashboard?visao={chave}" />
-						{/each}
-					</div>
-				</div>
-			</div>
-
-			{#if data.perfil.dados_aluno || data.perfil.dados_professor}
-				{@const faixaExibicao = data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor?.grau_faixa || 'Preta Shodan'}
-				<!-- Badge de Graduação Unificada do Judoca / Sensei -->
-				<div
-					class="shrink-0 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800/80 flex flex-col items-center justify-center min-w-[200px] text-center space-y-1.5 shadow-lg"
-				>
-					<span class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold">
-						Graduação Atual
-					</span>
-					<div class="my-0.5">
-						<BadgeFaixa faixa={faixaExibicao} size="lg" showLegend={true} />
-					</div>
-					{#if data.perfil.dados_aluno?.nome_professor_responsavel}
-						<span class="text-[10px] font-mono text-zinc-500">
-							Sensei: {data.perfil.dados_aluno.nome_professor_responsavel}
-						</span>
-					{:else if data.perfil.dados_professor?.n_federacao}
-						<span class="text-[10px] font-mono text-zinc-500">
-							Reg. FPJ/CBJ: {data.perfil.dados_professor.n_federacao}
-						</span>
-					{/if}
-				</div>
-			{/if}
-		</div>
-	</header>
-
+<div class="space-y-6 animate-in fade-in duration-300">
 	<!-- ========================================================================= -->
 	<!-- ALERTAS DE FEEDBACK DE AÇÃO (DADOS OU SENHA)                              -->
 	<!-- ========================================================================= -->
@@ -252,204 +191,225 @@
 	{/if}
 
 	<!-- ========================================================================= -->
-	<!-- 2. FORMULÁRIO PRINCIPAL: DADOS CADASTRAIS, CONTATO E ENDEREÇO             -->
+	<!-- SUB-MENUS 1 & 2: FORMULÁRIO UNIFICADO (DADOS & CONTATO / ENDEREÇO)        -->
 	<!-- ========================================================================= -->
 	<form
 		action="?/salvarDados"
 		method="POST"
 		onsubmit={() => (salvandoDados = true)}
-		class="space-y-8"
+		class={subMenuAtivo === 'dados' || subMenuAtivo === 'endereco' ? 'space-y-6' : 'hidden'}
 	>
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-			<!-- ===================================================================== -->
-			<!-- CARD 1: DADOS DE IDENTIFICAÇÃO CIVIL (SOMENTE LEITURA / LGPD)         -->
-			<!-- ===================================================================== -->
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
-				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-					<div class="flex items-center gap-2.5">
-						<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-							<Lock class="w-4 h-4 text-zinc-400" />
+		<!-- CONTEÚDO DO SUB-MENU 1: DADOS & CONTATO -->
+		<div class={subMenuAtivo === 'dados' ? 'grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-200' : 'hidden'}>
+			<!-- CARD 1: DADOS DE IDENTIFICAÇÃO CIVIL (SOMENTE LEITURA / LGPD) -->
+			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm flex flex-col justify-between">
+				<div class="space-y-5">
+					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+								<Lock class="w-4 h-4 text-zinc-400" />
+							</div>
+							<div>
+								<h2 class="text-sm font-bold text-white font-display">Identificação Civil</h2>
+								<p class="text-[11px] text-zinc-500">Dados oficiais registrados no dojo</p>
+							</div>
 						</div>
-						<div>
-							<h2 class="text-sm font-bold text-white font-display">Identificação Civil</h2>
-							<p class="text-[11px] text-zinc-500">Dados oficiais registrados no dojo</p>
+						<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+							Somente Leitura
+						</span>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div class="sm:col-span-2 space-y-1">
+							<label for="nome-civil" class="text-xs font-semibold text-zinc-400">Nome Completo</label>
+							<input
+								id="nome-civil"
+								type="text"
+								readonly
+								value={data.perfil.nome}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<div class="space-y-1">
+							<div class="flex items-center justify-between">
+								<label for="cpf-civil" class="text-xs font-semibold text-zinc-400">
+									{data.perfil.tipo_documento === 'ESTRANGEIRO' ? 'Documento Estrangeiro' : 'CPF (LGPD Mascarado)'}
+								</label>
+								{#if data.perfil.tipo_documento === 'ESTRANGEIRO'}
+									<span class="text-[10px] font-mono text-blue-400">
+										🌐 {data.perfil.pais_origem || 'Internacional'}
+									</span>
+								{/if}
+							</div>
+							<input
+								id="cpf-civil"
+								type="text"
+								readonly
+								value={data.perfil.cpf_mascarado}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs font-mono cursor-not-allowed"
+							/>
+						</div>
+
+						<div class="space-y-1">
+							<label for="genero-civil" class="text-xs font-semibold text-zinc-400">Gênero</label>
+							<input
+								id="genero-civil"
+								type="text"
+								readonly
+								value={data.perfil.genero === 'M' ? 'Masculino' : 'Feminino'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs cursor-not-allowed"
+							/>
+						</div>
+
+						<div class="space-y-1">
+							<label for="nasc-civil" class="text-xs font-semibold text-zinc-400">Data de Nascimento</label>
+							<input
+								id="nasc-civil"
+								type="text"
+								readonly
+								value={data.perfil.data_nascimento_br}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs font-mono cursor-not-allowed"
+							/>
+						</div>
+
+						<div class="space-y-1">
+							<label for="idade-civil" class="text-xs font-semibold text-zinc-400">Idade Atual</label>
+							<input
+								id="idade-civil"
+								type="text"
+								readonly
+								value="{data.perfil.idade} anos"
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs cursor-not-allowed"
+							/>
 						</div>
 					</div>
-					<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
-						Somente Leitura
-					</span>
 				</div>
 
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-					<div class="sm:col-span-2 space-y-1">
-						<label for="nome-civil" class="text-xs font-semibold text-zinc-400">Nome Completo</label>
-						<input
-							id="nome-civil"
-							type="text"
-							readonly
-							value={data.perfil.nome}
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<div class="flex items-center justify-between">
-							<label for="cpf-civil" class="text-xs font-semibold text-zinc-400">
-								{data.perfil.tipo_documento === 'ESTRANGEIRO' ? 'Documento Estrangeiro (Passaporte/RNM)' : 'CPF (LGPD Mascarado)'}
-							</label>
-							{#if data.perfil.tipo_documento === 'ESTRANGEIRO'}
-								<span class="text-[10px] font-mono text-blue-400">
-									🌐 {data.perfil.pais_origem || 'Internacional'}
-								</span>
-							{/if}
-						</div>
-						<input
-							id="cpf-civil"
-							type="text"
-							readonly
-							value={data.perfil.cpf_mascarado}
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs font-mono cursor-not-allowed"
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<label for="genero-civil" class="text-xs font-semibold text-zinc-400">Gênero</label>
-						<input
-							id="genero-civil"
-							type="text"
-							readonly
-							value={data.perfil.genero === 'M' ? 'Masculino' : 'Feminino'}
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs cursor-not-allowed"
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<label for="nasc-civil" class="text-xs font-semibold text-zinc-400">Data de Nascimento</label>
-						<input
-							id="nasc-civil"
-							type="text"
-							readonly
-							value={data.perfil.data_nascimento_br}
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs font-mono cursor-not-allowed"
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<label for="idade-civil" class="text-xs font-semibold text-zinc-400">Idade Atual</label>
-						<input
-							id="idade-civil"
-							type="text"
-							readonly
-							value="{data.perfil.idade} anos"
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-400 text-xs cursor-not-allowed"
-						/>
-					</div>
-				</div>
-
-				<p class="text-[11px] text-zinc-500 italic pt-1 border-t border-zinc-900">
+				<p class="text-[11px] text-zinc-500 italic pt-3 border-t border-zinc-900">
 					* A alteração de documentos civis, idade e nome exige validação presencial junto ao Sensei ou secretaria do dojo.
 				</p>
 			</div>
 
-			<!-- ===================================================================== -->
-			<!-- CARD 2: CANAIS DE CONTATO E ACESSO (EDITÁVEIS PELO USUÁRIO)           -->
-			<!-- ===================================================================== -->
-			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
-				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-					<div class="flex items-center gap-2.5">
-						<div class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400">
-							<Mail class="w-4 h-4 text-red-400" />
+			<!-- CARD 2: CANAIS DE CONTATO E ACESSO (EDITÁVEIS PELO USUÁRIO) -->
+			<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm flex flex-col justify-between">
+				<div class="space-y-5">
+					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400">
+								<Mail class="w-4 h-4 text-red-400" />
+							</div>
+							<div>
+								<h2 class="text-sm font-bold text-white font-display">Canais de Contato & Acesso</h2>
+								<p class="text-[11px] text-zinc-500">Utilizados para login, avisos e notificações</p>
+							</div>
 						</div>
-						<div>
-							<h2 class="text-sm font-bold text-white font-display">Canais de Contato & Acesso</h2>
-							<p class="text-[11px] text-zinc-500">Utilizados para login, avisos e notificações</p>
-						</div>
+						<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800/80 text-emerald-400">
+							✏️ Editável
+						</span>
 					</div>
-					<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800/80 text-emerald-400">
-						✏️ Você pode editar
-					</span>
+
+					<div class="space-y-4">
+						<div class="space-y-1.5">
+							<label for="email" class="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+								<span>E-mail de Acesso e Login <span class="text-red-500">*</span></span>
+								<span class="text-[10px] text-zinc-500 font-mono">Chave de autenticação</span>
+							</label>
+							<div class="relative">
+								<Mail class="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+								<input
+									id="email"
+									name="email"
+									type="email"
+									required
+									bind:value={email}
+									placeholder="seu.email@exemplo.com"
+									class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
+								/>
+							</div>
+						</div>
+
+						<div class="space-y-1.5">
+							<label for="telefone" class="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+								<span>Telefone / WhatsApp</span>
+								<span class="text-[10px] text-zinc-500 font-mono">Contato para emergências</span>
+							</label>
+							<div class="relative">
+								<Phone class="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+								<input
+									id="telefone"
+									name="telefone"
+									type="tel"
+									bind:value={telefone}
+									placeholder="(11) 98765-4321"
+									class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
+								/>
+							</div>
+						</div>
+
+						{#if data.ehAluno}
+							<!-- Destaque: Campo de Peso Corporal do Judoca -->
+							<div class="p-4 rounded-xl bg-amber-950/20 border border-amber-600/40 space-y-2 mt-2">
+								<div class="flex items-center justify-between">
+									<label for="peso" class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+										<Scale class="w-4 h-4 text-amber-400" />
+										<span>Peso Atual do Judoca (kg)</span>
+									</label>
+									<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-amber-900/50 text-amber-300">
+										✏️ Editável por você
+									</span>
+								</div>
+
+								<div class="relative">
+									<input
+										id="peso"
+										name="peso"
+										type="number"
+										step="0.01"
+										min="20"
+										max="250"
+										bind:value={peso}
+										placeholder="Ex.: 78.50"
+										class="w-full pl-3.5 pr-12 py-2.5 rounded-xl bg-zinc-900 border border-amber-600/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-white text-xs font-mono font-bold transition-all"
+									/>
+									<span class="absolute right-3.5 top-2.5 text-xs text-zinc-400 font-mono font-bold">
+										kg
+									</span>
+								</div>
+								<p class="text-[11px] text-amber-200/80 leading-relaxed">
+									Mantenha seu peso atualizado para agilizar sua categoria em campeonatos e ranqueamento interno do dojo.
+								</p>
+							</div>
+						{/if}
+					</div>
 				</div>
 
-				<div class="space-y-4">
-					<div class="space-y-1.5">
-						<label for="email" class="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-							<span>E-mail de Acesso e Login <span class="text-red-500">*</span></span>
-							<span class="text-[10px] text-zinc-500 font-mono">Chave de autenticação</span>
-						</label>
-						<div class="relative">
-							<Mail class="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-							<input
-								id="email"
-								name="email"
-								type="email"
-								required
-								bind:value={email}
-								placeholder="seu.email@exemplo.com"
-								class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
-							/>
-						</div>
-					</div>
-
-					<div class="space-y-1.5">
-						<label for="telefone" class="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-							<span>Telefone / WhatsApp</span>
-							<span class="text-[10px] text-zinc-500 font-mono">Contato para emergências</span>
-						</label>
-						<div class="relative">
-							<Phone class="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-							<input
-								id="telefone"
-								name="telefone"
-								type="tel"
-								bind:value={telefone}
-								placeholder="(11) 98765-4321"
-								class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
-							/>
-						</div>
-					</div>
-
-					{#if data.ehAluno}
-						<!-- Destaque: Campo de Peso Corporal do Judoca -->
-						<div class="p-4 rounded-xl bg-amber-950/20 border border-amber-600/40 space-y-2 mt-2">
-							<div class="flex items-center justify-between">
-								<label for="peso" class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-									<Scale class="w-4 h-4 text-amber-400" />
-									<span>Peso Atual do Judoca (kg)</span>
-								</label>
-								<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-amber-900/50 text-amber-300">
-									✏️ Editável por você
-								</span>
-							</div>
-
-							<div class="relative">
-								<input
-									id="peso"
-									name="peso"
-									type="number"
-									step="0.01"
-									min="20"
-									max="250"
-									bind:value={peso}
-									placeholder="Ex.: 78.50"
-									class="w-full pl-3.5 pr-12 py-2.5 rounded-xl bg-zinc-900 border border-amber-600/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-white text-xs font-mono font-bold transition-all"
-								/>
-								<span class="absolute right-3.5 top-2.5 text-xs text-zinc-400 font-mono font-bold">
-									kg
-								</span>
-							</div>
-							<p class="text-[11px] text-amber-200/80 leading-relaxed">
-								Mantenha seu peso atualizado para agilizar sua categoria em campeonatos e ranqueamento interno do dojo.
-							</p>
-						</div>
-					{/if}
+				<div class="pt-4 border-t border-zinc-900 flex items-center justify-between gap-3">
+					<a
+						href="/dashboard/perfil?aba=endereco"
+						class="text-xs font-mono text-zinc-400 hover:text-white transition-colors"
+					>
+						Ver Endereço Residencial →
+					</a>
+					<button
+						type="submit"
+						disabled={salvandoDados}
+						class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-all disabled:opacity-50 cursor-pointer"
+					>
+						{#if salvandoDados}
+							<Loader2 class="w-4 h-4 animate-spin" />
+							<span>Gravando...</span>
+						{:else}
+							<Save class="w-4 h-4" />
+							<span>Salvar Alterações</span>
+						{/if}
+					</button>
 				</div>
 			</div>
 		</div>
 
-		<!-- ========================================================================= -->
-		<!-- CARD 3: ENDEREÇO RESIDENCIAL COMPLETO COM AUTO-CEP (EDITÁVEL)             -->
-		<!-- ========================================================================= -->
-		<div class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+		<!-- CONTEÚDO DO SUB-MENU 2: ENDEREÇO RESIDENCIAL COMPLETO -->
+		<div class={subMenuAtivo === 'endereco' ? 'p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm animate-in fade-in duration-200' : 'hidden'}>
 			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-900">
 				<div class="flex items-center gap-2.5">
 					<div class="w-8 h-8 rounded-lg bg-sky-950/40 border border-sky-800/60 flex items-center justify-center text-sky-400">
@@ -457,11 +417,11 @@
 					</div>
 					<div>
 						<h2 class="text-sm font-bold text-white font-display">Endereço Residencial Completo</h2>
-						<p class="text-[11px] text-zinc-500">Dados de localização do titular cadastrado</p>
+						<p class="text-[11px] text-zinc-500">Dados de localização do titular cadastrado com consulta automática de CEP</p>
 					</div>
 				</div>
 				<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-950/60 border border-emerald-800/80 text-emerald-400 self-start sm:self-auto">
-					✏️ Você pode editar
+					✏️ Editável
 				</span>
 			</div>
 
@@ -488,7 +448,7 @@
 							onclick={consultarCep}
 							disabled={buscandoCep}
 							title="Buscar endereço pelo CEP"
-							class="px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 flex items-center justify-center transition-all shrink-0"
+							class="px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 flex items-center justify-center transition-all shrink-0 cursor-pointer"
 						>
 							{#if buscandoCep}
 								<Loader2 class="w-4 h-4 animate-spin text-red-500" />
@@ -589,18 +549,24 @@
 			</div>
 
 			<!-- Botão de Salvar Dados do Perfil -->
-			<div class="pt-4 border-t border-zinc-900 flex justify-end">
+			<div class="pt-4 border-t border-zinc-900 flex items-center justify-between gap-3">
+				<a
+					href="/dashboard/perfil?aba=dados"
+					class="text-xs font-mono text-zinc-400 hover:text-white transition-colors"
+				>
+					← Voltar para Dados & Contato
+				</a>
 				<button
 					type="submit"
 					disabled={salvandoDados}
-					class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-all disabled:opacity-50"
+					class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-all disabled:opacity-50 cursor-pointer"
 				>
 					{#if salvandoDados}
 						<Loader2 class="w-4 h-4 animate-spin" />
 						<span>Gravando Alterações...</span>
 					{:else}
 						<Save class="w-4 h-4" />
-						<span>Salvar Dados Cadastrais</span>
+						<span>Salvar Endereço & Dados</span>
 					{/if}
 				</button>
 			</div>
@@ -608,466 +574,471 @@
 	</form>
 
 	<!-- ========================================================================= -->
-	<!-- 3. DADOS TÉCNICOS DO JUDÔ (SE FOR ALUNO - SOMENTE LEITURA DO SENSEI)      -->
+	<!-- SUB-MENU 3: FICHA TÉCNICA DO JUDÔ, SENSEI & VÍNCULO DE RESPONSÁVEL         -->
 	<!-- ========================================================================= -->
-	{#if data.perfil.dados_aluno}
-		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
-			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-				<div class="flex items-center gap-2.5">
-					<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-						<Award class="w-4 h-4 text-zinc-400" />
-					</div>
-					<div>
-						<h2 class="text-sm font-bold text-white font-display">Dados Técnicos do Judô</h2>
-						<p class="text-[11px] text-zinc-500">Faixa atual, Sensei técnico e dados de competição/federação</p>
-					</div>
-				</div>
-				<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
-					Somente Leitura
-				</span>
-			</div>
-
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<!-- 1. Graduação Atual (Faixa) -->
-				<div class="space-y-1">
-					<label for="tecnico-faixa" class="text-xs font-semibold text-zinc-400">Graduação Atual (Faixa)</label>
-					<div class="relative flex items-center">
-						<input
-							id="tecnico-faixa"
-							type="text"
-							readonly
-							value={data.perfil.dados_aluno.graduacao_atual}
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed pr-28 select-all"
-						/>
-						<div class="absolute right-2.5 pointer-events-none">
-							<BadgeFaixa faixa={data.perfil.dados_aluno.graduacao_atual} size="sm" />
-						</div>
-					</div>
-				</div>
-
-				<!-- 2. Sensei Técnico Responsável -->
-				<div class="space-y-1">
-					<label for="tecnico-sensei" class="text-xs font-semibold text-zinc-400">Sensei Técnico Responsável</label>
-					<input
-						id="tecnico-sensei"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.nome_professor_responsavel}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 3. Matrícula no Dojo -->
-				<div class="space-y-1">
-					<label for="tecnico-matricula" class="text-xs font-semibold text-zinc-400">Matrícula no Dojo</label>
-					<input
-						id="tecnico-matricula"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.matricula || 'Pendente de atribuição'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 4. Peso Atual (kg) -->
-				<div class="space-y-1">
-					<label for="tecnico-peso" class="text-xs font-semibold text-zinc-400">Peso Atual (kg)</label>
-					<input
-						id="tecnico-peso"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.peso !== null && data.perfil.dados_aluno.peso !== undefined
-							? `${data.perfil.dados_aluno.peso} kg`
-							: 'Pendente de pesagem'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 5. Categoria de Peso / Idade -->
-				<div class="space-y-1">
-					<label for="tecnico-categoria" class="text-xs font-semibold text-zinc-400">Categoria de Peso / Idade</label>
-					<input
-						id="tecnico-categoria"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.categoria || 'Não classificada'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 6. Nº de Registro Federativo (FPJ/CBJ) -->
-				<div class="space-y-1">
-					<label for="tecnico-federacao" class="text-xs font-semibold text-zinc-400">Nº de Registro Federativo (FPJ/CBJ)</label>
-					<input
-						id="tecnico-federacao"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.n_federacao || 'Pendente na Secretaria'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 7. Status na Federação -->
-				<div class="space-y-1">
-					<label for="tecnico-status-fed" class="text-xs font-semibold text-zinc-400">Status na Federação</label>
-					<input
-						id="tecnico-status-fed"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.status_federacao || 'Pendente'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 8. Grupo Competitivo -->
-				<div class="space-y-1">
-					<label for="tecnico-grupo" class="text-xs font-semibold text-zinc-400">Grupo Competitivo</label>
-					<input
-						id="tecnico-grupo"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.grupo_especial_aspirante || 'Não classificado / Tradicional'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 9. Data de Início no Tatame -->
-				<div class="space-y-1">
-					<label for="tecnico-data-inicio" class="text-xs font-semibold text-zinc-400">Data de Início no Tatame</label>
-					<input
-						id="tecnico-data-inicio"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.data_inicio_br || 'Não informada'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
-					/>
-				</div>
-
-				<!-- 10. Data da 1ª Graduação (Faixa) -->
-				<div class="space-y-1">
-					<label for="tecnico-data-grad" class="text-xs font-semibold text-zinc-400">Data da 1ª Graduação (Faixa)</label>
-					<input
-						id="tecnico-data-grad"
-						type="text"
-						readonly
-						value={data.perfil.dados_aluno.data_primeira_graduacao_br || 'Não informada'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
-					/>
-				</div>
-			</div>
-
-			<p class="text-[11px] text-zinc-500 italic pt-1 border-t border-zinc-900">
-				* A alteração de graduações, faixas, categorias e registros federativos do judoca exige validação do Sensei Técnico ou secretaria do dojo (Homologado pelo Sensei).
-			</p>
-		</section>
-	{/if}
-
-	<!-- ========================================================================= -->
-	<!-- 4. DADOS DE PROFESSOR OU RESPONSÁVEL (SE APLICÁVEL)                       -->
-	<!-- ========================================================================= -->
-	{#if data.perfil.dados_professor}
-		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
-			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-				<div class="flex items-center gap-2.5">
-					<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-						<Sparkles class="w-4 h-4 text-zinc-400" />
-					</div>
-					<div>
-						<h2 class="text-sm font-bold text-white font-display">Credenciamento Técnico de Sensei</h2>
-						<p class="text-[11px] text-zinc-500">Credenciais federativas e titulação no tatame</p>
-					</div>
-				</div>
-				<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
-					Somente Leitura
-				</span>
-			</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="space-y-1">
-					<label for="sensei-grau" class="text-xs font-semibold text-zinc-400">Grau / Faixa (Dan)</label>
-					<div class="relative flex items-center">
-						<input
-							id="sensei-grau"
-							type="text"
-							readonly
-							value={data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor.grau_faixa || 'Preta Shodan'}
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed pr-36 select-all"
-						/>
-						<div class="absolute right-2.5 pointer-events-none">
-							<BadgeFaixa faixa={data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor.grau_faixa || 'Preta Shodan'} size="sm" />
-						</div>
-					</div>
-				</div>
-				<div class="space-y-1">
-					<label for="sensei-federacao" class="text-xs font-semibold text-zinc-400">Nº Registro Federativo</label>
-					<input
-						id="sensei-federacao"
-						type="text"
-						readonly
-						value={data.perfil.dados_professor.n_federacao || data.perfil.dados_aluno?.n_federacao || 'Não informado'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
-					/>
-				</div>
-			</div>
-		</section>
-	{/if}
-
-	{#if data.perfil.dados_responsavel}
-		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
-			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-				<div class="flex items-center gap-2.5">
-					<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-						<Building2 class="w-4 h-4 text-zinc-400" />
-					</div>
-					<div>
-						<h2 class="text-sm font-bold text-white font-display">Dados de Responsável Legal</h2>
-						<p class="text-[11px] text-zinc-500">Vínculo formal e responsabilidade financeira</p>
-					</div>
-				</div>
-				<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
-					Somente Leitura
-				</span>
-			</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="space-y-1">
-					<label for="resp-parentesco" class="text-xs font-semibold text-zinc-400">Grau de Parentesco</label>
-					<input
-						id="resp-parentesco"
-						type="text"
-						readonly
-						value={data.perfil.dados_responsavel.grau_parentesco || 'Responsável Legal'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
-					/>
-				</div>
-				<div class="space-y-1">
-					<label for="resp-financeiro" class="text-xs font-semibold text-zinc-400">Responsável Financeiro</label>
-					<input
-						id="resp-financeiro"
-						type="text"
-						readonly
-						value={data.perfil.dados_responsavel.financeiro ? 'Sim (Titular Financeiro)' : 'Não'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 {data.perfil.dados_responsavel.financeiro ? 'text-emerald-400 font-semibold' : 'text-zinc-300'} text-xs cursor-not-allowed select-all"
-					/>
-				</div>
-				{#if data.perfil.dados_responsavel.dependentes && data.perfil.dados_responsavel.dependentes.length > 0}
-					<div class="sm:col-span-2 space-y-3 pt-2">
-						<div class="flex items-center justify-between">
-							<span class="text-xs font-semibold text-zinc-300 block">Alunos Tutelados Vinculados</span>
-							<span class="text-[10px] font-mono text-zinc-500">
-								{data.perfil.dados_responsavel.dependentes.length} atleta(s)
-							</span>
-						</div>
-						<div class="flex items-center gap-2 flex-wrap">
-							{#each data.perfil.dados_responsavel.dependentes as dep}
-								<span class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white font-medium flex items-center gap-2">
-									<span>🥋</span>
-									<span>{dep.nome}</span>
-								</span>
-							{/each}
-						</div>
-
-						<!-- Link de redirecionamento para a nova aba dedicada 'Perfil do Responsável' -->
-						<div class="mt-2 p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
-							<div class="space-y-0.5">
-								<p class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-									<span>Nova aba dedicada: Perfil do Responsável</span>
-								</p>
-								<p class="text-[11px] text-zinc-400">
-									Para manter o seu perfil limpo e organizado, a ficha técnica, turmas e pesagens oficiais dos seus dependentes estão em sua própria aba lateral.
-								</p>
+	{#if subMenuAtivo === 'tecnico'}
+		<div class="space-y-6 animate-in fade-in duration-200">
+			{#if data.perfil.dados_aluno}
+				<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+								<Award class="w-4 h-4 text-zinc-400" />
 							</div>
-							<a
-								href="/dashboard/responsavel"
-								class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-all shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
-							>
-								<span>Ver Perfil dos Alunos</span>
-								<span>→</span>
-							</a>
+							<div>
+								<h2 class="text-sm font-bold text-white font-display">Dados Técnicos do Judô</h2>
+								<p class="text-[11px] text-zinc-500">Faixa atual, Sensei técnico e dados de competição/federação</p>
+							</div>
+						</div>
+						<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+							Somente Leitura
+						</span>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<!-- 1. Graduação Atual (Faixa) -->
+						<div class="space-y-1">
+							<label for="tecnico-faixa" class="text-xs font-semibold text-zinc-400">Graduação Atual (Faixa)</label>
+							<div class="relative flex items-center">
+								<input
+									id="tecnico-faixa"
+									type="text"
+									readonly
+									value={data.perfil.dados_aluno.graduacao_atual}
+									class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed pr-28 select-all"
+								/>
+								<div class="absolute right-2.5 pointer-events-none">
+									<BadgeFaixa faixa={data.perfil.dados_aluno.graduacao_atual} size="sm" />
+								</div>
+							</div>
+						</div>
+
+						<!-- 2. Sensei Técnico Responsável -->
+						<div class="space-y-1">
+							<label for="tecnico-sensei" class="text-xs font-semibold text-zinc-400">Sensei Técnico Responsável</label>
+							<input
+								id="tecnico-sensei"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.nome_professor_responsavel}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 3. Matrícula no Dojo -->
+						<div class="space-y-1">
+							<label for="tecnico-matricula" class="text-xs font-semibold text-zinc-400">Matrícula no Dojo</label>
+							<input
+								id="tecnico-matricula"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.matricula || 'Pendente de atribuição'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 4. Peso Atual (kg) -->
+						<div class="space-y-1">
+							<label for="tecnico-peso" class="text-xs font-semibold text-zinc-400">Peso Atual (kg)</label>
+							<input
+								id="tecnico-peso"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.peso !== null && data.perfil.dados_aluno.peso !== undefined
+									? `${data.perfil.dados_aluno.peso} kg`
+									: 'Pendente de pesagem'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 5. Categoria de Peso / Idade -->
+						<div class="space-y-1">
+							<label for="tecnico-categoria" class="text-xs font-semibold text-zinc-400">Categoria de Peso / Idade</label>
+							<input
+								id="tecnico-categoria"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.categoria || 'Não classificada'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 6. Nº de Registro Federativo (FPJ/CBJ) -->
+						<div class="space-y-1">
+							<label for="tecnico-federacao" class="text-xs font-semibold text-zinc-400">Nº de Registro Federativo (FPJ/CBJ)</label>
+							<input
+								id="tecnico-federacao"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.n_federacao || 'Pendente na Secretaria'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 7. Status na Federação -->
+						<div class="space-y-1">
+							<label for="tecnico-status-fed" class="text-xs font-semibold text-zinc-400">Status na Federação</label>
+							<input
+								id="tecnico-status-fed"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.status_federacao || 'Pendente'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 8. Grupo Competitivo -->
+						<div class="space-y-1">
+							<label for="tecnico-grupo" class="text-xs font-semibold text-zinc-400">Grupo Competitivo</label>
+							<input
+								id="tecnico-grupo"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.grupo_especial_aspirante || 'Não classificado / Tradicional'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 9. Data de Início no Tatame -->
+						<div class="space-y-1">
+							<label for="tecnico-data-inicio" class="text-xs font-semibold text-zinc-400">Data de Início no Tatame</label>
+							<input
+								id="tecnico-data-inicio"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.data_inicio_br || 'Não informada'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+							/>
+						</div>
+
+						<!-- 10. Data da 1ª Graduação (Faixa) -->
+						<div class="space-y-1">
+							<label for="tecnico-data-grad" class="text-xs font-semibold text-zinc-400">Data da 1ª Graduação (Faixa)</label>
+							<input
+								id="tecnico-data-grad"
+								type="text"
+								readonly
+								value={data.perfil.dados_aluno.data_primeira_graduacao_br || 'Não informada'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+							/>
 						</div>
 					</div>
-				{/if}
-			</div>
-		</section>
-	{/if}
 
-	<!-- ========================================================================= -->
-	<!-- 5. PAINEL DE SEGURANÇA: TROCA DE SENHA DE ACESSO                          -->
-	<!-- ========================================================================= -->
-	<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
-		<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-			<div class="flex items-center gap-2.5">
-				<div class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400">
-					<KeyRound class="w-4 h-4 text-red-400" />
-				</div>
-				<div>
-					<h2 class="text-sm font-bold text-white font-display">Segurança & Troca de Senha</h2>
-					<p class="text-[11px] text-zinc-500">Altere sua credencial de acesso informando a senha antiga</p>
-				</div>
-			</div>
-			<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
-				Credencial
-			</span>
+					<p class="text-[11px] text-zinc-500 italic pt-1 border-t border-zinc-900">
+						* A alteração de graduações, faixas, categorias e registros federativos do judoca exige validação do Sensei Técnico ou secretaria do dojo.
+					</p>
+				</section>
+			{/if}
+
+			{#if data.perfil.dados_professor}
+				<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+								<Sparkles class="w-4 h-4 text-zinc-400" />
+							</div>
+							<div>
+								<h2 class="text-sm font-bold text-white font-display">Credenciamento Técnico de Sensei</h2>
+								<p class="text-[11px] text-zinc-500">Credenciais federativas e titulação no tatame</p>
+							</div>
+						</div>
+						<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+							Somente Leitura
+						</span>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div class="space-y-1">
+							<label for="sensei-grau" class="text-xs font-semibold text-zinc-400">Grau / Faixa (Dan)</label>
+							<div class="relative flex items-center">
+								<input
+									id="sensei-grau"
+									type="text"
+									readonly
+									value={data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor.grau_faixa || 'Preta Shodan'}
+									class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed pr-36 select-all"
+								/>
+								<div class="absolute right-2.5 pointer-events-none">
+									<BadgeFaixa faixa={data.perfil.dados_aluno?.graduacao_atual || data.perfil.dados_professor.grau_faixa || 'Preta Shodan'} size="sm" />
+								</div>
+							</div>
+						</div>
+						<div class="space-y-1">
+							<label for="sensei-federacao" class="text-xs font-semibold text-zinc-400">Nº Registro Federativo</label>
+							<input
+								id="sensei-federacao"
+								type="text"
+								readonly
+								value={data.perfil.dados_professor.n_federacao || data.perfil.dados_aluno?.n_federacao || 'Não informado'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-mono cursor-not-allowed select-all"
+							/>
+						</div>
+					</div>
+				</section>
+			{/if}
+
+			{#if data.perfil.dados_responsavel}
+				<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm">
+					<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+								<Building2 class="w-4 h-4 text-zinc-400" />
+							</div>
+							<div>
+								<h2 class="text-sm font-bold text-white font-display">Dados de Responsável Legal</h2>
+								<p class="text-[11px] text-zinc-500">Vínculo formal e responsabilidade financeira</p>
+							</div>
+						</div>
+						<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+							Somente Leitura
+						</span>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div class="space-y-1">
+							<label for="resp-parentesco" class="text-xs font-semibold text-zinc-400">Grau de Parentesco</label>
+							<input
+								id="resp-parentesco"
+								type="text"
+								readonly
+								value={data.perfil.dados_responsavel.grau_parentesco || 'Responsável Legal'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs font-medium cursor-not-allowed select-all"
+							/>
+						</div>
+						<div class="space-y-1">
+							<label for="resp-financeiro" class="text-xs font-semibold text-zinc-400">Responsável Financeiro</label>
+							<input
+								id="resp-financeiro"
+								type="text"
+								readonly
+								value={data.perfil.dados_responsavel.financeiro ? 'Sim (Titular Financeiro)' : 'Não'}
+								class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 {data.perfil.dados_responsavel.financeiro ? 'text-emerald-400 font-semibold' : 'text-zinc-300'} text-xs cursor-not-allowed select-all"
+							/>
+						</div>
+						{#if data.perfil.dados_responsavel.dependentes && data.perfil.dados_responsavel.dependentes.length > 0}
+							<div class="sm:col-span-2 space-y-3 pt-2">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-zinc-300 block">Alunos Tutelados Vinculados</span>
+									<span class="text-[10px] font-mono text-zinc-500">
+										{data.perfil.dados_responsavel.dependentes.length} atleta(s)
+									</span>
+								</div>
+								<div class="flex items-center gap-2 flex-wrap">
+									{#each data.perfil.dados_responsavel.dependentes as dep}
+										<span class="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white font-medium flex items-center gap-2">
+											<span>🥋</span>
+											<span>{dep.nome}</span>
+										</span>
+									{/each}
+								</div>
+
+								<div class="mt-2 p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+									<div class="space-y-0.5">
+										<p class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+											<span>Aba dedicada: Perfil do Responsável</span>
+										</p>
+										<p class="text-[11px] text-zinc-400">
+											A ficha técnica, turmas e pesagens oficiais dos seus dependentes estão em sua própria aba lateral.
+										</p>
+									</div>
+									<a
+										href="/dashboard/responsavel"
+										class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-all shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
+									>
+										<span>Ver Perfil dos Alunos</span>
+										<span>→</span>
+									</a>
+								</div>
+							</div>
+						{/if}
+					</div>
+				</section>
+			{/if}
 		</div>
+	{/if}
 
-		<form
-			action="?/alterarSenha"
-			method="POST"
-			onsubmit={() => (salvandoSenha = true)}
-			class="space-y-4 max-w-xl"
-		>
-			<div class="space-y-1.5">
-				<label for="senhaAtual" class="text-xs font-semibold text-zinc-300">
-					Senha Atual de Acesso <span class="text-red-500">*</span>
-				</label>
-				<div class="relative">
-					<input
-						id="senhaAtual"
-						name="senhaAtual"
-						type={mostrarSenhaAtual ? 'text' : 'password'}
-						required
-						placeholder="Digite sua senha atual"
-						class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
-					/>
-					<button
-						type="button"
-						onclick={() => (mostrarSenhaAtual = !mostrarSenhaAtual)}
-						class="absolute right-3 top-2.5 text-zinc-400 hover:text-white"
-						title={mostrarSenhaAtual ? 'Ocultar senha' : 'Ver senha'}
-					>
-						{#if mostrarSenhaAtual}
-							<EyeOff class="w-4 h-4" />
-						{:else}
-							<Eye class="w-4 h-4" />
-						{/if}
-					</button>
-				</div>
-			</div>
-
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="space-y-1.5">
-					<div class="flex items-center justify-between">
-						<label for="novaSenha" class="text-xs font-semibold text-zinc-300">
-							Nova Senha (Mín. 8 caracteres) <span class="text-red-500">*</span>
-						</label>
-						{#if analiseNovaSenha.forca === 'forte'}
-							<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-								<ShieldCheck class="w-3 h-3" /> Senha Forte
-							</span>
-						{:else if analiseNovaSenha.forca === 'boa'}
-							<span class="text-[10px] font-mono text-blue-400 font-bold">Senha Boa</span>
-						{:else if analiseNovaSenha.forca === 'media'}
-							<span class="text-[10px] font-mono text-amber-400 font-bold">Senha Média</span>
-						{:else if novaSenha.length > 0}
-							<span class="text-[10px] font-mono text-red-400 font-bold">Senha Fraca</span>
-						{/if}
-					</div>
-					<div class="relative">
-						<input
-							id="novaSenha"
-							name="novaSenha"
-							type={mostrarNovaSenha ? 'text' : 'password'}
-							required
-							minlength="8"
-							bind:value={novaSenha}
-							placeholder="Mínimo 8 caracteres com símbolos"
-							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs font-mono transition-all"
-						/>
-						<button
-							type="button"
-							onclick={() => (mostrarNovaSenha = !mostrarNovaSenha)}
-							class="absolute right-3 top-2.5 text-zinc-400 hover:text-white"
-							title={mostrarNovaSenha ? 'Ocultar senha' : 'Ver senha'}
-						>
-							{#if mostrarNovaSenha}
-								<EyeOff class="w-4 h-4" />
-							{:else}
-								<Eye class="w-4 h-4" />
-							{/if}
-						</button>
-					</div>
-
-					<!-- Barra de Força da Senha -->
-					{#if novaSenha.length > 0}
-						<div class="space-y-1 pt-1">
-							<div class="grid grid-cols-4 gap-1 h-1.5">
-								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 1 ? (analiseNovaSenha.forca === 'fraca' ? 'bg-red-500' : analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
-								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 2 ? (analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
-								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 3 ? (analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
-								<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
-							</div>
-							<div class="grid grid-cols-2 gap-1 pt-1 text-[10px] font-mono">
-								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.comprimentoMinimo ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseNovaSenha.criterios.comprimentoMinimo}<Check class="w-3 h-3" />{:else}•{/if} 8+ chars
-								</span>
-								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula}<Check class="w-3 h-3" />{:else}•{/if} Maiúsc./Minúsc.
-								</span>
-								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.numero ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseNovaSenha.criterios.numero}<Check class="w-3 h-3" />{:else}•{/if} 1+ número
-								</span>
-								<span class="flex items-center gap-1 {analiseNovaSenha.criterios.especial ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseNovaSenha.criterios.especial}<Check class="w-3 h-3" />{:else}•{/if} Símbolo (@$!%*?&#)
-								</span>
-							</div>
-						</div>
-					{/if}
-				</div>
-
-				<div class="space-y-1.5">
-					<label for="confirmacaoNovaSenha" class="text-xs font-semibold text-zinc-300">
-						Confirmar Nova Senha <span class="text-red-500">*</span>
-					</label>
-					<div class="relative">
-						<input
-							id="confirmacaoNovaSenha"
-							name="confirmacaoNovaSenha"
-							type={mostrarConfirmacao ? 'text' : 'password'}
-							required
-							minlength="8"
-							placeholder="Repita a nova senha"
-							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs font-mono transition-all"
-						/>
-						<button
-							type="button"
-							onclick={() => (mostrarConfirmacao = !mostrarConfirmacao)}
-							class="absolute right-3 top-2.5 text-zinc-400 hover:text-white"
-							title={mostrarConfirmacao ? 'Ocultar senha' : 'Ver senha'}
-						>
-							{#if mostrarConfirmacao}
-								<EyeOff class="w-4 h-4" />
-							{:else}
-								<Eye class="w-4 h-4" />
-							{/if}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			<div class="pt-2">
-				<button
-					type="submit"
-					disabled={salvandoSenha}
-					class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-600 text-white text-xs font-bold transition-all disabled:opacity-50"
-				>
-					{#if salvandoSenha}
-						<Loader2 class="w-4 h-4 animate-spin text-red-500" />
-						<span>Atualizando Senha...</span>
-					{:else}
-						<KeyRound class="w-4 h-4 text-red-400" />
-						<span>Atualizar Senha de Acesso</span>
-					{/if}
-				</button>
-			</div>
-		</form>
-	</section>
-
-	{#if data.ehAluno && data.metricasPresenca}
-		<section class="space-y-4">
+	<!-- ========================================================================= -->
+	<!-- SUB-MENU 4: FREQUÊNCIA NO TATAME                                          -->
+	<!-- ========================================================================= -->
+	{#if subMenuAtivo === 'frequencia' && data.ehAluno && data.metricasPresenca}
+		<section class="space-y-4 animate-in fade-in duration-200">
 			<CalendarioTatameMensal
 				sessoes={data.presencas || []}
 				turmasMatriculadas={data.turmasMatriculadas || []}
 				titulo="Meu Histórico Mensal de Presença no Tatame"
 				subtitulo="Acompanhe seus dias de treino realizados no dojo ({data.metricasPresenca.total_presentes} presenças em {data.metricasPresenca.dias_distintos_treinados} dias • {data.metricasPresenca.percentual_presenca}% de frequência)"
 			/>
+		</section>
+	{/if}
+
+	<!-- ========================================================================= -->
+	<!-- SUB-MENU 5: PAINEL DE SEGURANÇA & TROCA DE SENHA                          -->
+	<!-- ========================================================================= -->
+	{#if subMenuAtivo === 'seguranca'}
+		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 shadow-sm animate-in fade-in duration-200">
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2.5">
+					<div class="w-8 h-8 rounded-lg bg-red-950/40 border border-red-800/60 flex items-center justify-center text-red-400">
+						<KeyRound class="w-4 h-4 text-red-400" />
+					</div>
+					<div>
+						<h2 class="text-sm font-bold text-white font-display">Segurança & Troca de Senha</h2>
+						<p class="text-[11px] text-zinc-500">Altere sua credencial de acesso informando a senha antiga</p>
+					</div>
+				</div>
+				<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+					Credencial
+				</span>
+			</div>
+
+			<form
+				action="?/alterarSenha"
+				method="POST"
+				onsubmit={() => (salvandoSenha = true)}
+				class="space-y-4 max-w-xl"
+			>
+				<div class="space-y-1.5">
+					<label for="senhaAtual" class="text-xs font-semibold text-zinc-300">
+						Senha Atual de Acesso <span class="text-red-500">*</span>
+					</label>
+					<div class="relative">
+						<input
+							id="senhaAtual"
+							name="senhaAtual"
+							type={mostrarSenhaAtual ? 'text' : 'password'}
+							required
+							placeholder="Digite sua senha atual"
+							class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs transition-all"
+						/>
+						<button
+							type="button"
+							onclick={() => (mostrarSenhaAtual = !mostrarSenhaAtual)}
+							class="absolute right-3 top-2.5 text-zinc-400 hover:text-white cursor-pointer"
+							title={mostrarSenhaAtual ? 'Ocultar senha' : 'Ver senha'}
+						>
+							{#if mostrarSenhaAtual}
+								<EyeOff class="w-4 h-4" />
+							{:else}
+								<Eye class="w-4 h-4" />
+							{/if}
+						</button>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div class="space-y-1.5">
+						<div class="flex items-center justify-between">
+							<label for="novaSenha" class="text-xs font-semibold text-zinc-300">
+								Nova Senha (Mín. 8 caracteres) <span class="text-red-500">*</span>
+							</label>
+							{#if analiseNovaSenha.forca === 'forte'}
+								<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+									<ShieldCheck class="w-3 h-3" /> Senha Forte
+								</span>
+							{:else if analiseNovaSenha.forca === 'boa'}
+								<span class="text-[10px] font-mono text-blue-400 font-bold">Senha Boa</span>
+							{:else if analiseNovaSenha.forca === 'media'}
+								<span class="text-[10px] font-mono text-amber-400 font-bold">Senha Média</span>
+							{:else if novaSenha.length > 0}
+								<span class="text-[10px] font-mono text-red-400 font-bold">Senha Fraca</span>
+							{/if}
+						</div>
+						<div class="relative">
+							<input
+								id="novaSenha"
+								name="novaSenha"
+								type={mostrarNovaSenha ? 'text' : 'password'}
+								required
+								minlength="8"
+								bind:value={novaSenha}
+								placeholder="Mínimo 8 caracteres com símbolos"
+								class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs font-mono transition-all"
+							/>
+							<button
+								type="button"
+								onclick={() => (mostrarNovaSenha = !mostrarNovaSenha)}
+								class="absolute right-3 top-2.5 text-zinc-400 hover:text-white cursor-pointer"
+								title={mostrarNovaSenha ? 'Ocultar senha' : 'Ver senha'}
+							>
+								{#if mostrarNovaSenha}
+									<EyeOff class="w-4 h-4" />
+								{:else}
+									<Eye class="w-4 h-4" />
+								{/if}
+							</button>
+						</div>
+
+						<!-- Barra de Força da Senha -->
+						{#if novaSenha.length > 0}
+							<div class="space-y-1 pt-1">
+								<div class="grid grid-cols-4 gap-1 h-1.5">
+									<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 1 ? (analiseNovaSenha.forca === 'fraca' ? 'bg-red-500' : analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+									<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 2 ? (analiseNovaSenha.forca === 'media' ? 'bg-amber-500' : analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+									<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 3 ? (analiseNovaSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+									<div class="rounded-full transition-all duration-300 {analiseNovaSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
+								</div>
+								<div class="grid grid-cols-2 gap-1 pt-1 text-[10px] font-mono">
+									<span class="flex items-center gap-1 {analiseNovaSenha.criterios.comprimentoMinimo ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+										{#if analiseNovaSenha.criterios.comprimentoMinimo}<Check class="w-3 h-3" />{:else}•{/if} 8+ chars
+									</span>
+									<span class="flex items-center gap-1 {analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+										{#if analiseNovaSenha.criterios.maiuscula && analiseNovaSenha.criterios.minuscula}<Check class="w-3 h-3" />{:else}•{/if} Maiúsc./Minúsc.
+									</span>
+									<span class="flex items-center gap-1 {analiseNovaSenha.criterios.numero ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+										{#if analiseNovaSenha.criterios.numero}<Check class="w-3 h-3" />{:else}•{/if} 1+ número
+									</span>
+									<span class="flex items-center gap-1 {analiseNovaSenha.criterios.especial ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
+										{#if analiseNovaSenha.criterios.especial}<Check class="w-3 h-3" />{:else}•{/if} Símbolo (@$!%*?&#)
+									</span>
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					<div class="space-y-1.5">
+						<label for="confirmacaoNovaSenha" class="text-xs font-semibold text-zinc-300">
+							Confirmar Nova Senha <span class="text-red-500">*</span>
+						</label>
+						<div class="relative">
+							<input
+								id="confirmacaoNovaSenha"
+								name="confirmacaoNovaSenha"
+								type={mostrarConfirmacao ? 'text' : 'password'}
+								required
+								minlength="8"
+								placeholder="Repita a nova senha"
+								class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-xs font-mono transition-all"
+							/>
+							<button
+								type="button"
+								onclick={() => (mostrarConfirmacao = !mostrarConfirmacao)}
+								class="absolute right-3 top-2.5 text-zinc-400 hover:text-white cursor-pointer"
+								title={mostrarConfirmacao ? 'Ocultar senha' : 'Ver senha'}
+							>
+								{#if mostrarConfirmacao}
+									<EyeOff class="w-4 h-4" />
+								{:else}
+									<Eye class="w-4 h-4" />
+								{/if}
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="pt-2">
+					<button
+						type="submit"
+						disabled={salvandoSenha}
+						class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-[0_0_18px_rgba(220,38,38,0.3)] transition-all disabled:opacity-50 cursor-pointer"
+					>
+						{#if salvandoSenha}
+							<Loader2 class="w-4 h-4 animate-spin text-white" />
+							<span>Atualizando Senha...</span>
+						{:else}
+							<KeyRound class="w-4 h-4 text-white" />
+							<span>Atualizar Senha de Acesso</span>
+						{/if}
+					</button>
+				</div>
+			</form>
 		</section>
 	{/if}
 </div>
