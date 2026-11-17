@@ -6,7 +6,12 @@ import {
 	listarPerfisDoSistema
 } from '#lib/server/repositorios/usuario.repo';
 import { listarResponsaveisDoDojo } from '#lib/server/repositorios/responsavel.repo';
-import { atualizarUsuarioNoDojo } from '#lib/server/servicos/usuario.service';
+import {
+	atualizarUsuarioNoDojo,
+	redefinirSenhaUsuarioNoDojo,
+	alternarBloqueioUsuarioNoDojo,
+	desvincularUsuarioDoDojo
+} from '#lib/server/servicos/usuario.service';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	exigirPermissao(locals.perfis, 'USUARIOS_GERENCIAR');
@@ -34,12 +39,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	return {
 		usuario,
 		perfis,
-		responsaveis
+		responsaveis,
+		idOperadorLogado: locals.usuario?.id || null
 	};
 };
 
 export const actions: Actions = {
-	default: async ({ params, request, locals, getClientAddress }) => {
+	salvarDados: async ({ params, request, locals, getClientAddress }) => {
 		exigirPermissao(locals.perfis, 'USUARIOS_GERENCIAR');
 
 		const idAcademia = locals.idAcademia;
@@ -93,9 +99,116 @@ export const actions: Actions = {
 				idUsuario,
 				dados
 			);
+			return {
+				sucesso: true,
+				mensagem: 'Dados cadastrais, perfis e credenciais técnicas sincronizados com sucesso.'
+			};
 		} catch (erro: any) {
 			return fail(400, {
 				erro: erro?.message || 'Falha ao atualizar dados do usuário.'
+			});
+		}
+	},
+
+	redefinirSenha: async ({ params, request, locals, getClientAddress }) => {
+		exigirPermissao(locals.perfis, 'USUARIOS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia;
+		if (!idAcademia || !locals.usuario) {
+			throw error(401, 'Sessão inválida');
+		}
+
+		const idUsuario = Number(params.id);
+		const formData = await request.formData();
+		const novaSenha = String(formData.get('novaSenha') || '');
+		const confirmacaoSenha = String(formData.get('confirmacaoSenha') || '');
+
+		try {
+			await redefinirSenhaUsuarioNoDojo(
+				{
+					idAcademia,
+					idUsuarioOperador: locals.usuario.id,
+					ip: getClientAddress()
+				},
+				idUsuario,
+				{ novaSenha, confirmacaoSenha }
+			);
+			return {
+				sucesso: true,
+				abaRetorno: 'seguranca',
+				mensagem: 'Senha redefinida com sucesso. Todas as sessões ativas do usuário foram encerradas.'
+			};
+		} catch (erro: any) {
+			return fail(400, {
+				abaRetorno: 'seguranca',
+				erro: erro?.message || 'Falha ao redefinir senha.'
+			});
+		}
+	},
+
+	alternarBloqueio: async ({ params, request, locals, getClientAddress }) => {
+		exigirPermissao(locals.perfis, 'USUARIOS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia;
+		if (!idAcademia || !locals.usuario) {
+			throw error(401, 'Sessão inválida');
+		}
+
+		const idUsuario = Number(params.id);
+		const formData = await request.formData();
+		const acao = String(formData.get('acao') || '');
+		const motivo = String(formData.get('motivo') || '');
+		const bloquear = acao === 'bloquear';
+
+		try {
+			await alternarBloqueioUsuarioNoDojo(
+				{
+					idAcademia,
+					idUsuarioOperador: locals.usuario.id,
+					ip: getClientAddress()
+				},
+				idUsuario,
+				bloquear,
+				motivo
+			);
+			return {
+				sucesso: true,
+				abaRetorno: 'seguranca',
+				mensagem: bloquear
+					? 'Acesso do usuário a este dojo foi suspenso e suas sessões ativas foram revogadas.'
+					: 'Acesso do usuário a este dojo foi reativado com sucesso.'
+			};
+		} catch (erro: any) {
+			return fail(400, {
+				abaRetorno: 'seguranca',
+				erro: erro?.message || 'Falha ao alterar status de acesso do usuário.'
+			});
+		}
+	},
+
+	desvincular: async ({ params, locals, getClientAddress }) => {
+		exigirPermissao(locals.perfis, 'USUARIOS_GERENCIAR');
+
+		const idAcademia = locals.idAcademia;
+		if (!idAcademia || !locals.usuario) {
+			throw error(401, 'Sessão inválida');
+		}
+
+		const idUsuario = Number(params.id);
+
+		try {
+			await desvincularUsuarioDoDojo(
+				{
+					idAcademia,
+					idUsuarioOperador: locals.usuario.id,
+					ip: getClientAddress()
+				},
+				idUsuario
+			);
+		} catch (erro: any) {
+			return fail(400, {
+				abaRetorno: 'seguranca',
+				erro: erro?.message || 'Falha ao desvincular usuário do dojo.'
 			});
 		}
 

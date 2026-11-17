@@ -53,7 +53,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const metricasDojo = await buscarMetricasGestaoDojo(idAcademia);
 	const estatisticas = await buscarEstatisticasSeguranca(idAcademia);
-	const logsAuditoria = await listarLogsAuditoria(idAcademia, 30);
+	const logsAuditoria = await listarLogsAuditoria(idAcademia, 200);
 	const provedorStorage = getStorageProvider();
 
 	return {

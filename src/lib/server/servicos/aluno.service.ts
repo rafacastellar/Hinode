@@ -12,12 +12,90 @@ import {
 	vincularResponsavelExistenteEmTransacao
 } from '../repositorios/responsavel.repo';
 import { listarProfessoresDoDojo } from '../repositorios/professor.repo';
+import { inserirHistoricoGraduacaoEmTransacao } from '../repositorios/graduacao.repo';
 import {
 	type AlunoInput,
 	type MatricularAlunoInput,
 	editarAlunoSchema
 } from '../validacao/aluno.schema';
-import type { RowDataPacket } from 'mysql2';
+import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
+
+/**
+ * Garante que a graduação informada no ato da matrícula ou edição do judoca
+ * esteja devidamente gravada na trilha oficial de `Historico_Graduacao`.
+ * Caso o judoca seja matriculado em faixa superior à Branca e tenha `dataPrimeiraGraduacao`
+ * anterior à `dataGraduacaoAtual`, também registra a 1ª graduação (Faixa Branca) se ausente.
+ */
+async function garantirHistoricoGraduacaoAlunoEmTransacao(
+	conn: PoolConnection,
+	params: {
+		idAcademia: number;
+		idAluno: number;
+		idProfessorHomologador: number;
+		graduacaoAtual: string;
+		dataInicio?: string | null;
+		dataPrimeiraGraduacao?: string | null;
+		dataGraduacaoAtual?: string | null;
+		descricaoPadrao: string;
+	}
+): Promise<void> {
+	const hojeIso = new Date().toISOString().slice(0, 10);
+	const faixaAlvo = (params.graduacaoAtual || 'Branca').trim();
+	const ehBranca = faixaAlvo.toLowerCase() === 'branca';
+
+	const dataGradAtualIso =
+		params.dataGraduacaoAtual ||
+		params.dataPrimeiraGraduacao ||
+		params.dataInicio ||
+		hojeIso;
+
+	// Se o atleta foi cadastrado diretamente em faixa superior à Branca e informou uma data anterior de 1ª graduação/início,
+	// garante também o registro inicial da Faixa Branca na linha do tempo se ainda não existir.
+	const dataPrimeiraIso = params.dataPrimeiraGraduacao || params.dataInicio || null;
+	if (!ehBranca && dataPrimeiraIso && dataPrimeiraIso < dataGradAtualIso) {
+		const [temBranca] = await conn.execute<RowDataPacket[]>(
+			`SELECT id_historico FROM Historico_Graduacao
+			 WHERE id_aluno = ? AND LOWER(TRIM(faixa)) = 'branca'
+			 LIMIT 1`,
+			[params.idAluno]
+		);
+		if (temBranca.length === 0) {
+			await inserirHistoricoGraduacaoEmTransacao(conn, {
+				idEventoGraduacao: null,
+				idAluno: params.idAluno,
+				idProfessorHomologador: params.idProfessorHomologador,
+				dataGraduacao: dataPrimeiraIso,
+				associacao: 'Dojo / Ingresso no Judô',
+				faixa: 'Branca',
+				origemRegistro: 'HISTORICO_ANTERIOR',
+				descricaoOrigem: '1ª Graduação / Início no Tatame (Registro de Matrícula)',
+				idAcademiaFallback: params.idAcademia
+			});
+		}
+	}
+
+	// Verifica se já existe registro em Historico_Graduacao para a faixa atual informada
+	const [jaRegistrada] = await conn.execute<RowDataPacket[]>(
+		`SELECT id_historico FROM Historico_Graduacao
+		 WHERE id_aluno = ? AND LOWER(TRIM(faixa)) = LOWER(TRIM(?))
+		 LIMIT 1`,
+		[params.idAluno, faixaAlvo]
+	);
+
+	if (jaRegistrada.length === 0) {
+		await inserirHistoricoGraduacaoEmTransacao(conn, {
+			idEventoGraduacao: null,
+			idAluno: params.idAluno,
+			idProfessorHomologador: params.idProfessorHomologador,
+			dataGraduacao: dataGradAtualIso,
+			associacao: 'Dojo / Cadastro Cadastral',
+			faixa: faixaAlvo,
+			origemRegistro: ehBranca ? 'HISTORICO_ANTERIOR' : 'PROMOCAO_DIRETA',
+			descricaoOrigem: params.descricaoPadrao,
+			idAcademiaFallback: params.idAcademia
+		});
+	}
+}
 
 export interface ResultadoCriacaoAluno {
 	sucesso: boolean;
@@ -43,11 +121,11 @@ export async function cadastrarAluno(
 		const temResponsavelExistente = Boolean(dados.idResponsavelExistente);
 		const temResponsavelManual = Boolean(
 			dados.responsavelNome &&
-				dados.responsavelNome.trim().length >= 3 &&
-				dados.responsavelCpf &&
-				dados.responsavelCpf.length === 11 &&
-				dados.responsavelTelefone &&
-				dados.responsavelTelefone.length >= 8
+			dados.responsavelNome.trim().length >= 3 &&
+			dados.responsavelCpf &&
+			dados.responsavelCpf.length === 11 &&
+			dados.responsavelTelefone &&
+			dados.responsavelTelefone.length >= 8
 		);
 
 		if (!temResponsavelExistente && !temResponsavelManual) {
@@ -240,6 +318,18 @@ export async function cadastrarAluno(
 			}
 		}
 
+		// 5. Garante registro oficial da graduação informada no histórico do judoca
+		await garantirHistoricoGraduacaoAlunoEmTransacao(conn, {
+			idAcademia,
+			idAluno,
+			idProfessorHomologador: dados.idProfessorResponsavel,
+			graduacaoAtual: dados.graduacaoAtual,
+			dataInicio: dados.dataInicio || null,
+			dataPrimeiraGraduacao: dados.dataPrimeiraGraduacao || null,
+			dataGraduacaoAtual: dados.dataGraduacaoAtual || null,
+			descricaoPadrao: 'Graduação informada na Matrícula no Dojo'
+		});
+
 		return {
 			sucesso: true,
 			idAluno,
@@ -326,7 +416,15 @@ export async function matricularUsuarioExistente(
 			}
 		}
 
-		// 5. Grava dados técnicos
+		// 5. Grava dados técnicos (preenchendo data_inicio e data_primeira_graduacao com hoje caso não informados na faixa Branca)
+		const hojeIso = new Date().toISOString().slice(0, 10);
+		const dataInicioFinal = dados.dataInicio || hojeIso;
+		const dataPrimeiraGradFinal =
+			dados.dataPrimeiraGraduacao ||
+			(dados.graduacaoAtual.trim().toLowerCase() === 'branca'
+				? dados.dataGraduacaoAtual || dataInicioFinal
+				: null);
+
 		await conn.execute(
 			`INSERT INTO Aluno (
 				id_usuario, matricula, peso, categoria, n_federacao, status_federacao,
@@ -340,18 +438,30 @@ export async function matricularUsuarioExistente(
 				categoriaFinal || null,
 				dados.nFederacao || null,
 				dados.statusFederacao || null,
-				dados.dataInicio || null,
-				dados.dataPrimeiraGraduacao || null,
+				dataInicioFinal,
+				dataPrimeiraGradFinal,
 				dados.graduacaoAtual,
 				grupoFinal || null,
 				dados.idProfessorResponsavel
 			]
 		);
 
+		// 6. Grava automaticamente a graduação inicial/atual na linha do tempo (Historico_Graduacao)
+		await garantirHistoricoGraduacaoAlunoEmTransacao(conn, {
+			idAcademia,
+			idAluno: dados.idUsuario,
+			idProfessorHomologador: dados.idProfessorResponsavel,
+			graduacaoAtual: dados.graduacaoAtual,
+			dataInicio: dataInicioFinal,
+			dataPrimeiraGraduacao: dataPrimeiraGradFinal,
+			dataGraduacaoAtual: dados.dataGraduacaoAtual || null,
+			descricaoPadrao: 'Graduação informada na Matrícula no Dojo'
+		});
+
 		return {
 			sucesso: true,
 			idAluno: dados.idUsuario,
-			mensagem: `Judoca ${usuario.nome} matriculado com sucesso.`
+			mensagem: `Judoca ${usuario.nome} matriculado com sucesso e graduação (${dados.graduacaoAtual}) registrada no histórico.`
 		};
 	});
 }
@@ -404,9 +514,22 @@ export async function atualizarDadosAluno(
 
 	return await executarTransacao(async (conn) => {
 		await atualizarAlunoEmTransacao(conn, idAcademia, idAluno, dados);
+
+		// Garante que a faixa atual do judoca também conste no Historico_Graduacao
+		await garantirHistoricoGraduacaoAlunoEmTransacao(conn, {
+			idAcademia,
+			idAluno,
+			idProfessorHomologador: dados.idProfessorResponsavel,
+			graduacaoAtual: dados.graduacaoAtual,
+			dataInicio: dados.dataInicio || null,
+			dataPrimeiraGraduacao: dados.dataPrimeiraGraduacao || null,
+			dataGraduacaoAtual: dados.dataGraduacaoAtual || null,
+			descricaoPadrao: 'Graduação registrada via Ficha Técnica do Judoca'
+		});
+
 		return {
 			sucesso: true,
-			mensagem: 'Dados técnicos e esportivos do judoca atualizados com sucesso.'
+			mensagem: 'Dados técnicos, esportivos e registro de graduação do judoca atualizados com sucesso.'
 		};
 	});
 }
@@ -425,6 +548,9 @@ export async function recalcularCategoriasDojo(
 			u.nome,
 			u.genero,
 			DATE_FORMAT(u.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+			DATE_FORMAT(a.data_inicio, '%Y-%m-%d') AS data_inicio,
+			DATE_FORMAT(a.data_primeira_graduacao, '%Y-%m-%d') AS data_primeira_graduacao,
+			a.id_professor_responsavel,
 			a.peso,
 			a.graduacao_atual,
 			a.categoria,
@@ -438,50 +564,69 @@ export async function recalcularCategoriasDojo(
 
 	let totalAtualizados = 0;
 
-	for (const aluno of alunos) {
-		if (!aluno.data_nascimento) continue;
-		const classif = obterClassificacaoJudo({
-			dataNascimento: String(aluno.data_nascimento),
-			genero: aluno.genero === 'F' ? 'F' : 'M',
-			peso: aluno.peso !== null ? Number(aluno.peso) : null,
-			graduacao: aluno.graduacao_atual
+		await executarTransacao(async (conn) => {
+			for (const aluno of alunos) {
+				if (aluno.data_nascimento) {
+					const classif = obterClassificacaoJudo({
+						dataNascimento: String(aluno.data_nascimento),
+						genero: aluno.genero === 'F' ? 'F' : 'M',
+						peso: aluno.peso !== null ? Number(aluno.peso) : null,
+						graduacao: aluno.graduacao_atual
+					});
+
+						// Atualiza se mudou ou se não estava preenchido
+						if (
+							aluno.categoria !== classif.categoriaCompleta ||
+							aluno.grupo_especial_aspirante !== classif.divisao
+						) {
+							await conn.execute(
+								`UPDATE Aluno 
+						 SET categoria = ?, grupo_especial_aspirante = ? 
+						 WHERE id_usuario = ?`,
+								[classif.categoriaCompleta, classif.divisao, aluno.id_usuario]
+							);
+							totalAtualizados++;
+						}
+					}
+
+					// Garante que todo judoca já matriculado também tenha registro da sua faixa atual em Historico_Graduacao
+					await garantirHistoricoGraduacaoAlunoEmTransacao(conn, {
+						idAcademia,
+						idAluno: Number(aluno.id_usuario),
+						idProfessorHomologador: Number(aluno.id_professor_responsavel),
+						graduacaoAtual: String(aluno.graduacao_atual || 'Branca'),
+						dataInicio: aluno.data_inicio ? String(aluno.data_inicio) : null,
+						dataPrimeiraGraduacao: aluno.data_primeira_graduacao
+							? String(aluno.data_primeira_graduacao)
+							: null,
+						descricaoPadrao: 'Sincronização de Graduação Cadastral no Dojo'
+					});
+				}
 		});
 
-		// Atualiza se mudou ou se não estava preenchido
-		if (aluno.categoria !== classif.categoriaCompleta || aluno.grupo_especial_aspirante !== classif.divisao) {
-			await pool.execute(
-				`UPDATE Aluno 
-				 SET categoria = ?, grupo_especial_aspirante = ? 
-				 WHERE id_usuario = ?`,
-				[classif.categoriaCompleta, classif.divisao, aluno.id_usuario]
-			);
-			totalAtualizados++;
+		return {
+			totalAtualizados,
+			totalAlunos: alunos.length
+		};
+	}
+
+	/**
+	 * Registra uma Pesagem Rápida no Tatame para um judoca, recalculando
+	 * instantaneamente sua categoria CBJ/FPJ e gravando trilha de auditoria.
+	 */
+	export async function registrarPesagemRapidaAluno(
+		idAcademia: number,
+		idUsuarioExecutor: number,
+		idAluno: number,
+		novoPeso: number
+	): Promise<{ sucesso: boolean; mensagem: string; novaCategoria: string }> {
+		if (!Number.isFinite(novoPeso) || novoPeso < 10 || novoPeso > 300) {
+			throw error(400, { message: 'Informe um peso válido entre 10,0 kg e 300,0 kg.' });
 		}
-	}
 
-	return {
-		totalAtualizados,
-		totalAlunos: alunos.length
-	};
-}
-
-/**
- * Registra uma Pesagem Rápida no Tatame para um judoca, recalculando
- * instantaneamente sua categoria CBJ/FPJ e gravando trilha de auditoria.
- */
-export async function registrarPesagemRapidaAluno(
-	idAcademia: number,
-	idUsuarioExecutor: number,
-	idAluno: number,
-	novoPeso: number
-): Promise<{ sucesso: boolean; mensagem: string; novaCategoria: string }> {
-	if (!Number.isFinite(novoPeso) || novoPeso < 10 || novoPeso > 300) {
-		throw error(400, { message: 'Informe um peso válido entre 10,0 kg e 300,0 kg.' });
-	}
-
-	return await executarTransacao(async (conn) => {
-		const [rows] = await conn.execute<RowDataPacket[]>(
-			`SELECT 
+		return await executarTransacao(async (conn) => {
+			const [rows] = await conn.execute<RowDataPacket[]>(
+				`SELECT 
 				a.id_usuario,
 				u.nome,
 				u.genero,
@@ -495,54 +640,54 @@ export async function registrarPesagemRapidaAluno(
 			 INNER JOIN Usuario_Academia ua ON u.id_usuario = ua.id_usuario
 			 WHERE a.id_usuario = ? AND ua.id_academia = ?
 			 LIMIT 1`,
-			[idAluno, idAcademia]
-		);
+				[idAluno, idAcademia]
+			);
 
-		if (rows.length === 0) {
-			throw error(404, { message: 'Judoca não encontrado nesta academia.' });
-		}
+			if (rows.length === 0) {
+				throw error(404, { message: 'Judoca não encontrado nesta academia.' });
+			}
 
-		const aluno = rows[0];
-		const pesoAnterior = aluno.peso !== null ? Number(aluno.peso) : null;
-		const categoriaAnterior = aluno.categoria ? String(aluno.categoria) : null;
+			const aluno = rows[0];
+			const pesoAnterior = aluno.peso !== null ? Number(aluno.peso) : null;
+			const categoriaAnterior = aluno.categoria ? String(aluno.categoria) : null;
 
-		const classif = obterClassificacaoJudo({
-			dataNascimento: String(aluno.data_nascimento),
-			genero: aluno.genero === 'F' ? 'F' : 'M',
-			peso: novoPeso,
-			graduacao: String(aluno.graduacao_atual || 'Branca')
-		});
+			const classif = obterClassificacaoJudo({
+				dataNascimento: String(aluno.data_nascimento),
+				genero: aluno.genero === 'F' ? 'F' : 'M',
+				peso: novoPeso,
+				graduacao: String(aluno.graduacao_atual || 'Branca')
+			});
 
-		const novaCategoria = classif.categoriaCompleta;
-		const novaDivisao = classif.divisao;
+			const novaCategoria = classif.categoriaCompleta;
+			const novaDivisao = classif.divisao;
 
-		await conn.execute(
-			`UPDATE Aluno 
+			await conn.execute(
+				`UPDATE Aluno 
 			 SET peso = ?, categoria = ?, grupo_especial_aspirante = ? 
 			 WHERE id_usuario = ?`,
-			[novoPeso, novaCategoria, novaDivisao, idAluno]
-		);
+				[novoPeso, novaCategoria, novaDivisao, idAluno]
+			);
 
-		await conn.execute(
-			`INSERT INTO Log_Auditoria (id_academia, id_usuario_executor, acao, entidade, id_entidade, dados_antes, dados_depois)
+			await conn.execute(
+				`INSERT INTO Log_Auditoria (id_academia, id_usuario_executor, acao, entidade, id_entidade, dados_antes, dados_depois)
 			 VALUES (?, ?, 'MUDANCA_PESO_CATEGORIA', 'Aluno', ?, ?, ?)`,
-			[
-				idAcademia,
-				idUsuarioExecutor,
-				String(idAluno),
-				JSON.stringify({ peso: pesoAnterior, categoria: categoriaAnterior }),
-				JSON.stringify({
-					peso: novoPeso,
-					categoria: novaCategoria,
-					origem: 'Pesagem Rápida no Tatame'
-				})
-			]
-		);
+				[
+					idAcademia,
+					idUsuarioExecutor,
+					String(idAluno),
+					JSON.stringify({ peso: pesoAnterior, categoria: categoriaAnterior }),
+					JSON.stringify({
+						peso: novoPeso,
+						categoria: novaCategoria,
+						origem: 'Pesagem Rápida no Tatame'
+					})
+				]
+			);
 
-		return {
-			sucesso: true,
-			novaCategoria,
-			mensagem: `Peso de ${aluno.nome} atualizado para ${novoPeso.toFixed(1)} kg (${novaCategoria}).`
-		};
-	});
-}
+			return {
+				sucesso: true,
+				novaCategoria,
+				mensagem: `Peso de ${aluno.nome} atualizado para ${novoPeso.toFixed(1)} kg (${novaCategoria}).`
+			};
+		});
+	}

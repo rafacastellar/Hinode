@@ -90,6 +90,12 @@ export const alunoSchema = z.object({
 		.nullish()
 		.refine((val) => !val || regexData.test(val), { message: 'Data da 1ª graduação inválida' })
 		.transform((val) => val || null),
+	dataGraduacaoAtual: z
+		.string()
+		.trim()
+		.nullish()
+		.refine((val) => !val || regexData.test(val), { message: 'Data da graduação atual inválida' })
+		.transform((val) => val || null),
 	graduacaoAtual: z
 		.string()
 		.trim()
@@ -178,6 +184,12 @@ export const editarAlunoSchema = z.object({
 		.trim()
 		.nullish()
 		.refine((val) => !val || regexData.test(val), { message: 'Data da 1ª graduação inválida' })
+		.transform((val) => val || null),
+	dataGraduacaoAtual: z
+		.string()
+		.trim()
+		.nullish()
+		.refine((val) => !val || regexData.test(val), { message: 'Data da graduação atual inválida' })
 		.transform((val) => val || null),
 	graduacaoAtual: z
 		.string()

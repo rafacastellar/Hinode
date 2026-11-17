@@ -20,6 +20,9 @@ import {
 	desvincularResponsavelDoUsuarioTx
 } from '../repositorios/usuario.repo';
 import { calcularIdadeServidor } from '../repositorios/aluno.repo';
+import { inserirHistoricoGraduacaoEmTransacao } from '../repositorios/graduacao.repo';
+import { obterClassificacaoJudo } from '../../dominio/regras-categoria-peso';
+import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import {
 	criarUsuarioSchema,
 	editarUsuarioSchema,
@@ -33,6 +36,154 @@ export interface ContextoOperador {
 	idAcademia: number;
 	idUsuarioOperador: number;
 	ip?: string;
+}
+
+/**
+ * Sincroniza unificadamente as credenciais técnicas (Graduação/Faixa e Nº Federação FPJ/CBJ)
+ * entre as tabelas `Professor`, `Aluno` e `Historico_Graduacao`.
+ * Quando um Professor é cadastrado ou editado, garante também seu registro técnico em `Aluno`
+ * e `Historico_Graduacao` para que possa ter linha do tempo e promoções de Dan homologadas.
+ */
+async function sincronizarCredenciaisTecnicasProfessorAlunoTx(
+	conn: PoolConnection,
+	params: {
+		idAcademia: number;
+		idUsuario: number;
+		ehProfessor: boolean;
+		ehAluno: boolean;
+		dataNascimento: string;
+		genero: 'M' | 'F';
+		nFederacao: string | null;
+		grauFaixa: string | null;
+	}
+): Promise<void> {
+	const faixaPadrao = params.ehProfessor ? 'Preta 1º Dan' : 'Branca';
+	const faixaFinal = (params.grauFaixa && params.grauFaixa.trim()) || faixaPadrao;
+	const nFedFinal = params.nFederacao && params.nFederacao.trim() ? params.nFederacao.trim() : null;
+
+	// 1. Se for Professor, sincroniza tabela Professor
+	if (params.ehProfessor) {
+		await sincronizarDadosProfessorTx(conn, params.idUsuario, nFedFinal, faixaFinal);
+	}
+
+	// 2. Se for Professor ou se for Aluno (com faixa/federação informadas ou já matriculado), sincroniza Aluno + Historico_Graduacao
+	const [alunoExistente] = await conn.execute<RowDataPacket[]>(
+		'SELECT id_usuario, peso, id_professor_responsavel FROM Aluno WHERE id_usuario = ? LIMIT 1',
+		[params.idUsuario]
+	);
+
+	const deveSincronizarAluno =
+		params.ehProfessor ||
+		alunoExistente.length > 0 ||
+		(params.ehAluno && Boolean(params.grauFaixa || params.nFederacao));
+
+	if (!deveSincronizarAluno) return;
+
+	// Determina o id_professor_responsavel (se o próprio usuário é Professor, pode ser ele mesmo; senão busca um professor do dojo)
+	let idProfResponsavel: number | null =
+		alunoExistente.length > 0 && alunoExistente[0].id_professor_responsavel
+			? Number(alunoExistente[0].id_professor_responsavel)
+			: params.ehProfessor
+				? params.idUsuario
+				: null;
+
+	if (!idProfResponsavel) {
+		const [profsDojo] = await conn.execute<RowDataPacket[]>(
+			`SELECT p.id_usuario
+			 FROM Professor p
+			 INNER JOIN Usuario_Academia ua ON ua.id_usuario = p.id_usuario
+			 WHERE ua.id_academia = ?
+			 ORDER BY p.id_usuario ASC LIMIT 1`,
+			[params.idAcademia]
+		);
+		if (profsDojo.length > 0) {
+			idProfResponsavel = Number(profsDojo[0].id_usuario);
+		}
+	}
+
+	if (!idProfResponsavel) return;
+
+	const pesoAtual =
+		alunoExistente.length > 0 && alunoExistente[0].peso !== null
+			? Number(alunoExistente[0].peso)
+			: null;
+
+	const classif = obterClassificacaoJudo({
+		dataNascimento: params.dataNascimento,
+		genero: params.genero,
+		peso: pesoAtual,
+		graduacao: faixaFinal
+	});
+
+	const hojeIso = new Date().toISOString().slice(0, 10);
+
+	if (alunoExistente.length === 0) {
+		await conn.execute(
+			`INSERT INTO Aluno (
+				id_usuario,
+				n_federacao,
+				status_federacao,
+				data_inicio,
+				data_primeira_graduacao,
+				graduacao_atual,
+				categoria,
+				grupo_especial_aspirante,
+				id_professor_responsavel
+			) VALUES (?, ?, 'Ativo', ?, ?, ?, ?, ?, ?)`,
+			[
+				params.idUsuario,
+				nFedFinal,
+				hojeIso,
+				hojeIso,
+				faixaFinal,
+				classif.categoriaCompleta || null,
+				classif.divisao || null,
+				idProfResponsavel
+			]
+		);
+	} else {
+		await conn.execute(
+			`UPDATE Aluno
+			 SET graduacao_atual = COALESCE(?, graduacao_atual),
+			     n_federacao = COALESCE(?, n_federacao),
+			     categoria = COALESCE(?, categoria),
+			     grupo_especial_aspirante = COALESCE(?, grupo_especial_aspirante)
+			 WHERE id_usuario = ?`,
+			[
+				params.grauFaixa ? faixaFinal : null,
+				nFedFinal,
+				classif.categoriaCompleta || null,
+				classif.divisao || null,
+				params.idUsuario
+			]
+		);
+	}
+
+	// 3. Garante que a faixa conste em Historico_Graduacao
+	if (params.ehProfessor || params.grauFaixa) {
+		const [jaNoHistorico] = await conn.execute<RowDataPacket[]>(
+			`SELECT id_historico FROM Historico_Graduacao
+			 WHERE id_aluno = ? AND LOWER(TRIM(faixa)) = LOWER(TRIM(?))
+			 LIMIT 1`,
+			[params.idUsuario, faixaFinal]
+		);
+
+		if (jaNoHistorico.length === 0) {
+			await inserirHistoricoGraduacaoEmTransacao(conn, {
+				idEventoGraduacao: null,
+				idAluno: params.idUsuario,
+				idProfessorHomologador: idProfResponsavel,
+				dataGraduacao: hojeIso,
+				associacao: 'CBJ / FPJ',
+				faixa: faixaFinal,
+				origemRegistro: 'HISTORICO_ANTERIOR',
+				descricaoOrigem: params.ehProfessor
+					? 'Graduação Oficial de Sensei / Professor (Sincronizada)'
+					: 'Graduação Inicial Registrada no Cadastro de Usuário',
+				idAcademiaFallback: params.idAcademia
+			});
+		}
+	}
 }
 
 /**
@@ -100,18 +251,24 @@ export async function cadastrarUsuarioNoDojo(
 			dados.idsPerfis
 		);
 
-		// 4. Se perfil de Professor atribuído, sincroniza tabela técnica Professor
+		// 4. Sincronização unificada de credenciais técnicas (Professor + Aluno + Histórico de Graduação)
 		const todosPerfis = await listarPerfisDoSistema();
 		const perfilProfessor = todosPerfis.find((p) => p.role.toLowerCase() === 'professor');
-		const ehProfessor = perfilProfessor && dados.idsPerfis.includes(perfilProfessor.id_perfil);
+		const perfilAluno = todosPerfis.find((p) => p.role.toLowerCase() === 'aluno');
+		const ehProfessor = Boolean(perfilProfessor && dados.idsPerfis.includes(perfilProfessor.id_perfil));
+		const ehAluno = Boolean(perfilAluno && dados.idsPerfis.includes(perfilAluno.id_perfil));
 
-		if (ehProfessor) {
-			await sincronizarDadosProfessorTx(
-				conn,
-				idUsuarioFinal,
-				dados.nFederacao,
-				dados.grauFaixa
-			);
+		if (ehProfessor || ehAluno) {
+			await sincronizarCredenciaisTecnicasProfessorAlunoTx(conn, {
+				idAcademia: ctx.idAcademia,
+				idUsuario: idUsuarioFinal,
+				ehProfessor,
+				ehAluno,
+				dataNascimento: dados.dataNascimento,
+				genero: dados.genero,
+				nFederacao: dados.nFederacao || null,
+				grauFaixa: dados.grauFaixa || null
+			});
 		}
 
 		// 4.1. Se perfil de Responsável atribuído, garante registro na tabela Responsavel
@@ -249,17 +406,23 @@ export async function atualizarUsuarioNoDojo(
 			dados.idsPerfis
 		);
 
-		// 5. Se perfil Professor selecionado, atualiza dados do Sensei
+		// 5. Sincronização unificada de credenciais técnicas (Professor + Aluno + Histórico de Graduação)
 		const perfilProfessor = todosPerfis.find((p) => p.role.toLowerCase() === 'professor');
-		const ehProfessor = perfilProfessor && dados.idsPerfis.includes(perfilProfessor.id_perfil);
+		const perfilAluno = todosPerfis.find((p) => p.role.toLowerCase() === 'aluno');
+		const ehProfessor = Boolean(perfilProfessor && dados.idsPerfis.includes(perfilProfessor.id_perfil));
+		const ehAluno = Boolean(perfilAluno && dados.idsPerfis.includes(perfilAluno.id_perfil));
 
-		if (ehProfessor) {
-			await sincronizarDadosProfessorTx(
-				conn,
+		if (ehProfessor || ehAluno) {
+			await sincronizarCredenciaisTecnicasProfessorAlunoTx(conn, {
+				idAcademia: ctx.idAcademia,
 				idUsuario,
-				dados.nFederacao,
-				dados.grauFaixa
-			);
+				ehProfessor,
+				ehAluno,
+				dataNascimento: dados.dataNascimento,
+				genero: dados.genero,
+				nFederacao: dados.nFederacao || null,
+				grauFaixa: dados.grauFaixa || null
+			});
 		}
 
 		// 5.1. Se perfil Responsável selecionado, garante registro na tabela Responsavel

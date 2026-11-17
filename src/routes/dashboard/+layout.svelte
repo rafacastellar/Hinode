@@ -25,6 +25,12 @@
 		KeyRound,
 		ChevronDown,
 		History,
+		UserPlus,
+		Scale,
+		BarChart3,
+		ShieldCheck,
+		Globe,
+		Server,
 	} from "@lucide/svelte";
 	import { page } from "$app/state";
 
@@ -296,12 +302,148 @@
 		page.url.searchParams.get("aba") || "proximos",
 	);
 
+	// Sub-menus dinâmicos do item "Alunos & Judocas" na Sidebar Lateral
+	const subMenusAlunos = [
+		{
+			chave: "quadro",
+			titulo: "Quadro Geral de Judocas",
+			href: "/dashboard/alunos?aba=quadro",
+			icone: Users,
+		},
+		{
+			chave: "matricular",
+			titulo: "Matricular Judocas",
+			href: "/dashboard/alunos/novo",
+			icone: UserPlus,
+		},
+		{
+			chave: "pesagens",
+			titulo: "Histórico de Pesagens",
+			href: "/dashboard/alunos?aba=pesagens",
+			icone: Scale,
+		},
+		{
+			chave: "dados",
+			titulo: "Dados Gerais",
+			href: "/dashboard/alunos?aba=dados",
+			icone: BarChart3,
+		},
+	];
+
+	const abaAlunosAtiva = $derived.by(() => {
+		if (page.url.pathname === "/dashboard/alunos/novo") return "matricular";
+		if (page.url.pathname === "/dashboard/alunos") {
+			return page.url.searchParams.get("aba") || "quadro";
+		}
+		return "";
+	});
+
+	// Sub-menus dinâmicos do item "Equipe & Usuários" na Sidebar Lateral
+	const subMenusUsuarios = [
+		{
+			chave: "gestao",
+			titulo: "Gestão de Usuários",
+			href: "/dashboard/usuarios",
+			icone: Users,
+		},
+		{
+			chave: "novo",
+			titulo: "Cadastrar Usuário",
+			href: "/dashboard/usuarios/novo",
+			icone: UserPlus,
+		},
+	];
+
+	const abaUsuariosAtiva = $derived.by(() => {
+		if (page.url.pathname === "/dashboard/usuarios/novo") return "novo";
+		if (page.url.pathname.startsWith("/dashboard/usuarios")) return "gestao";
+		return "";
+	});
+
+	// Sub-menus dinâmicos do item "Configurações do Dojo" na Sidebar Lateral
+	const subMenusConfiguracoes = [
+		{
+			chave: "indicadores",
+			titulo: "Indicadores & Estatísticas",
+			href: "/dashboard/configuracoes?aba=indicadores",
+			icone: BarChart3,
+		},
+		{
+			chave: "institucional",
+			titulo: "Dados Institucionais",
+			href: "/dashboard/configuracoes?aba=institucional",
+			icone: Building2,
+		},
+		{
+			chave: "endereco",
+			titulo: "Endereço da Sede",
+			href: "/dashboard/configuracoes?aba=endereco",
+			icone: MapPin,
+		},
+		{
+			chave: "identidade",
+			titulo: "Identidade Visual & Domínio",
+			href: "/dashboard/configuracoes?aba=identidade",
+			icone: Globe,
+		},
+		{
+			chave: "auditoria",
+			titulo: "Auditoria LGPD & Compliance",
+			href: "/dashboard/configuracoes?aba=auditoria",
+			icone: ShieldCheck,
+		},
+		{
+			chave: "sistema",
+			titulo: "Informações sobre o Sistema",
+			href: "/dashboard/configuracoes?aba=sistema",
+			icone: Server,
+		},
+	];
+
+	const abaConfiguracoesAtiva = $derived(
+		page.url.searchParams.get("aba") || "indicadores",
+	);
+
 	function rotaAtiva(href: string): boolean {
 		const caminhoAtual = page.url.pathname;
 		if (href === "/dashboard") {
 			return caminhoAtual === "/dashboard";
 		}
 		return caminhoAtual.startsWith(href);
+	}
+
+	// Controle de expansão independente dos sub-menus na Sidebar (expande/recolhe sem navegar)
+	let menusExpandidos = $state<Record<string, boolean>>({});
+
+	const ROTAS_COM_SUBMENU = [
+		"/dashboard/alunos",
+		"/dashboard/usuarios",
+		"/dashboard/perfil",
+		"/dashboard/graduacoes",
+		"/dashboard/minhas-graduacoes",
+		"/dashboard/campeonatos",
+		"/dashboard/configuracoes",
+	];
+
+	$effect(() => {
+		const caminho = page.url.pathname;
+		for (const rota of ROTAS_COM_SUBMENU) {
+			if (caminho.startsWith(rota) && menusExpandidos[rota] === undefined) {
+				menusExpandidos[rota] = true;
+			}
+		}
+	});
+
+	function alternarSubmenu(href: string) {
+		if (sidebarMinimizada) {
+			sidebarMinimizada = false;
+			if (typeof window !== "undefined") {
+				localStorage.setItem("hinode_sidebar_minimizada", "false");
+			}
+			menusExpandidos[href] = true;
+			return;
+		}
+		menusExpandidos[href] = !menusExpandidos[href];
 	}
 </script>
 
@@ -449,80 +591,170 @@
 			{#each data.itensMenu as item}
 				{@const Icone = mapaIcones[item.icone] || LayoutDashboard}
 				{@const ativo = rotaAtiva(item.href)}
+				{@const ehItemAlunos = item.href === "/dashboard/alunos"}
+				{@const ehItemUsuarios = item.href === "/dashboard/usuarios"}
 				{@const ehItemPerfil = item.href === "/dashboard/perfil"}
 				{@const ehItemGraduacoes = item.href === "/dashboard/graduacoes"}
 				{@const ehItemMinhasGraduacoes = item.href === "/dashboard/minhas-graduacoes"}
 				{@const ehItemCampeonatos = item.href === "/dashboard/campeonatos"}
+				{@const ehItemConfiguracoes = item.href === "/dashboard/configuracoes"}
 				{@const temSubmenu =
+					ehItemAlunos ||
+					ehItemUsuarios ||
 					ehItemPerfil ||
 					ehItemGraduacoes ||
 					ehItemMinhasGraduacoes ||
-					ehItemCampeonatos}
+					ehItemCampeonatos ||
+					ehItemConfiguracoes}
+				{@const expandido = Boolean(menusExpandidos[item.href])}
 
 				<div class="space-y-1">
-					<a
-						href={item.href}
-						title={sidebarMinimizada ? item.titulo : undefined}
-						class="flex items-center {sidebarMinimizada
-							? 'justify-center p-2.5'
-							: 'justify-between gap-3 px-3 py-2.5'} rounded-xl text-xs font-medium transition-all group relative {ativo
-							? 'bg-red-950/40 border border-red-800/70 text-white font-semibold shadow-[0_0_16px_rgba(220,38,38,0.15)]'
-							: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/70 border border-transparent'}"
-					>
-						<div class="flex items-center gap-3 min-w-0">
-							<Icone
-								class="w-4 h-4 shrink-0 transition-colors {ativo
-									? 'text-red-500'
-									: 'text-zinc-500 group-hover:text-zinc-300'}"
-							/>
-							{#if !sidebarMinimizada}
-								<span class="truncate">{item.titulo}</span>
-							{/if}
-						</div>
+					{#if temSubmenu}
+						<button
+							type="button"
+							onclick={() => alternarSubmenu(item.href)}
+							aria-expanded={expandido}
+							title={sidebarMinimizada ? item.titulo : undefined}
+							class="w-full text-left cursor-pointer flex items-center {sidebarMinimizada
+								? 'justify-center p-2.5'
+								: 'justify-between gap-3 px-3 py-2.5'} rounded-xl text-xs font-medium transition-all group relative {ativo
+								? 'bg-red-950/40 border border-red-800/70 text-white font-semibold shadow-[0_0_16px_rgba(220,38,38,0.15)]'
+								: expandido
+									? 'bg-zinc-900/80 border border-zinc-800 text-zinc-100 font-semibold'
+									: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/70 border border-transparent'}"
+						>
+							<div class="flex items-center gap-3 min-w-0">
+								<Icone
+									class="w-4 h-4 shrink-0 transition-colors {ativo
+										? 'text-red-500'
+										: expandido
+											? 'text-red-400'
+											: 'text-zinc-500 group-hover:text-zinc-300'}"
+								/>
+								{#if !sidebarMinimizada}
+									<span class="truncate">{item.titulo}</span>
+								{/if}
+							</div>
 
-						{#if temSubmenu && !sidebarMinimizada}
-							<ChevronDown
-								class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 {ativo
-									? 'rotate-0 text-red-400'
-									: '-rotate-90 text-zinc-600 group-hover:text-zinc-400'}"
-							/>
-						{:else if item.badge}
-							{#if sidebarMinimizada}
-								<span
-									class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full {item.badgeUrgente
-										? 'bg-red-500 ring-2 ring-red-400 animate-pulse'
-										: 'bg-red-500'}"
-									title="{item.titulo}: {item.badge}"
-								></span>
-							{:else}
-								{#if item.badgeUrgente}
+							{#if !sidebarMinimizada}
+								<ChevronDown
+									class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 {expandido
+										? 'rotate-0 text-red-400'
+										: '-rotate-90 text-zinc-600 group-hover:text-zinc-400'}"
+								/>
+							{/if}
+						</button>
+					{:else}
+						<a
+							href={item.href}
+							title={sidebarMinimizada ? item.titulo : undefined}
+							class="flex items-center {sidebarMinimizada
+								? 'justify-center p-2.5'
+								: 'justify-between gap-3 px-3 py-2.5'} rounded-xl text-xs font-medium transition-all group relative {ativo
+								? 'bg-red-950/40 border border-red-800/70 text-white font-semibold shadow-[0_0_16px_rgba(220,38,38,0.15)]'
+								: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/70 border border-transparent'}"
+						>
+							<div class="flex items-center gap-3 min-w-0">
+								<Icone
+									class="w-4 h-4 shrink-0 transition-colors {ativo
+										? 'text-red-500'
+										: 'text-zinc-500 group-hover:text-zinc-300'}"
+								/>
+								{#if !sidebarMinimizada}
+									<span class="truncate">{item.titulo}</span>
+								{/if}
+							</div>
+
+							{#if item.badge}
+								{#if sidebarMinimizada}
 									<span
-										class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-red-600 text-white shrink-0 shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse flex items-center gap-1.5"
-									>
-										<span
-											class="w-1.5 h-1.5 rounded-full bg-white"
-										></span>
-										<span>{item.badge}</span>
-									</span>
+										class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full {item.badgeUrgente
+											? 'bg-red-500 ring-2 ring-red-400 animate-pulse'
+											: 'bg-red-500'}"
+										title="{item.titulo}: {item.badge}"
+									></span>
 								{:else}
-									<span
-										class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500 shrink-0"
-									>
-										{item.badge}
-									</span>
+									{#if item.badgeUrgente}
+										<span
+											class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-red-600 text-white shrink-0 shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse flex items-center gap-1.5"
+										>
+											<span
+												class="w-1.5 h-1.5 rounded-full bg-white"
+											></span>
+											<span>{item.badge}</span>
+										</span>
+									{:else}
+										<span
+											class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500 shrink-0"
+										>
+											{item.badge}
+										</span>
+									{/if}
 								{/if}
 							{/if}
-						{/if}
-					</a>
+						</a>
+					{/if}
 
-					<!-- Sub-menus de Meu Perfil na Sidebar (Exibidos quando a rota /dashboard/perfil está ativa) -->
-					{#if ehItemPerfil && ativo && !sidebarMinimizada}
+					<!-- Sub-menus de Alunos & Judocas na Sidebar -->
+					{#if ehItemAlunos && expandido && !sidebarMinimizada}
+						<div
+							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
+						>
+							{#each subMenusAlunos as sub}
+								{@const SubIcone = sub.icone}
+								{@const subAtivo = abaAlunosAtiva === sub.chave}
+								<a
+									href={sub.href}
+									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
+										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+								>
+									<SubIcone
+										class="w-3.5 h-3.5 shrink-0 {subAtivo
+											? 'text-red-400'
+											: 'text-zinc-500'}"
+									/>
+									<span class="truncate">{sub.titulo}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Sub-menus de Equipe & Usuários na Sidebar -->
+					{#if ehItemUsuarios && expandido && !sidebarMinimizada}
+						<div
+							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
+						>
+							{#each subMenusUsuarios as sub}
+								{@const SubIcone = sub.icone}
+								{@const subAtivo = abaUsuariosAtiva === sub.chave}
+								<a
+									href={sub.href}
+									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
+										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+								>
+									<SubIcone
+										class="w-3.5 h-3.5 shrink-0 {subAtivo
+											? 'text-red-400'
+											: 'text-zinc-500'}"
+									/>
+									<span class="truncate">{sub.titulo}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Sub-menus de Meu Perfil na Sidebar -->
+					{#if ehItemPerfil && expandido && !sidebarMinimizada}
 						<div
 							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
 						>
 							{#each subMenusPerfil as sub}
 								{@const SubIcone = sub.icone}
-								{@const subAtivo = abaPerfilAtiva === sub.chave}
+								{@const subAtivo =
+									page.url.pathname.startsWith("/dashboard/perfil") &&
+									abaPerfilAtiva === sub.chave}
 								<a
 									href="/dashboard/perfil?aba={sub.chave}"
 									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
@@ -540,8 +772,8 @@
 						</div>
 					{/if}
 
-					<!-- Sub-menus de Graduações na Sidebar (Exibidos quando a rota /dashboard/graduacoes está ativa) -->
-					{#if ehItemGraduacoes && ativo && !sidebarMinimizada}
+					<!-- Sub-menus de Graduações na Sidebar -->
+					{#if ehItemGraduacoes && expandido && !sidebarMinimizada}
 						<div
 							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
 						>
@@ -568,7 +800,7 @@
 					{/if}
 
 					<!-- Sub-menus de Minhas Graduações na Sidebar -->
-					{#if ehItemMinhasGraduacoes && ativo && !sidebarMinimizada}
+					{#if ehItemMinhasGraduacoes && expandido && !sidebarMinimizada}
 						<div
 							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
 						>
@@ -595,7 +827,7 @@
 					{/if}
 
 					<!-- Sub-menus de Campeonatos na Sidebar -->
-					{#if ehItemCampeonatos && ativo && !sidebarMinimizada}
+					{#if ehItemCampeonatos && expandido && !sidebarMinimizada}
 						<div
 							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
 						>
@@ -606,6 +838,33 @@
 									abaCampeonatosAtiva === sub.chave}
 								<a
 									href="/dashboard/campeonatos?aba={sub.chave}"
+									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
+										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+								>
+									<SubIcone
+										class="w-3.5 h-3.5 shrink-0 {subAtivo
+											? 'text-red-400'
+											: 'text-zinc-500'}"
+									/>
+									<span class="truncate">{sub.titulo}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Sub-menus de Configurações do Dojo na Sidebar -->
+					{#if ehItemConfiguracoes && expandido && !sidebarMinimizada}
+						<div
+							class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1 animate-in slide-in-from-top-1 duration-200"
+						>
+							{#each subMenusConfiguracoes as sub}
+								{@const SubIcone = sub.icone}
+								{@const subAtivo =
+									page.url.pathname === "/dashboard/configuracoes" &&
+									abaConfiguracoesAtiva === sub.chave}
+								<a
+									href={sub.href}
 									class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
 										? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold shadow-sm'
 										: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
@@ -799,63 +1058,141 @@
 						{@const Icone =
 							mapaIcones[item.icone] || LayoutDashboard}
 						{@const ativo = rotaAtiva(item.href)}
+						{@const ehItemAlunos = item.href === "/dashboard/alunos"}
+						{@const ehItemUsuarios = item.href === "/dashboard/usuarios"}
 						{@const ehItemPerfil = item.href === "/dashboard/perfil"}
 						{@const ehItemGraduacoes = item.href === "/dashboard/graduacoes"}
 						{@const ehItemMinhasGraduacoes = item.href === "/dashboard/minhas-graduacoes"}
 						{@const ehItemCampeonatos = item.href === "/dashboard/campeonatos"}
+						{@const ehItemConfiguracoes = item.href === "/dashboard/configuracoes"}
 						{@const temSubmenu =
+							ehItemAlunos ||
+							ehItemUsuarios ||
 							ehItemPerfil ||
 							ehItemGraduacoes ||
 							ehItemMinhasGraduacoes ||
-							ehItemCampeonatos}
+							ehItemCampeonatos ||
+							ehItemConfiguracoes}
+						{@const expandido = Boolean(menusExpandidos[item.href])}
 
 						<div class="space-y-1">
-							<a
-								href={item.href}
-								onclick={() => !temSubmenu && (menuAberto = false)}
-								class="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-xs font-medium {ativo
-									? 'bg-red-950/40 border border-red-800/70 text-white font-semibold'
-									: 'text-zinc-400 hover:text-white hover:bg-zinc-900'}"
-							>
-								<div class="flex items-center gap-3">
-									<Icone
-										class="w-4 h-4 {ativo
-											? 'text-red-500'
-											: 'text-zinc-500'}"
-									/>
-									<span>{item.titulo}</span>
-								</div>
-								{#if temSubmenu}
+							{#if temSubmenu}
+								<button
+									type="button"
+									onclick={() => (menusExpandidos[item.href] = !menusExpandidos[item.href])}
+									aria-expanded={expandido}
+									class="w-full text-left cursor-pointer flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-xs font-medium {ativo
+										? 'bg-red-950/40 border border-red-800/70 text-white font-semibold'
+										: expandido
+											? 'bg-zinc-900 border border-zinc-800 text-white font-semibold'
+											: 'text-zinc-400 hover:text-white hover:bg-zinc-900'}"
+								>
+									<div class="flex items-center gap-3">
+										<Icone
+											class="w-4 h-4 {ativo
+												? 'text-red-500'
+												: expandido
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+										/>
+										<span>{item.titulo}</span>
+									</div>
 									<ChevronDown
-										class="w-3.5 h-3.5 transition-transform duration-200 {ativo
+										class="w-3.5 h-3.5 transition-transform duration-200 {expandido
 											? 'rotate-0 text-red-400'
 											: '-rotate-90 text-zinc-600'}"
 									/>
-								{:else if item.badge}
-									{#if item.badgeUrgente}
-										<span
-											class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse flex items-center gap-1.5"
-										>
+								</button>
+							{:else}
+								<a
+									href={item.href}
+									onclick={() => (menuAberto = false)}
+									class="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-xs font-medium {ativo
+										? 'bg-red-950/40 border border-red-800/70 text-white font-semibold'
+										: 'text-zinc-400 hover:text-white hover:bg-zinc-900'}"
+								>
+									<div class="flex items-center gap-3">
+										<Icone
+											class="w-4 h-4 {ativo
+												? 'text-red-500'
+												: 'text-zinc-500'}"
+										/>
+										<span>{item.titulo}</span>
+									</div>
+									{#if item.badge}
+										{#if item.badgeUrgente}
 											<span
-												class="w-1.5 h-1.5 rounded-full bg-white"
-											></span>
-											<span>{item.badge}</span>
-										</span>
-									{:else}
-										<span
-											class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500"
-										>
-											{item.badge}
-										</span>
+												class="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse flex items-center gap-1.5"
+											>
+												<span
+													class="w-1.5 h-1.5 rounded-full bg-white"
+												></span>
+												<span>{item.badge}</span>
+											</span>
+										{:else}
+											<span
+												class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500"
+											>
+												{item.badge}
+											</span>
+										{/if}
 									{/if}
-								{/if}
-							</a>
+								</a>
+							{/if}
 
-							{#if ehItemPerfil && ativo}
+							{#if ehItemAlunos && expandido}
+								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
+									{#each subMenusAlunos as sub}
+										{@const SubIcone = sub.icone}
+										{@const subAtivo = abaAlunosAtiva === sub.chave}
+										<a
+											href={sub.href}
+											onclick={() => (menuAberto = false)}
+											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
+												: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+										>
+											<SubIcone
+												class="w-3.5 h-3.5 shrink-0 {subAtivo
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+											/>
+											<span class="truncate">{sub.titulo}</span>
+										</a>
+									{/each}
+								</div>
+							{/if}
+
+							{#if ehItemUsuarios && expandido}
+								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
+									{#each subMenusUsuarios as sub}
+										{@const SubIcone = sub.icone}
+										{@const subAtivo = abaUsuariosAtiva === sub.chave}
+										<a
+											href={sub.href}
+											onclick={() => (menuAberto = false)}
+											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
+												: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+										>
+											<SubIcone
+												class="w-3.5 h-3.5 shrink-0 {subAtivo
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+											/>
+											<span class="truncate">{sub.titulo}</span>
+										</a>
+									{/each}
+								</div>
+							{/if}
+
+							{#if ehItemPerfil && expandido}
 								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
 									{#each subMenusPerfil as sub}
 										{@const SubIcone = sub.icone}
-										{@const subAtivo = abaPerfilAtiva === sub.chave}
+										{@const subAtivo =
+											page.url.pathname.startsWith("/dashboard/perfil") &&
+											abaPerfilAtiva === sub.chave}
 										<a
 											href="/dashboard/perfil?aba={sub.chave}"
 											onclick={() => (menuAberto = false)}
@@ -874,7 +1211,7 @@
 								</div>
 							{/if}
 
-							{#if ehItemGraduacoes && ativo}
+							{#if ehItemGraduacoes && expandido}
 								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
 									{#each subMenusGraduacoes as sub}
 										{@const SubIcone = sub.icone}
@@ -899,7 +1236,7 @@
 								</div>
 							{/if}
 
-							{#if ehItemMinhasGraduacoes && ativo}
+							{#if ehItemMinhasGraduacoes && expandido}
 								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
 									{#each subMenusMinhasGraduacoes as sub}
 										{@const SubIcone = sub.icone}
@@ -924,7 +1261,7 @@
 								</div>
 							{/if}
 
-							{#if ehItemCampeonatos && ativo}
+							{#if ehItemCampeonatos && expandido}
 								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
 									{#each subMenusCampeonatos as sub}
 										{@const SubIcone = sub.icone}
@@ -933,6 +1270,31 @@
 											abaCampeonatosAtiva === sub.chave}
 										<a
 											href="/dashboard/campeonatos?aba={sub.chave}"
+											onclick={() => (menuAberto = false)}
+											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
+												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'
+												: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'}"
+										>
+											<SubIcone
+												class="w-3.5 h-3.5 shrink-0 {subAtivo
+													? 'text-red-400'
+													: 'text-zinc-500'}"
+											/>
+											<span class="truncate">{sub.titulo}</span>
+										</a>
+									{/each}
+								</div>
+							{/if}
+
+							{#if ehItemConfiguracoes && expandido}
+								<div class="ml-4 pl-3 border-l border-zinc-800/90 space-y-1 py-1">
+									{#each subMenusConfiguracoes as sub}
+										{@const SubIcone = sub.icone}
+										{@const subAtivo =
+											page.url.pathname === "/dashboard/configuracoes" &&
+											abaConfiguracoesAtiva === sub.chave}
+										<a
+											href={sub.href}
 											onclick={() => (menuAberto = false)}
 											class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all {subAtivo
 												? 'bg-zinc-900 border border-red-800/60 text-red-300 font-semibold'

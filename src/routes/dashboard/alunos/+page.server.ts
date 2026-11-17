@@ -15,8 +15,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const busca = url.searchParams.get('busca') || '';
 
 	const [alunos, historicoMudancasPeso] = await Promise.all([
-		listarAlunos(idAcademia, busca),
-		obterHistoricoMudancasPeso(idAcademia, 30)
+		listarAlunos(idAcademia),
+		obterHistoricoMudancasPeso(idAcademia)
 	]);
 
 	return {

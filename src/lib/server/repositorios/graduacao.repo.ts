@@ -1202,7 +1202,7 @@ export async function obterOuCriarEventoGraduacaoEmTransacao(
 }
 
 /**
- * Atualiza atomicamente a faixa atual do aluno em Aluno.
+ * Atualiza atomicamente a faixa atual do aluno em Aluno e sincroniza Professor.grau_faixa caso também seja Sensei.
  */
 export async function atualizarFaixaAlunoEmTransacao(
 	conn: PoolConnection,
@@ -1211,6 +1211,10 @@ export async function atualizarFaixaAlunoEmTransacao(
 ): Promise<void> {
 	await conn.execute(
 		'UPDATE Aluno SET graduacao_atual = ? WHERE id_usuario = ?',
+		[novaFaixa, idAluno]
+	);
+	await conn.execute(
+		'UPDATE Professor SET grau_faixa = ? WHERE id_usuario = ?',
 		[novaFaixa, idAluno]
 	);
 }

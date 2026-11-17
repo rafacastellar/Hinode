@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const idPerfilFiltro = perfilParam ? Number(perfilParam) : undefined;
 
 	const [usuarios, perfis] = await Promise.all([
-		listarUsuariosDoDojo(idAcademia, busca, idPerfilFiltro),
+		listarUsuariosDoDojo(idAcademia),
 		listarPerfisDoSistema()
 	]);
 

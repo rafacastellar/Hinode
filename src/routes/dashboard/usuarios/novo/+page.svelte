@@ -1,9 +1,15 @@
 <script lang="ts">
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
+	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
+	import {
+		OPCOES_FAIXAS_CADASTRO,
+		LISTA_TODAS_FAIXAS_VALORES
+	} from '#lib/dominio/graduacao';
 	import {
 		UserPlus,
 		ArrowLeft,
+		ArrowRight,
 		ShieldCheck,
 		Lock,
 		Award,
@@ -16,15 +22,15 @@
 		Search,
 		Loader2,
 		HeartHandshake,
-		Users,
 		Plus,
 		Trash2,
-		CheckCircle2,
 		Eye,
 		EyeOff,
 		Globe,
 		Check,
-		X
+		Sparkles,
+		Copy,
+		RefreshCw
 	} from '@lucide/svelte';
 	import {
 		validarCpfOficial,
@@ -36,20 +42,74 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let salvando = $state(false);
+	let abaAtiva = $state<'identificacao' | 'endereco' | 'perfis' | 'responsaveis'>('identificacao');
+
+	const abasCadastro = [
+		{ chave: 'identificacao', rotulo: '1. Identificação & Contato', icone: User },
+		{ chave: 'endereco', rotulo: '2. Endereço', icone: MapPin },
+		{ chave: 'perfis', rotulo: '3. Perfis & Dados Técnicos', icone: ShieldCheck },
+		{ chave: 'responsaveis', rotulo: '4. Responsáveis / Dependentes', icone: HeartHandshake }
+	] as const;
 
 	let perfisSelecionados = $state<number[]>([]);
+	let nomeValor = $state('');
+	let emailValor = $state('');
+	let telefoneValor = $state('');
 	let dataNasc = $state('');
 	let generoSelecionado = $state<'M' | 'F'>('M');
+	let grauFaixaSelecionado = $state('Preta 1º Dan');
+	let nFederacaoValor = $state('');
 
 	// Documento e Nacionalidade
 	let tipoDocumento = $state<'CPF' | 'ESTRANGEIRO'>('CPF');
 	let cpfValor = $state('');
 	let paisOrigem = $state('Brasil');
 
-	// Senha com Segurança e Força
+	// Senha com Segurança, Confirmação e Sugestão Automática
 	let senhaValor = $state('');
+	let confirmacaoSenhaValor = $state('');
 	let mostrarSenha = $state(false);
+	let copiadoFeedback = $state(false);
 	const analiseSenha = $derived(analisarForcaSenha(senhaValor));
+	const senhasConferem = $derived(
+		senhaValor.length >= 8 && confirmacaoSenhaValor.length > 0 && senhaValor === confirmacaoSenhaValor
+	);
+
+	function sugerirSenhaPadraoDojo() {
+		const digitosCpf = cpfValor.replace(/\D/g, '');
+		const prefixoDoc =
+			digitosCpf.length >= 4
+				? digitosCpf.slice(0, 4)
+				: String(Math.floor(1000 + Math.random() * 9000));
+		const sufixoAno = dataNasc && dataNasc.length >= 4 ? dataNasc.slice(2, 4) : '26';
+		const sugerida = `Hinode@${prefixoDoc}${sufixoAno}`;
+		senhaValor = sugerida;
+		confirmacaoSenhaValor = sugerida;
+		mostrarSenha = true;
+	}
+
+	function sortearSenhaForte() {
+		const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+		const num = Math.floor(1000 + Math.random() * 9000);
+		const l1 = letras.charAt(Math.floor(Math.random() * letras.length));
+		const l2 = letras.charAt(Math.floor(Math.random() * letras.length)).toLowerCase();
+		const sugerida = `Hinode#${num}${l1}${l2}`;
+		senhaValor = sugerida;
+		confirmacaoSenhaValor = sugerida;
+		mostrarSenha = true;
+	}
+
+	async function copiarCredenciaisWhatsApp() {
+		if (!senhaValor) {
+			sugerirSenhaPadraoDojo();
+		}
+		const texto = `🥋 *Acesso ao Sistema — Judô Hinodê*\n👤 *Usuário:* ${nomeValor.trim() || 'Novo Membro'}\n📧 *Login (E-mail):* ${emailValor.trim() || '(informe o e-mail)'}\n🔑 *Senha Inicial:* ${senhaValor}`;
+		try {
+			await navigator.clipboard.writeText(texto);
+			copiadoFeedback = true;
+			setTimeout(() => (copiadoFeedback = false), 2500);
+		} catch {}
+	}
 
 	const statusCpf = $derived.by(() => {
 		if (tipoDocumento === 'CPF') {
@@ -98,6 +158,9 @@
 	let novoFinanceiro = $state(false);
 
 	$effect(() => {
+		if (form?.valores?.nome) nomeValor = form.valores.nome;
+		if (form?.valores?.email) emailValor = form.valores.email;
+		if (form?.valores?.telefone) telefoneValor = form.valores.telefone;
 		if (form?.valores?.idsPerfis) {
 			perfisSelecionados = form.valores.idsPerfis;
 		}
@@ -115,6 +178,12 @@
 		}
 		if (form?.valores?.paisOrigem) {
 			paisOrigem = form.valores.paisOrigem;
+		}
+		if (form?.valores?.grauFaixa) {
+			grauFaixaSelecionado = form.valores.grauFaixa;
+		}
+		if (form?.valores?.nFederacao) {
+			nFederacaoValor = form.valores.nFederacao;
 		}
 		if (form?.valores?.cep) cep = form.valores.cep;
 		if (form?.valores?.logradouro) logradouro = form.valores.logradouro;
@@ -186,21 +255,87 @@
 		}
 	});
 
-	// Identifica se o perfil Professor está selecionado
 	let perfilProfessorId = $derived(
 		data.perfis.find((p: any) => p.role.toLowerCase() === 'professor')?.id_perfil
+	);
+	let perfilAlunoId = $derived(
+		data.perfis.find((p: any) => p.role.toLowerCase() === 'aluno')?.id_perfil
 	);
 
 	let ehProfessorSelecionado = $derived(
 		perfilProfessorId ? perfisSelecionados.includes(perfilProfessorId) : false
 	);
+	let ehAlunoSelecionado = $derived(
+		perfilAlunoId ? perfisSelecionados.includes(perfilAlunoId) : false
+	);
 
-	// Filtra responsáveis disponíveis que ainda não foram adicionados à lista
+	// Quando o usuário seleciona apenas Aluno (e não Professor), ajusta o default da faixa para Branca se ainda estava em Preta 1º Dan
+	$effect(() => {
+		if (ehAlunoSelecionado && !ehProfessorSelecionado && grauFaixaSelecionado === 'Preta 1º Dan') {
+			grauFaixaSelecionado = 'Branca';
+		} else if (ehProfessorSelecionado && grauFaixaSelecionado === 'Branca') {
+			grauFaixaSelecionado = 'Preta 1º Dan';
+		}
+	});
+
 	const responsaveisDisponiveisParaAdicionar = $derived(
 		data.responsaveis.filter(
 			(r: any) => !responsaveisVinculados.some((item) => item.idResponsavel === r.id_usuario)
 		)
 	);
+
+	// =========================================================================
+	// CÁLCULO DE PROGRESSO / COMPLETUDE DO PERFIL (%)
+	// =========================================================================
+	const statusAbas = $derived.by(() => {
+		const idOk =
+			nomeValor.trim().length >= 3 &&
+			emailValor.includes('@') &&
+			statusCpf === 'valido' &&
+			dataNasc.length === 10 &&
+			senhasConferem;
+
+		const endOk =
+			cep.replace(/\D/g, '').length === 8 &&
+			logradouro.trim().length > 0 &&
+			cidade.trim().length > 0 &&
+			uf.trim().length === 2;
+
+		const perfisOk = perfisSelecionados.length > 0;
+		const respOk = ehMenor ? responsaveisVinculados.length > 0 : dataNasc.length === 10;
+
+		return {
+			identificacao: idOk,
+			endereco: endOk,
+			perfis: perfisOk,
+			responsaveis: respOk
+		};
+	});
+
+	const percentualPreenchimento = $derived.by(() => {
+		let pontos = 0;
+		const total = 10;
+		if (nomeValor.trim().length >= 3) pontos += 1.5;
+		if (emailValor.includes('@')) pontos += 1.5;
+		if (statusCpf === 'valido') pontos += 1.5;
+		if (dataNasc.length === 10) pontos += 1;
+		if (telefoneValor.replace(/\D/g, '').length >= 8) pontos += 0.5;
+		if (senhasConferem) pontos += 1;
+		if (
+			cep.replace(/\D/g, '').length === 8 &&
+			logradouro.trim().length > 0 &&
+			cidade.trim().length > 0 &&
+			uf.trim().length === 2
+		) {
+			pontos += 1.5;
+		} else if (logradouro.trim().length > 0 || cidade.trim().length > 0) {
+			pontos += 0.75;
+		}
+		if (perfisSelecionados.length > 0) pontos += 1;
+		if (ehMenor ? responsaveisVinculados.length > 0 : dataNasc.length === 10) pontos += 0.5;
+
+		return Math.min(100, Math.round((pontos / total) * 100));
+	});
 
 	function adicionarResponsavel() {
 		if (!idResponsavelParaAdicionar) return;
@@ -278,25 +413,27 @@
 
 <div class="max-w-4xl mx-auto space-y-6">
 	<!-- Topo de Navegação -->
-	<div class="flex items-center gap-4">
-		<a
-			href="/dashboard/usuarios"
-			class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
-			title="Voltar para a lista"
-		>
-			<ArrowLeft class="w-4 h-4" />
-		</a>
-		<div>
-			<div class="flex items-center gap-2">
-				<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-semibold">
-					Controle de Acessos
-				</span>
-				<span class="text-zinc-600">•</span>
-				<span class="text-xs font-mono text-zinc-400">Novo Registro</span>
+	<div class="flex items-center justify-between gap-4 pb-4 border-b border-zinc-900">
+		<div class="flex items-center gap-4">
+			<a
+				href="/dashboard/usuarios"
+				class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
+				title="Voltar para Gestão de Usuários"
+			>
+				<ArrowLeft class="w-4 h-4" />
+			</a>
+			<div>
+				<div class="flex items-center gap-2">
+					<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-semibold">
+						Equipe & Usuários
+					</span>
+					<span class="text-zinc-600">•</span>
+					<span class="text-xs font-mono text-zinc-400">Cadastro Estruturado em Abas</span>
+				</div>
+				<h1 class="text-2xl font-extrabold text-white tracking-tight font-display">
+					Cadastrar Usuário & Atribuir Perfis
+				</h1>
 			</div>
-			<h1 class="text-2xl font-extrabold text-white tracking-tight font-display">
-				Cadastrar Usuário & Atribuir Perfis
-			</h1>
 		</div>
 	</div>
 
@@ -308,7 +445,68 @@
 		</div>
 	{/if}
 
-	<!-- Formulário -->
+	<!-- Barra de Progresso de Preenchimento do Perfil -->
+	<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-2.5">
+		<div class="flex items-center justify-between gap-2 text-xs">
+			<div class="flex items-center gap-2">
+				<span class="font-mono uppercase tracking-wider text-[10px] text-zinc-400 font-bold">
+					Completude do Perfil Cadastral
+				</span>
+				{#if percentualPreenchimento === 100}
+					<span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-950/60 border border-emerald-800 text-emerald-300 font-bold">
+						Completo ✓
+					</span>
+				{/if}
+			</div>
+			<span class="font-mono font-bold text-sm {percentualPreenchimento === 100 ? 'text-emerald-400' : 'text-red-400'}">
+				{percentualPreenchimento}%
+			</span>
+		</div>
+		<div class="w-full h-2 rounded-full bg-zinc-900 overflow-hidden">
+			<div
+				class="h-full rounded-full transition-all duration-300 {percentualPreenchimento === 100
+					? 'bg-emerald-500'
+					: percentualPreenchimento >= 60
+						? 'bg-amber-500'
+						: 'bg-red-600'}"
+				style="width: {Math.max(4, percentualPreenchimento)}%"
+			></div>
+		</div>
+	</div>
+
+	<!-- Barra de Abas Passo a Passo -->
+	<div class="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-zinc-950 border border-zinc-900">
+		{#each abasCadastro as tab}
+			{@const Icone = tab.icone}
+			{@const ativa = abaAtiva === tab.chave}
+			{@const concluida = statusAbas[tab.chave]}
+			<button
+				type="button"
+				onclick={() => (abaAtiva = tab.chave)}
+				class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer {ativa
+					? 'bg-red-950/50 border border-red-800/80 text-white font-semibold shadow-sm'
+					: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 border border-transparent'}"
+			>
+				<Icone class="w-3.5 h-3.5 shrink-0 {ativa ? 'text-red-400' : concluida ? 'text-emerald-400' : 'text-zinc-500'}" />
+				<span class="truncate">{tab.rotulo}</span>
+				{#if concluida}
+					<Check class="w-3.5 h-3.5 ml-auto text-emerald-400 shrink-0" />
+				{:else if tab.chave === 'perfis' && perfisSelecionados.length > 0}
+					<span class="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-mono bg-red-600 text-white font-bold">
+						{perfisSelecionados.length}
+					</span>
+				{:else if tab.chave === 'responsaveis' && ehMenor}
+					<span
+						class="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-amber-950 border border-amber-700 text-amber-300"
+					>
+						!
+					</span>
+				{/if}
+			</button>
+		{/each}
+	</div>
+
+	<!-- Formulário Único (todas as abas permanecem no DOM via class:hidden para envio atômico) -->
 	<form
 		method="POST"
 		use:enhance={() => {
@@ -321,14 +519,20 @@
 		class="space-y-6"
 	>
 		<!-- ========================================================================= -->
-		<!-- 1. DADOS DE IDENTIFICAÇÃO E ACESSO -->
+		<!-- ABA 1: IDENTIFICAÇÃO & CONTATO                                            -->
 		<!-- ========================================================================= -->
-		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-			<div class="flex items-center gap-2 pb-3 border-b border-zinc-900">
-				<User class="w-4 h-4 text-red-500" />
-				<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
-					1. Identificação Pessoal & Acesso
-				</h2>
+		<section
+			class:hidden={abaAtiva !== 'identificacao'}
+			class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4 animate-in fade-in duration-150"
+		>
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2">
+					<User class="w-4 h-4 text-red-500" />
+					<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
+						1. Identificação Pessoal & Credencial de Acesso
+					</h2>
+				</div>
+				<span class="text-[10px] font-mono text-zinc-500">Etapa 1 de 4</span>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -343,7 +547,7 @@
 						name="nome"
 						required
 						minlength="3"
-						value={form?.valores?.nome || ''}
+						bind:value={nomeValor}
 						placeholder="Ex: Carlos Eduardo Silva"
 						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
 					/>
@@ -361,8 +565,26 @@
 							id="email"
 							name="email"
 							required
-							value={form?.valores?.email || ''}
+							bind:value={emailValor}
 							placeholder="operador@dojohinode.com.br"
+							class="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
+						/>
+					</div>
+				</div>
+
+				<!-- Telefone -->
+				<div>
+					<label for="telefone" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+						Telefone de Contato (Opcional)
+					</label>
+					<div class="relative">
+						<Phone class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+						<input
+							type="tel"
+							id="telefone"
+							name="telefone"
+							bind:value={telefoneValor}
+							placeholder="(11) 99999-9999"
 							class="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
 						/>
 					</div>
@@ -382,16 +604,28 @@
 					<div class="grid grid-cols-2 gap-2">
 						<button
 							type="button"
-							onclick={() => { tipoDocumento = 'CPF'; paisOrigem = 'Brasil'; }}
-							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all {tipoDocumento === 'CPF' ? 'bg-red-950/40 border-red-700 text-white shadow-sm' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
+							onclick={() => {
+								tipoDocumento = 'CPF';
+								paisOrigem = 'Brasil';
+							}}
+							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all {tipoDocumento ===
+							'CPF'
+								? 'bg-red-950/40 border-red-700 text-white shadow-sm'
+								: 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
 						>
 							<span>🇧🇷</span>
 							<span>Brasileiro (CPF)</span>
 						</button>
 						<button
 							type="button"
-							onclick={() => { tipoDocumento = 'ESTRANGEIRO'; if (paisOrigem === 'Brasil') paisOrigem = ''; }}
-							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all {tipoDocumento === 'ESTRANGEIRO' ? 'bg-blue-950/40 border-blue-700 text-white shadow-sm' : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
+							onclick={() => {
+								tipoDocumento = 'ESTRANGEIRO';
+								if (paisOrigem === 'Brasil') paisOrigem = '';
+							}}
+							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all {tipoDocumento ===
+							'ESTRANGEIRO'
+								? 'bg-blue-950/40 border-blue-700 text-white shadow-sm'
+								: 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
 						>
 							<Globe class="w-3.5 h-3.5 text-blue-400" />
 							<span>Estrangeiro (Passaporte / RNM)</span>
@@ -414,12 +648,12 @@
 						{:else if statusCpf === 'invalido'}
 							<span class="text-[10px] font-mono text-red-400 font-bold flex items-center gap-1">
 								<AlertCircle class="w-3 h-3" />
-								{tipoDocumento === 'CPF' ? 'CPF Inválido (Dígitos Incorretos)' : 'Mínimo 3 caracteres'}
+								{tipoDocumento === 'CPF'
+									? 'CPF Inválido (Dígitos Incorretos)'
+									: 'Mínimo 3 caracteres'}
 							</span>
 						{:else if statusCpf === 'incompleto'}
-							<span class="text-[10px] font-mono text-zinc-500">
-								Digite os 11 dígitos
-							</span>
+							<span class="text-[10px] font-mono text-zinc-500">Digite os 11 dígitos</span>
 						{/if}
 					</div>
 					<input
@@ -431,11 +665,15 @@
 						value={cpfValor}
 						oninput={tratarInputCpf}
 						placeholder={tipoDocumento === 'CPF' ? '000.000.000-00' : 'Ex: PA12345678 ou RNM'}
-						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border text-xs text-white font-mono focus:outline-none transition-colors {statusCpf === 'valido' ? 'border-emerald-600/70 focus:border-emerald-500' : statusCpf === 'invalido' ? 'border-red-600/70 focus:border-red-500' : 'border-zinc-800 focus:border-red-600'}"
+						class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border text-xs text-white font-mono focus:outline-none transition-colors {statusCpf ===
+						'valido'
+							? 'border-emerald-600/70 focus:border-emerald-500'
+							: statusCpf === 'invalido'
+								? 'border-red-600/70 focus:border-red-500'
+								: 'border-zinc-800 focus:border-red-600'}"
 					/>
 				</div>
 
-				<!-- País de Origem (Somente se Estrangeiro) -->
 				{#if tipoDocumento === 'ESTRANGEIRO'}
 					<div>
 						<label for="paisOrigem" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
@@ -455,106 +693,6 @@
 					<input type="hidden" name="paisOrigem" value="Brasil" />
 				{/if}
 
-				<!-- Senha de Acesso e Força -->
-				<div class="md:col-span-2 space-y-2">
-					<div class="flex items-center justify-between">
-						<label for="senha" class="text-[11px] font-mono uppercase text-zinc-400 block">
-							Senha de Acesso Inicial *
-						</label>
-						{#if analiseSenha.forca === 'forte'}
-							<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-								<ShieldCheck class="w-3 h-3" /> Senha Forte
-							</span>
-						{:else if analiseSenha.forca === 'boa'}
-							<span class="text-[10px] font-mono text-blue-400 font-bold">
-								Senha Boa
-							</span>
-						{:else if analiseSenha.forca === 'media'}
-							<span class="text-[10px] font-mono text-amber-400 font-bold">
-								Senha Média
-							</span>
-						{:else if senhaValor.length > 0}
-							<span class="text-[10px] font-mono text-red-400 font-bold">
-								Senha Fraca
-							</span>
-						{/if}
-					</div>
-
-					<div class="relative">
-						<Lock class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-						<input
-							type={mostrarSenha ? 'text' : 'password'}
-							id="senha"
-							name="senha"
-							required
-							minlength="8"
-							bind:value={senhaValor}
-							placeholder="Crie uma senha forte (mín. 8 caracteres)"
-							class="w-full pl-9 pr-10 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors font-mono"
-						/>
-						<button
-							type="button"
-							onclick={() => (mostrarSenha = !mostrarSenha)}
-							class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-							title={mostrarSenha ? 'Ocultar senha' : 'Exibir senha'}
-						>
-							{#if mostrarSenha}
-								<EyeOff class="w-4 h-4" />
-							{:else}
-								<Eye class="w-4 h-4" />
-							{/if}
-						</button>
-					</div>
-
-					<!-- Barra de Força da Senha -->
-					{#if senhaValor.length > 0}
-						<div class="space-y-1.5 pt-1">
-							<div class="grid grid-cols-4 gap-1.5 h-1.5">
-								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 1 ? (analiseSenha.forca === 'fraca' ? 'bg-red-500' : analiseSenha.forca === 'media' ? 'bg-amber-500' : analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
-								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 2 ? (analiseSenha.forca === 'media' ? 'bg-amber-500' : analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
-								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 3 ? (analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
-								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
-							</div>
-
-							<!-- Critérios de Segurança -->
-							<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10px] font-mono">
-								<span class="flex items-center gap-1 {analiseSenha.criterios.comprimentoMinimo ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseSenha.criterios.comprimentoMinimo}
-										<Check class="w-3 h-3 shrink-0" />
-									{:else}
-										<span class="w-3 h-3 text-center inline-block">•</span>
-									{/if}
-									8+ caracteres
-								</span>
-								<span class="flex items-center gap-1 {analiseSenha.criterios.maiuscula && analiseSenha.criterios.minuscula ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseSenha.criterios.maiuscula && analiseSenha.criterios.minuscula}
-										<Check class="w-3 h-3 shrink-0" />
-									{:else}
-										<span class="w-3 h-3 text-center inline-block">•</span>
-									{/if}
-									Maiúsculas & minúsculas
-								</span>
-								<span class="flex items-center gap-1 {analiseSenha.criterios.numero ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseSenha.criterios.numero}
-										<Check class="w-3 h-3 shrink-0" />
-									{:else}
-										<span class="w-3 h-3 text-center inline-block">•</span>
-									{/if}
-									Ao menos 1 número
-								</span>
-								<span class="flex items-center gap-1 {analiseSenha.criterios.especial ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">
-									{#if analiseSenha.criterios.especial}
-										<Check class="w-3 h-3 shrink-0" />
-									{:else}
-										<span class="w-3 h-3 text-center inline-block">•</span>
-									{/if}
-									Símbolo (@$!%*?&#)
-								</span>
-							</div>
-						</div>
-					{/if}
-				</div>
-
 				<!-- Data de Nascimento -->
 				<div>
 					<div class="flex items-center justify-between mb-1">
@@ -563,7 +701,7 @@
 						</label>
 						{#if idadeCalculada !== null}
 							<span class="text-[10px] font-mono text-emerald-400 font-bold">
-								{idadeCalculada} anos {idadeCalculada >= 18 ? '(Maior de Idade)' : '(Menor de Idade)'}
+								{idadeCalculada} anos {idadeCalculada >= 18 ? '(Maior)' : '(Menor)'}
 							</span>
 						{/if}
 					</div>
@@ -586,41 +724,202 @@
 						Gênero *
 					</span>
 					<div class="grid grid-cols-2 gap-2">
-						<label class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer select-none transition-colors {generoSelecionado === 'M' ? 'bg-red-950/30 border-red-800 text-white font-semibold' : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'}">
-							<input type="radio" name="genero" value="M" bind:group={generoSelecionado} class="sr-only" />
+						<label
+							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer select-none transition-colors {generoSelecionado ===
+							'M'
+								? 'bg-red-950/30 border-red-800 text-white font-semibold'
+								: 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
+						>
+							<input
+								type="radio"
+								name="genero"
+								value="M"
+								bind:group={generoSelecionado}
+								class="sr-only"
+							/>
 							<span class="text-xs">Masculino</span>
 						</label>
-						<label class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer select-none transition-colors {generoSelecionado === 'F' ? 'bg-red-950/30 border-red-800 text-white font-semibold' : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'}">
-							<input type="radio" name="genero" value="F" bind:group={generoSelecionado} class="sr-only" />
+						<label
+							class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer select-none transition-colors {generoSelecionado ===
+							'F'
+								? 'bg-red-950/30 border-red-800 text-white font-semibold'
+								: 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'}"
+						>
+							<input
+								type="radio"
+								name="genero"
+								value="F"
+								bind:group={generoSelecionado}
+								class="sr-only"
+							/>
 							<span class="text-xs">Feminino</span>
 						</label>
 					</div>
 				</div>
 
-				<!-- Telefone -->
-				<div>
-					<label for="telefone" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-						Telefone de Contato (Opcional)
-					</label>
-					<div class="relative">
-						<Phone class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-						<input
-							type="tel"
-							id="telefone"
-							name="telefone"
-							value={form?.valores?.telefone || ''}
-							placeholder="(11) 99999-9999"
-							class="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
-						/>
+				<!-- Senha de Acesso, Sugestão Automática e Confirmação -->
+				<div class="md:col-span-2 p-4 rounded-2xl bg-zinc-900/35 border border-zinc-800/80 space-y-3.5">
+					<div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-800/70">
+						<div>
+							<span class="text-xs font-bold text-white block">
+								Credencial de Senha Inicial & Sugestão Automática
+							</span>
+							<span class="text-[11px] text-zinc-500">
+								Gere uma senha padronizada com 1 clique ou digite manualmente nos dois campos
+							</span>
+						</div>
+
+						<div class="flex items-center gap-2 flex-wrap">
+							<button
+								type="button"
+								onclick={sugerirSenhaPadraoDojo}
+								class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/70 border border-amber-800/70 text-[11px] font-mono font-semibold text-amber-300 transition-colors cursor-pointer"
+								title="Gera Hinode@ + 4 primeiros dígitos do CPF + 2 dígitos do ano de nascimento"
+							>
+								<Sparkles class="w-3.5 h-3.5 text-amber-400" />
+								<span>Padrão CPF (Hinode@CPF)</span>
+							</button>
+							<button
+								type="button"
+								onclick={sortearSenhaForte}
+								class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[11px] font-mono text-zinc-300 transition-colors cursor-pointer"
+								title="Sorteia uma senha forte aleatória"
+							>
+								<RefreshCw class="w-3 h-3" />
+								<span>Sortear Senha</span>
+							</button>
+							<button
+								type="button"
+								onclick={copiarCredenciaisWhatsApp}
+								class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-800/70 text-[11px] font-mono font-semibold text-emerald-300 transition-colors cursor-pointer"
+								title="Copia o cartão de acesso pronto para enviar no WhatsApp do usuário"
+							>
+								{#if copiadoFeedback}
+									<Check class="w-3.5 h-3.5 text-emerald-400" />
+									<span>Copiado p/ WhatsApp!</span>
+								{:else}
+									<Copy class="w-3.5 h-3.5 text-emerald-400" />
+									<span>Copiar Acesso p/ WhatsApp</span>
+								{/if}
+							</button>
+						</div>
 					</div>
+
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+						<div>
+							<div class="flex items-center justify-between mb-1">
+								<label for="senha" class="text-[11px] font-mono uppercase text-zinc-400 block">
+									Senha de Acesso Inicial *
+								</label>
+								{#if analiseSenha.forca === 'forte'}
+									<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+										<ShieldCheck class="w-3 h-3" /> Senha Forte
+									</span>
+								{:else if analiseSenha.forca === 'boa'}
+									<span class="text-[10px] font-mono text-blue-400 font-bold">Senha Boa</span>
+								{:else if analiseSenha.forca === 'media'}
+									<span class="text-[10px] font-mono text-amber-400 font-bold">Senha Média</span>
+								{:else if senhaValor.length > 0}
+									<span class="text-[10px] font-mono text-red-400 font-bold">Senha Fraca</span>
+								{/if}
+							</div>
+
+							<div class="relative">
+								<Lock class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+								<input
+									type={mostrarSenha ? 'text' : 'password'}
+									id="senha"
+									name="senha"
+									required
+									minlength="8"
+									bind:value={senhaValor}
+									placeholder="Crie uma senha forte (mín. 8 caracteres)"
+									class="w-full pl-9 pr-10 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-red-600 transition-colors font-mono"
+								/>
+								<button
+									type="button"
+									onclick={() => (mostrarSenha = !mostrarSenha)}
+									class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+								>
+									{#if mostrarSenha}
+										<EyeOff class="w-4 h-4" />
+									{:else}
+										<Eye class="w-4 h-4" />
+									{/if}
+								</button>
+							</div>
+						</div>
+
+						<div>
+							<div class="flex items-center justify-between mb-1">
+								<label for="confirmacaoSenha" class="text-[11px] font-mono uppercase text-zinc-400 block">
+									Confirmar Senha Inicial *
+								</label>
+								{#if confirmacaoSenhaValor.length > 0}
+									{#if senhasConferem}
+										<span class="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+											<Check class="w-3 h-3" /> Senhas conferem
+										</span>
+									{:else}
+										<span class="text-[10px] font-mono text-red-400 font-bold">
+											Não conferem
+										</span>
+									{/if}
+								{/if}
+							</div>
+
+							<div class="relative">
+								<Lock class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+								<input
+									type={mostrarSenha ? 'text' : 'password'}
+									id="confirmacaoSenha"
+									name="confirmacaoSenha"
+									required
+									minlength="8"
+									bind:value={confirmacaoSenhaValor}
+									placeholder="Repita a senha inicial"
+									class="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-zinc-900/90 border {confirmacaoSenhaValor.length > 0
+										? senhasConferem
+											? 'border-emerald-600/80'
+											: 'border-red-600/80'
+										: 'border-zinc-800'} text-xs text-white focus:outline-none focus:border-red-600 transition-colors font-mono"
+								/>
+							</div>
+						</div>
+					</div>
+
+					{#if senhaValor.length > 0}
+						<div class="space-y-1.5 pt-1">
+							<div class="grid grid-cols-4 gap-1.5 h-1.5">
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 1 ? (analiseSenha.forca === 'fraca' ? 'bg-red-500' : analiseSenha.forca === 'media' ? 'bg-amber-500' : analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 2 ? (analiseSenha.forca === 'media' ? 'bg-amber-500' : analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 3 ? (analiseSenha.forca === 'boa' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-zinc-800'}"></div>
+								<div class="rounded-full transition-all duration-300 {analiseSenha.pontuacao >= 4 ? 'bg-emerald-500' : 'bg-zinc-800'}"></div>
+							</div>
+						</div>
+					{/if}
 				</div>
+			</div>
+
+			<div class="pt-4 border-t border-zinc-900 flex justify-end">
+				<button
+					type="button"
+					onclick={() => (abaAtiva = 'endereco')}
+					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-white transition-colors cursor-pointer"
+				>
+					<span>Próxima Aba: Endereço</span>
+					<ArrowRight class="w-3.5 h-3.5" />
+				</button>
 			</div>
 		</section>
 
 		<!-- ========================================================================= -->
-		<!-- 2. ENDEREÇO COMPLETO DO USUÁRIO -->
+		<!-- ABA 2: ENDEREÇO COMPLETO DO USUÁRIO                                       -->
 		<!-- ========================================================================= -->
-		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
+		<section
+			class:hidden={abaAtiva !== 'endereco'}
+			class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4 animate-in fade-in duration-150"
+		>
 			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
 				<div class="flex items-center gap-2">
 					<MapPin class="w-4 h-4 text-red-500" />
@@ -628,13 +927,10 @@
 						2. Endereço Completo & Residência
 					</h2>
 				</div>
-				<span class="text-[10px] font-mono text-zinc-500">
-					Tabela Endereco_Usuario
-				</span>
+				<span class="text-[10px] font-mono text-zinc-500">Etapa 2 de 4</span>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-				<!-- CEP com busca rápida -->
 				<div>
 					<label for="cep" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						CEP (8 dígitos)
@@ -654,7 +950,7 @@
 							type="button"
 							onclick={consultarCep}
 							disabled={buscandoCep || cep.replace(/\D/g, '').length !== 8}
-							class="px-3 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-semibold transition-colors disabled:opacity-40"
+							class="px-3 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer"
 							title="Consultar endereço via CEP"
 						>
 							{#if buscandoCep}
@@ -669,7 +965,6 @@
 					{/if}
 				</div>
 
-				<!-- Logradouro (Rua / Av) -->
 				<div class="md:col-span-2">
 					<label for="logradouro" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Logradouro (Rua, Avenida, Alameda)
@@ -684,7 +979,6 @@
 					/>
 				</div>
 
-				<!-- Número -->
 				<div>
 					<label for="numero" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Número
@@ -699,7 +993,6 @@
 					/>
 				</div>
 
-				<!-- Complemento -->
 				<div>
 					<label for="complemento" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Complemento
@@ -714,7 +1007,6 @@
 					/>
 				</div>
 
-				<!-- Bairro -->
 				<div>
 					<label for="bairro" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Bairro
@@ -729,7 +1021,6 @@
 					/>
 				</div>
 
-				<!-- Cidade -->
 				<div class="md:col-span-2">
 					<label for="cidade" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						Cidade
@@ -744,7 +1035,6 @@
 					/>
 				</div>
 
-				<!-- UF -->
 				<div>
 					<label for="uf" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
 						UF (Estado)
@@ -760,113 +1050,211 @@
 					/>
 				</div>
 			</div>
-		</section>
 
-		<!-- ========================================================================= -->
-		<!-- 3. GESTÃO DE PERFIS ACUMULATIVOS (RBAC) -->
-		<!-- ========================================================================= -->
-		<section class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-4">
-			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
-				<div class="flex items-center gap-2">
-					<ShieldCheck class="w-4 h-4 text-red-500" />
-					<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
-						3. Perfis Acumulativos no Dojo
-					</h2>
-				</div>
-				<span class="text-[10px] font-mono text-zinc-500">
-					Selecione todos que se aplicam
-				</span>
-			</div>
-
-			<p class="text-xs text-zinc-400">
-				O usuário receberá a <strong>união cumulativa</strong> de todas as permissões dos papéis selecionados abaixo.
-			</p>
-
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-				{#each data.perfis as perfil}
-					{@const marcado = perfisSelecionados.includes(perfil.id_perfil)}
-					<label
-						class="p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none {marcado
-							? 'bg-red-950/30 border-red-800 text-white shadow-[0_0_12px_rgba(220,38,38,0.15)]'
-							: 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:border-zinc-700'}"
-					>
-						<input
-							type="checkbox"
-							name="idsPerfis"
-							value={perfil.id_perfil}
-							checked={marcado}
-							onchange={() => alternarPerfil(perfil.id_perfil)}
-							class="mt-0.5 rounded border-zinc-700 text-red-600 focus:ring-0 focus:ring-offset-0 bg-zinc-900"
-						/>
-						<div>
-							<span class="text-xs font-bold block {marcado ? 'text-red-400' : 'text-zinc-200'}">
-								{perfil.role}
-							</span>
-							<span class="text-[11px] text-zinc-500 block mt-0.5">
-								{#if perfil.role === 'Admin'}
-									Acesso total às configurações e equipe.
-								{:else if perfil.role === 'Professor'}
-									Tatame, faixas e turmas técnicas.
-								{:else if perfil.role === 'Recepção'}
-									Matrículas e inscrições de atletas.
-								{:else if perfil.role === 'Aluno'}
-									Perfil habilitado para judoca / atleta.
-								{:else if perfil.role === 'Responsável'}
-									Acompanhamento de dependentes menores.
-								{/if}
-							</span>
-						</div>
-					</label>
-				{/each}
+			<div class="pt-4 border-t border-zinc-900 flex items-center justify-between">
+				<button
+					type="button"
+					onclick={() => (abaAtiva = 'identificacao')}
+					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-300 transition-colors cursor-pointer"
+				>
+					<ArrowLeft class="w-3.5 h-3.5" />
+					<span>Anterior</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => (abaAtiva = 'perfis')}
+					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-white transition-colors cursor-pointer"
+				>
+					<span>Próxima Aba: Perfis & Dados Técnicos</span>
+					<ArrowRight class="w-3.5 h-3.5" />
+				</button>
 			</div>
 		</section>
 
 		<!-- ========================================================================= -->
-		<!-- 4. VÍNCULO DE RESPONSÁVEIS LEGAIS (EXCLUSIVO PARA MENORES DE 18 ANOS) -->
+		<!-- ABA 3: PERFIS ACUMULATIVOS & DADOS TÉCNICOS UNIFICADOS (PROFESSOR/ALUNO)  -->
 		<!-- ========================================================================= -->
-		{#if idadeCalculada !== null && idadeCalculada >= 18}
-			<section class="p-6 rounded-2xl bg-zinc-950/60 border border-zinc-900 space-y-2 opacity-80">
-				<div class="flex items-center gap-3">
-					<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500">
-						<Lock class="w-4 h-4 text-zinc-400" />
-					</div>
-					<div>
-						<div class="flex items-center gap-2">
-							<h2 class="text-sm font-bold text-zinc-300 uppercase tracking-wider font-mono">
-								4. Responsável Legal
-							</h2>
-							<span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-zinc-900 border border-zinc-800 text-zinc-400 font-bold">
-								Desabilitado ({idadeCalculada} anos)
-							</span>
-						</div>
-						<p class="text-xs text-zinc-500 mt-0.5">
-							Usuário maior de 18 anos. O vínculo de responsáveis é aplicável exclusivamente a dependentes e atletas menores de idade.
-						</p>
-					</div>
-				</div>
-			</section>
-		{:else if ehMenor}
-			<section class="p-6 rounded-2xl bg-amber-950/20 border-2 border-amber-800/80 shadow-[0_0_25px_rgba(217,119,6,0.08)] space-y-5">
-				<div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-amber-900/40 gap-2">
-					<div class="flex items-center gap-2.5">
-						<HeartHandshake class="w-4 h-4 text-amber-400" />
-						<h2 class="text-sm font-bold text-amber-300 uppercase tracking-wider font-mono">
-							4. Responsáveis Legais pelo Menor
+		<section
+			class:hidden={abaAtiva !== 'perfis'}
+			class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6 animate-in fade-in duration-150"
+		>
+			<div class="space-y-4">
+				<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+					<div class="flex items-center gap-2">
+						<ShieldCheck class="w-4 h-4 text-red-500" />
+						<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
+							3. Perfis Acumulativos no Dojo
 						</h2>
 					</div>
-					<span class="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-amber-950/80 border border-amber-700 text-amber-300 w-fit">
-						Exigência Legal • Menor ({idadeCalculada} anos)
+					<span class="text-[10px] font-mono text-zinc-500">Etapa 3 de 4</span>
+				</div>
+
+				<p class="text-xs text-zinc-400">
+					O usuário receberá a <strong>união cumulativa</strong> de todas as permissões dos papéis selecionados abaixo.
+				</p>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+					{#each data.perfis as perfil}
+						{@const marcado = perfisSelecionados.includes(perfil.id_perfil)}
+						<label
+							class="p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none {marcado
+								? 'bg-red-950/30 border-red-800 text-white shadow-[0_0_12px_rgba(220,38,38,0.15)]'
+								: 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:border-zinc-700'}"
+						>
+							<input
+								type="checkbox"
+								name="idsPerfis"
+								value={perfil.id_perfil}
+								checked={marcado}
+								onchange={() => alternarPerfil(perfil.id_perfil)}
+								class="mt-0.5 rounded border-zinc-700 text-red-600 focus:ring-0 focus:ring-offset-0 bg-zinc-900"
+							/>
+							<div>
+								<span class="text-xs font-bold block {marcado ? 'text-red-400' : 'text-zinc-200'}">
+									{perfil.role}
+								</span>
+								<span class="text-[11px] text-zinc-500 block mt-0.5">
+									{#if perfil.role === 'Admin'}
+										Acesso total às configurações e equipe.
+									{:else if perfil.role === 'Professor'}
+										Tatame, faixas e turmas técnicas.
+									{:else if perfil.role === 'Recepção'}
+										Matrículas e inscrições de atletas.
+									{:else if perfil.role === 'Aluno'}
+										Perfil habilitado para judoca / atleta.
+									{:else if perfil.role === 'Responsável'}
+										Acompanhamento de dependentes menores.
+									{/if}
+								</span>
+							</div>
+						</label>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Bloco Unificado de Graduação & Federação (Ativo quando Professor ou Aluno está marcado) -->
+			<div
+				class:hidden={!ehProfessorSelecionado && !ehAlunoSelecionado}
+				class="p-5 rounded-2xl bg-amber-950/15 border border-amber-900/40 space-y-4"
+			>
+				<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-amber-900/30">
+					<div class="flex items-center gap-2">
+						<Award class="w-4 h-4 text-amber-500" />
+						<h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider font-mono">
+							Credenciais Técnicas Sincronizadas (Graduação & Código FPJ/CBJ)
+						</h3>
+					</div>
+					<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/60 border border-amber-800/60 text-amber-300">
+						Sincronia Automática Professor ↔ Aluno ↔ Histórico
 					</span>
 				</div>
 
 				<p class="text-xs text-zinc-300">
-					Vincule um ou mais responsáveis legais (ex: Pai e Mãe) cadastrados no dojo. Menores de 18 anos exigem obrigatoriamente ao menos 1 responsável.
+					A faixa e o código federativo informados abaixo são sincronizados automaticamente entre a ficha de <strong>Sensei / Professor</strong>, a ficha técnica de <strong>Judoca (Aluno)</strong> e a linha do tempo de <strong>Histórico de Graduações</strong>.
 				</p>
 
-				<!-- Widget de Inclusão de Responsável -->
-				<div class="p-4 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-4">
-					<div class="text-[11px] font-mono text-zinc-400 uppercase font-semibold">
-						Adicionar Responsável à Lista
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+					<div class="space-y-2">
+						<label for="grauFaixa" class="text-[11px] font-mono uppercase text-zinc-400 block">
+							Graduação Atual (Faixa & Dan)
+						</label>
+						<select
+							id="grauFaixa"
+							name="grauFaixa"
+							bind:value={grauFaixaSelecionado}
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500 transition-colors"
+						>
+							{#each OPCOES_FAIXAS_CADASTRO as opt}
+								<option value={opt.valor}>{opt.rotulo}</option>
+							{/each}
+							{#if grauFaixaSelecionado && !LISTA_TODAS_FAIXAS_VALORES.includes(grauFaixaSelecionado)}
+								<option value={grauFaixaSelecionado}>{grauFaixaSelecionado}</option>
+							{/if}
+						</select>
+						<div class="pt-1">
+							<BadgeFaixa faixa={grauFaixaSelecionado} size="md" showLegend={true} />
+						</div>
+					</div>
+
+					<div>
+						<label for="nFederacao" class="text-[11px] font-mono uppercase text-zinc-400 block mb-2">
+							Código / Registro na Federação (FPJ / CBJ)
+						</label>
+						<input
+							type="text"
+							id="nFederacao"
+							name="nFederacao"
+							bind:value={nFederacaoValor}
+							placeholder="Ex: FPJ-12345"
+							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-amber-500 transition-colors"
+						/>
+						<p class="text-[11px] text-zinc-500 mt-1.5">
+							Utilizado tanto nas homologações de exames como Sensei quanto nas inscrições oficiais.
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<div class="pt-4 border-t border-zinc-900 flex items-center justify-between">
+				<button
+					type="button"
+					onclick={() => (abaAtiva = 'endereco')}
+					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-300 transition-colors cursor-pointer"
+				>
+					<ArrowLeft class="w-3.5 h-3.5" />
+					<span>Anterior</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => (abaAtiva = 'responsaveis')}
+					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-white transition-colors cursor-pointer"
+				>
+					<span>Próxima Aba: Responsáveis Legais</span>
+					<ArrowRight class="w-3.5 h-3.5" />
+				</button>
+			</div>
+		</section>
+
+		<!-- ========================================================================= -->
+		<!-- ABA 4: VÍNCULO DE RESPONSÁVEIS LEGAIS                                     -->
+		<!-- ========================================================================= -->
+		<section
+			class:hidden={abaAtiva !== 'responsaveis'}
+			class="p-6 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-5 animate-in fade-in duration-150"
+		>
+			<div class="flex items-center justify-between pb-3 border-b border-zinc-900">
+				<div class="flex items-center gap-2">
+					<HeartHandshake class="w-4 h-4 text-amber-400" />
+					<h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">
+						4. Vínculo de Responsáveis Legais
+					</h2>
+				</div>
+				<span class="text-[10px] font-mono text-zinc-500">Etapa 4 de 4</span>
+			</div>
+
+			{#if idadeCalculada !== null && idadeCalculada >= 18}
+				<div class="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800 flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+						<Lock class="w-4 h-4" />
+					</div>
+					<div>
+						<span class="text-xs font-bold text-zinc-200 block">
+							Usuário Maior de 18 Anos ({idadeCalculada} anos)
+						</span>
+						<p class="text-xs text-zinc-500 mt-0.5">
+							O vínculo de responsável legal aplica-se exclusivamente a menores de 18 anos. Você já pode concluir o cadastro abaixo.
+						</p>
+					</div>
+				</div>
+			{:else if ehMenor}
+				<div class="p-5 rounded-2xl bg-amber-950/20 border border-amber-800/70 space-y-4">
+					<div class="flex items-center justify-between gap-2 flex-wrap">
+						<span class="text-xs font-bold text-amber-300">
+							Exigência Legal para Menor de Idade ({idadeCalculada} anos)
+						</span>
+						<span class="text-[10px] font-mono text-amber-400">
+							Vincule ao menos 1 responsável cadastrado
+						</span>
 					</div>
 
 					<div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
@@ -882,7 +1270,7 @@
 								<option value="">Selecione o responsável cadastrado...</option>
 								{#each responsaveisDisponiveisParaAdicionar as r}
 									<option value={r.id_usuario}>
-										{r.nome} (CPF: {r.cpf_mascarado}){r.total_menores > 0 ? ` • ${r.total_menores} menor(es)` : ''}
+										{r.nome} (CPF: {r.cpf_mascarado})
 									</option>
 								{/each}
 							</select>
@@ -922,64 +1310,45 @@
 								type="button"
 								onclick={adicionarResponsavel}
 								disabled={!idResponsavelParaAdicionar}
-								class="w-full h-9 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:hover:bg-amber-600 text-white text-xs font-semibold transition-colors"
+								class="w-full h-9 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white text-xs font-semibold transition-colors cursor-pointer"
 							>
 								<Plus class="w-3.5 h-3.5" />
 								<span>Vincular</span>
 							</button>
 						</div>
 					</div>
-				</div>
-
-				<!-- Lista de Responsáveis Vinculados -->
-				<div class="space-y-2">
-					<div class="text-[11px] font-mono uppercase text-zinc-400 font-semibold flex items-center justify-between">
-						<span>Responsáveis Vinculados ao Menor ({responsaveisVinculados.length})</span>
-						{#if responsaveisVinculados.length === 0}
-							<span class="text-red-400 text-[10px]">* Pelo menos 1 obrigatório</span>
-						{/if}
-					</div>
 
 					{#if responsaveisVinculados.length > 0}
-						<div class="grid grid-cols-1 gap-2">
+						<div class="grid grid-cols-1 gap-2 pt-2">
 							{#each responsaveisVinculados as resp (resp.idResponsavel)}
 								<div class="p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between gap-3">
-									<div class="flex items-center gap-3">
-										<div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 shrink-0">
-											<HeartHandshake class="w-4 h-4 text-amber-400" />
-										</div>
-										<div>
-											<div class="flex items-center gap-2 flex-wrap">
-												<span class="text-xs font-bold text-white">{resp.nome}</span>
-												{#if resp.cpf_mascarado}
-													<span class="text-[10px] font-mono text-zinc-500">CPF: {resp.cpf_mascarado}</span>
-												{/if}
-												<span class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-zinc-800 border border-zinc-700 text-zinc-300">
-													{resp.grauParentesco}
-												</span>
-												{#if resp.financeiro}
-													<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/60 border border-emerald-800 text-emerald-400">
-														Financeiro
-													</span>
-												{/if}
-											</div>
-										</div>
+									<div class="flex items-center gap-2 flex-wrap">
+										<span class="text-xs font-bold text-white">{resp.nome}</span>
+										{#if resp.cpf_mascarado}
+											<span class="text-[10px] font-mono text-zinc-500">CPF: {resp.cpf_mascarado}</span>
+										{/if}
+										<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-zinc-300">
+											{resp.grauParentesco}
+										</span>
+										{#if resp.financeiro}
+											<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/60 border border-emerald-800 text-emerald-400">
+												Financeiro
+											</span>
+										{/if}
 									</div>
 
 									<div class="flex items-center gap-2 shrink-0">
 										<button
 											type="button"
 											onclick={() => alternarFinanceiroResponsavel(resp.idResponsavel)}
-											class="text-[10px] px-2 py-1 rounded-lg border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
-											title="Alternar se é o responsável financeiro"
+											class="text-[10px] px-2 py-1 rounded-lg border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
 										>
 											{resp.financeiro ? 'Desmarcar Financeiro' : 'Tornar Financeiro'}
 										</button>
 										<button
 											type="button"
 											onclick={() => removerResponsavel(resp.idResponsavel)}
-											class="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-950/40 transition-colors"
-											title="Remover este responsável"
+											class="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-950/40 transition-colors cursor-pointer"
 										>
 											<Trash2 class="w-4 h-4" />
 										</button>
@@ -990,84 +1359,40 @@
 					{:else}
 						<div class="p-4 rounded-xl bg-amber-950/30 border border-dashed border-amber-900/60 text-center">
 							<p class="text-xs text-amber-300 font-medium">
-								Nenhum responsável vinculado ainda. Selecione e clique em "+ Vincular" acima para adicionar.
+								Nenhum responsável vinculado ainda. Selecione acima e clique em "Vincular".
 							</p>
 						</div>
 					{/if}
 				</div>
-
-				<!-- Campo oculto para transmissão atômica de múltiplos responsáveis -->
-				<input type="hidden" name="responsaveisJson" value={JSON.stringify(responsaveisVinculados)} />
-				{#if responsaveisVinculados.length > 0}
-					<input type="hidden" name="idResponsavel" value={responsaveisVinculados[0].idResponsavel} />
-					<input type="hidden" name="responsavelParentesco" value={responsaveisVinculados[0].grauParentesco} />
-					<input type="hidden" name="responsavelFinanceiro" value={responsaveisVinculados[0].financeiro ? 'on' : ''} />
-				{/if}
-			</section>
-		{:else}
-			<section class="p-5 rounded-2xl bg-zinc-950/40 border border-dashed border-zinc-900 space-y-2">
-				<div class="flex items-center gap-3">
-					<div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500">
-						<Calendar class="w-4 h-4 text-zinc-500" />
-					</div>
-					<div>
-						<h2 class="text-sm font-bold text-zinc-400 uppercase tracking-wider font-mono">
-							4. Vínculo de Responsável Legal
-						</h2>
-						<p class="text-xs text-zinc-500 mt-0.5">
-							Preencha a data de nascimento no início do formulário para verificar a necessidade de responsável legal (exigência para menores de 18 anos).
-						</p>
-					</div>
+			{:else}
+				<div class="p-5 rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800 text-xs text-zinc-400">
+					Informe a <strong>Data de Nascimento</strong> na Aba 1 para verificar se o usuário é menor de 18 anos.
 				</div>
-			</section>
-		{/if}
+			{/if}
+
+			<input type="hidden" name="responsaveisJson" value={JSON.stringify(responsaveisVinculados)} />
+			{#if responsaveisVinculados.length > 0}
+				<input type="hidden" name="idResponsavel" value={responsaveisVinculados[0].idResponsavel} />
+				<input type="hidden" name="responsavelParentesco" value={responsaveisVinculados[0].grauParentesco} />
+				<input type="hidden" name="responsavelFinanceiro" value={responsaveisVinculados[0].financeiro ? 'on' : ''} />
+			{/if}
+
+			<div class="pt-4 border-t border-zinc-900 flex items-center justify-between">
+				<button
+					type="button"
+					onclick={() => (abaAtiva = 'perfis')}
+					class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-300 transition-colors cursor-pointer"
+				>
+					<ArrowLeft class="w-3.5 h-3.5" />
+					<span>Anterior</span>
+				</button>
+			</div>
+		</section>
 
 		<!-- ========================================================================= -->
-		<!-- 5. CAMPOS TÉCNICOS DE SENSEI (CONDICIONAL) -->
+		<!-- BARRA FIXA DE CONCLUSÃO DO CADASTRO                                       -->
 		<!-- ========================================================================= -->
-		{#if ehProfessorSelecionado}
-			<section class="p-6 rounded-2xl bg-amber-950/15 border border-amber-900/40 space-y-4 transition-all">
-				<div class="flex items-center gap-2 pb-3 border-b border-amber-900/30">
-					<Award class="w-4 h-4 text-amber-500" />
-					<h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider font-mono">
-						5. Dados Técnicos de Sensei / Professor
-					</h2>
-				</div>
-
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-					<div>
-						<label for="nFederacao" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-							Número da Federação (FPJ / CBJ)
-						</label>
-						<input
-							type="text"
-							id="nFederacao"
-							name="nFederacao"
-							value={form?.valores?.nFederacao || ''}
-							placeholder="Ex: FPJ-12345"
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:border-amber-500 transition-colors"
-						/>
-					</div>
-
-					<div>
-						<label for="grauFaixa" class="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
-							Graduação / Dan (Preta, Kodansha ou Vermelha)
-						</label>
-						<input
-							type="text"
-							id="grauFaixa"
-							name="grauFaixa"
-							value={form?.valores?.grauFaixa || ''}
-							placeholder="Ex: 1º a 5º Dan (Preta), 6º a 8º Dan (Kodansha), 9º ou 10º Dan (Vermelha)"
-							class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500 transition-colors"
-						/>
-					</div>
-				</div>
-			</section>
-		{/if}
-
-		<!-- Botões de Ação -->
-		<div class="flex items-center justify-end gap-3 pt-4">
+		<div class="flex items-center justify-between gap-3 pt-4 border-t border-zinc-900">
 			<a
 				href="/dashboard/usuarios"
 				class="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold transition-colors"

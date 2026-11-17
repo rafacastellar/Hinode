@@ -42,6 +42,7 @@ export const actions: Actions = {
 			statusFederacao: formData.get('statusFederacao'),
 			dataInicio: formData.get('dataInicio'),
 			dataPrimeiraGraduacao: formData.get('dataPrimeiraGraduacao'),
+			dataGraduacaoAtual: formData.get('dataGraduacaoAtual'),
 			graduacaoAtual: formData.get('graduacaoAtual'),
 			grupoEspecialAspirante: formData.get('grupoEspecialAspirante'),
 			idProfessorResponsavel: formData.get('idProfessorResponsavel')

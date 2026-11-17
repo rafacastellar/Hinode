@@ -46,6 +46,8 @@ export interface UsuarioResumoDojo {
 	ativo_no_dojo: boolean;
 	motivo_bloqueio_dojo?: string | null;
 	perfis: PerfilItem[];
+	graduacao_unificada?: string | null;
+	n_federacao_unificado?: string | null;
 	dados_professor: {
 		n_federacao: string | null;
 		grau_faixa: string | null;
@@ -74,6 +76,8 @@ export interface UsuarioDetalhadoDojo {
 	genero: 'M' | 'F';
 	idade: number;
 	telefone: string | null;
+	ativo_no_dojo: boolean;
+	motivo_bloqueio_dojo: string | null;
 	ids_perfis: number[];
 	perfis: PerfilItem[];
 	dados_professor: {
@@ -322,11 +326,14 @@ export async function listarUsuariosDoDojo(
 			u.telefone,
 			prof.n_federacao,
 			prof.grau_faixa,
+			al.graduacao_atual AS aluno_graduacao,
+			al.n_federacao AS aluno_n_federacao,
 			COALESCE(ua.ativo, 1) AS ativo_no_dojo,
 			ua.motivo_bloqueio AS motivo_bloqueio_dojo
 		FROM Usuario u
 		INNER JOIN Usuario_Academia ua ON ua.id_usuario = u.id_usuario
 		LEFT JOIN Professor prof ON prof.id_usuario = u.id_usuario
+		LEFT JOIN Aluno al ON al.id_usuario = u.id_usuario
 		WHERE ua.id_academia = ?
 	`;
 
@@ -392,6 +399,16 @@ export async function listarUsuariosDoDojo(
 			ativo_no_dojo: Number(u.ativo_no_dojo) === 1,
 			motivo_bloqueio_dojo: u.motivo_bloqueio_dojo ? String(u.motivo_bloqueio_dojo) : null,
 			perfis: mapaPerfis.get(idUser) || [],
+			graduacao_unificada: u.grau_faixa
+				? String(u.grau_faixa)
+				: u.aluno_graduacao
+					? String(u.aluno_graduacao)
+					: null,
+			n_federacao_unificado: u.n_federacao
+				? String(u.n_federacao)
+				: u.aluno_n_federacao
+					? String(u.aluno_n_federacao)
+					: null,
 			dados_professor: u.n_federacao || u.grau_faixa
 				? {
 					n_federacao: u.n_federacao ? String(u.n_federacao) : null,
@@ -424,6 +441,8 @@ export async function buscarUsuarioDetalhadoNoDojo(
 			u.genero,
 			TIMESTAMPDIFF(YEAR, u.data_nascimento, CURDATE()) AS idade,
 			u.telefone,
+			COALESCE(ua.ativo, 1) AS ativo_no_dojo,
+			ua.motivo_bloqueio AS motivo_bloqueio_dojo,
 			prof.n_federacao,
 			prof.grau_faixa
 		FROM Usuario u
@@ -577,6 +596,8 @@ export async function buscarUsuarioDetalhadoNoDojo(
 		genero: (u.genero || 'M') as 'M' | 'F',
 		idade: Number(u.idade),
 		telefone: u.telefone ? String(u.telefone) : null,
+		ativo_no_dojo: Number(u.ativo_no_dojo) === 1,
+		motivo_bloqueio_dojo: u.motivo_bloqueio_dojo ? String(u.motivo_bloqueio_dojo) : null,
 		ids_perfis: listaPerfis.map((p) => p.id_perfil),
 		perfis: listaPerfis,
 		dados_professor:

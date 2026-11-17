@@ -53,6 +53,10 @@ export const criarUsuarioSchema = z
 				message:
 					'A senha deve conter ao menos: 1 letra maiúscula, 1 minúscula, 1 número e 1 caractere especial (@$!%*?&#)'
 			}),
+		confirmacaoSenha: z
+			.string()
+			.nullish()
+			.transform((val) => val || ''),
 		telefone: z
 			.string()
 			.trim()
@@ -179,6 +183,14 @@ export const criarUsuarioSchema = z
 					path: ['paisOrigem']
 				});
 			}
+		}
+
+		if (dados.confirmacaoSenha && dados.senha !== dados.confirmacaoSenha) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'A confirmação de senha não confere com a senha digitada',
+				path: ['confirmacaoSenha']
+			});
 		}
 	});
 

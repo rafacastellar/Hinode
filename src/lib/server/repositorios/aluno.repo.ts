@@ -429,6 +429,15 @@ export async function atualizarAlunoEmTransacao(
 			idAluno
 		]
 	);
+
+	// Sincroniza automaticamente a tabela Professor caso este judoca também possua registro como Sensei
+	await conn.execute(
+		`UPDATE Professor
+		 SET grau_faixa = ?,
+		     n_federacao = COALESCE(?, n_federacao)
+		 WHERE id_usuario = ?`,
+		[dados.graduacaoAtual, dados.nFederacao || null, idAluno]
+	);
 }
 
 export interface HistoricoMudancaPesoItem {
@@ -441,19 +450,21 @@ export interface HistoricoMudancaPesoItem {
 	categoria_anterior: string | null;
 	categoria_nova: string | null;
 	data_alteracao: string;
+	data_iso: string;
 	origem: string;
 	nome_professor_responsavel?: string | null;
 }
 
 /**
- * Retorna o histórico de alterações de peso e recálculo de categoria dos alunos do dojo
- * nos últimos N dias (padrão: 30 dias).
+ * Retorna o histórico de alterações de peso e recálculo de categoria dos alunos do dojo.
+ * Se `dias` for informado (> 0), filtra pelos últimos N dias; caso contrário, retorna o histórico completo.
  */
 export async function obterHistoricoMudancasPeso(
 	idAcademia: number,
-	dias: number = 30
+	dias?: number | null
 ): Promise<HistoricoMudancaPesoItem[]> {
 	const pool = getDbPool();
+	const filtrarDias = typeof dias === 'number' && dias > 0;
 	const sqlLogs = `
 		SELECT 
 			l.id_log,
@@ -461,6 +472,7 @@ export async function obterHistoricoMudancasPeso(
 			l.dados_antes,
 			l.dados_depois,
 			DATE_FORMAT(l.criado_em, '%d/%m/%Y às %H:%i') AS data_alteracao,
+			DATE_FORMAT(l.criado_em, '%Y-%m-%d') AS data_iso,
 			u.nome AS nome_aluno,
 			COALESCE(a.graduacao_atual, 'Branca') AS graduacao_atual,
 			prof_u.nome AS nome_professor_responsavel
@@ -471,11 +483,12 @@ export async function obterHistoricoMudancasPeso(
 		LEFT JOIN Professor p ON p.id_usuario = a.id_professor_responsavel
 		LEFT JOIN Usuario prof_u ON prof_u.id_usuario = p.id_usuario
 		WHERE l.id_academia = ? AND ua.id_academia = ? AND l.acao = 'MUDANCA_PESO_CATEGORIA'
-		  AND l.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY)
+		  ${filtrarDias ? 'AND l.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY)' : ''}
 		ORDER BY l.criado_em DESC
 	`;
 
-	const [rowsLogs] = await pool.execute<RowDataPacket[]>(sqlLogs, [idAcademia, idAcademia, dias]);
+	const params: any[] = filtrarDias ? [idAcademia, idAcademia, dias] : [idAcademia, idAcademia];
+	const [rowsLogs] = await pool.execute<RowDataPacket[]>(sqlLogs, params);
 
 	return rowsLogs.map((r) => {
 		let antes: any = {};
@@ -495,6 +508,7 @@ export async function obterHistoricoMudancasPeso(
 			categoria_anterior: antes.categoria || null,
 			categoria_nova: depois.categoria || null,
 			data_alteracao: String(r.data_alteracao),
+			data_iso: String(r.data_iso),
 			origem: depois.origem || 'Perfil do Aluno',
 			nome_professor_responsavel: r.nome_professor_responsavel ? String(r.nome_professor_responsavel) : null
 		};

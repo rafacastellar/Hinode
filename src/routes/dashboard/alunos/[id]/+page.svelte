@@ -44,6 +44,7 @@
 	let statusFederacao = $state('Ativo');
 	let dataInicio = $state('');
 	let dataPrimeiraGraduacao = $state('');
+	let dataGraduacaoAtual = $state('');
 	let graduacaoSelecionada = $state('Branca');
 	let grupoEspecialAspirante = $state('');
 	let idProfessorResponsavel = $state<number | ''>('');
@@ -79,6 +80,7 @@
 		statusFederacao = data.aluno.status_federacao || 'Ativo';
 		dataInicio = data.aluno.data_inicio || '';
 		dataPrimeiraGraduacao = data.aluno.data_primeira_graduacao || '';
+		dataGraduacaoAtual = data.dataUltimaGraduacaoIso || data.aluno.data_primeira_graduacao || data.aluno.data_inicio || '';
 		graduacaoSelecionada = normalizarFaixaParaCadastro(data.aluno.graduacao_atual) || 'Branca';
 		grupoEspecialAspirante = data.aluno.grupo_especial_aspirante || '';
 		idProfessorResponsavel = data.aluno.id_professor_responsavel || '';
@@ -661,6 +663,28 @@
 						bind:value={dataPrimeiraGraduacao}
 						class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 					/>
+				</div>
+
+				<!-- Data da Graduação Atual (Sincronizada com Historico_Graduacao) -->
+				<div class="sm:col-span-2">
+					<label
+						for="dataGraduacaoAtual"
+						class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+					>
+						Data da Graduação Atual ({graduacaoSelecionada})
+					</label>
+					<div class="flex flex-col sm:flex-row sm:items-center gap-3">
+						<input
+							type="date"
+							id="dataGraduacaoAtual"
+							name="dataGraduacaoAtual"
+							bind:value={dataGraduacaoAtual}
+							class="w-full sm:max-w-xs px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+						/>
+						<p class="text-[11px] text-zinc-400">
+							Caso a faixa <strong class="text-white">{graduacaoSelecionada}</strong> ainda não conste no histórico de faixas do judoca, ela será gravada automaticamente ao salvar.
+						</p>
+					</div>
 				</div>
 			</div>
 		</div>

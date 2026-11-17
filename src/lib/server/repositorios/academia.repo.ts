@@ -66,6 +66,7 @@ export interface ItemLogAuditoria {
 	dados_depois: any;
 	ip: string | null;
 	criado_em_formatado: string;
+	data_iso: string;
 }
 
 export interface AtualizarDadosAcademiaInput {
@@ -249,10 +250,10 @@ export async function buscarEstatisticasSeguranca(
  */
 export async function listarLogsAuditoria(
 	idAcademia: number,
-	limite: number = 25
+	limite: number = 200
 ): Promise<ItemLogAuditoria[]> {
 	const pool = getDbPool();
-	const limiteSeguro = Math.min(Math.max(limite, 5), 100);
+	const limiteSeguro = Math.min(Math.max(limite, 5), 500);
 
 	const [rows] = await pool.query<RowDataPacket[]>(
 		`SELECT 
@@ -266,7 +267,8 @@ export async function listarLogsAuditoria(
 			l.dados_antes,
 			l.dados_depois,
 			l.ip,
-			DATE_FORMAT(l.criado_em, '%d/%m/%Y %H:%i:%s') AS criado_em_formatado
+			DATE_FORMAT(l.criado_em, '%d/%m/%Y %H:%i:%s') AS criado_em_formatado,
+			DATE_FORMAT(l.criado_em, '%Y-%m-%d') AS data_iso
 		FROM Log_Auditoria l
 		LEFT JOIN Usuario u ON u.id_usuario = l.id_usuario
 		WHERE l.id_academia = ?
@@ -286,7 +288,8 @@ export async function listarLogsAuditoria(
 		dados_antes: r.dados_antes,
 		dados_depois: r.dados_depois,
 		ip: r.ip ? String(r.ip) : null,
-		criado_em_formatado: String(r.criado_em_formatado)
+		criado_em_formatado: String(r.criado_em_formatado),
+		data_iso: String(r.data_iso)
 	}));
 }
 

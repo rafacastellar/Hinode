@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { PageData, ActionData } from './$types';
-	import { enhance } from '$app/forms';
+	import type { PageData, ActionData } from "./$types";
+	import { enhance } from "$app/forms";
 	import {
 		User,
 		HeartHandshake,
@@ -18,63 +18,78 @@
 		UserPlus,
 		Phone,
 		Mail,
-		Calendar
-	} from '@lucide/svelte';
-	import BadgeFaixa from '#lib/components/ui/BadgeFaixa.svelte';
-	import { obterClassificacaoJudo } from '#lib/dominio/regras-categoria-peso';
-	import { OPCOES_FAIXAS_CADASTRO, LISTA_TODAS_FAIXAS_VALORES, normalizarFaixaParaCadastro } from '#lib/dominio/graduacao';
+		Calendar,
+	} from "@lucide/svelte";
+	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
+	import { obterClassificacaoJudo } from "#lib/dominio/regras-categoria-peso";
+	import {
+		OPCOES_FAIXAS_CADASTRO,
+		LISTA_TODAS_FAIXAS_VALORES,
+		normalizarFaixaParaCadastro,
+	} from "#lib/dominio/graduacao";
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	type Candidato = PageData['candidatos'][number];
+	type Candidato = PageData["candidatos"][number];
 
 	let carregando = $state(false);
 
 	// =========================================================================
 	// ESTADO: LOCALIZAÇÃO DO USUÁRIO (PERFIL ALUNO)
 	// =========================================================================
-	let termoBusca = $state('');
+	let termoBusca = $state("");
 	let listarTodos = $state(false);
 	let idSelecionado = $state<number | null>(null);
 
 	const selecionado = $derived<Candidato | null>(
-		idSelecionado ? (data.candidatos.find((c) => c.id_usuario === idSelecionado) ?? null) : null
+		idSelecionado
+			? (data.candidatos.find((c) => c.id_usuario === idSelecionado) ??
+					null)
+			: null,
 	);
 
-	const totalDisponiveis = $derived(data.candidatos.filter((c) => !c.ja_matriculado).length);
+	const totalDisponiveis = $derived(
+		data.candidatos.filter((c) => !c.ja_matriculado).length,
+	);
 
 	// Filtro local por nome, CPF (dígitos), e-mail ou telefone
 	const resultados = $derived.by<Candidato[]>(() => {
 		const q = termoBusca.trim().toLowerCase();
 		if (q.length < 2) return listarTodos ? data.candidatos : [];
-		const digitos = q.replace(/\D/g, '');
+		const digitos = q.replace(/\D/g, "");
 		return data.candidatos.filter(
 			(c) =>
 				c.nome.toLowerCase().includes(q) ||
 				c.email.toLowerCase().includes(q) ||
 				(digitos.length >= 3 &&
-					(c.cpf.includes(digitos) || (c.telefone ?? '').replace(/\D/g, '').includes(digitos)))
+					(c.cpf.includes(digitos) ||
+						(c.telefone ?? "")
+							.replace(/\D/g, "")
+							.includes(digitos))),
 		);
 	});
 
-	const exibindoResultados = $derived(termoBusca.trim().length >= 2 || listarTodos);
+	const exibindoResultados = $derived(
+		termoBusca.trim().length >= 2 || listarTodos,
+	);
 
 	const ehMenor = $derived(selecionado ? selecionado.idade < 18 : false);
 	const menorSemResponsavel = $derived(
-		!!selecionado && ehMenor && selecionado.responsaveis.length === 0
+		!!selecionado && ehMenor && selecionado.responsaveis.length === 0,
 	);
 
 	// Campos técnicos do Judoca
-	let matricula = $state('');
-	let peso = $state('');
-	let categoria = $state('');
-	let nFederacao = $state('');
-	let statusFederacao = $state('Ativo');
-	let dataInicio = $state('');
-	let dataPrimeiraGraduacao = $state('');
-	let graduacaoSelecionada = $state('Branca');
-	let grupoEspecialAspirante = $state('');
-	let idProfessorResponsavel = $state<number | ''>('');
+	let matricula = $state("");
+	let peso = $state("");
+	let categoria = $state("");
+	let nFederacao = $state("");
+	let statusFederacao = $state("Ativo");
+	let dataInicio = $state("");
+	let dataPrimeiraGraduacao = $state("");
+	let dataGraduacaoAtual = $state("");
+	let graduacaoSelecionada = $state("Branca");
+	let grupoEspecialAspirante = $state("");
+	let idProfessorResponsavel = $state<number | "">("");
 	let categoriaEditadaManualmente = $state(false);
 
 	// Motor de Regras Oficiais CBJ/FPJ (Reativo)
@@ -84,7 +99,7 @@
 			dataNascimento: selecionado.data_nascimento,
 			genero: selecionado.genero,
 			peso: peso,
-			graduacao: graduacaoSelecionada
+			graduacao: graduacaoSelecionada,
 		});
 	});
 
@@ -93,7 +108,9 @@
 		if (classificacaoOficial && !categoriaEditadaManualmente) {
 			if (
 				classificacaoOficial.categoriaCompleta &&
-				!classificacaoOficial.categoriaCompleta.includes('Informe o peso')
+				!classificacaoOficial.categoriaCompleta.includes(
+					"Informe o peso",
+				)
 			) {
 				categoria = classificacaoOficial.categoriaCompleta;
 			}
@@ -108,7 +125,7 @@
 		categoriaEditadaManualmente = false;
 		if (
 			classificacaoOficial.categoriaCompleta &&
-			!classificacaoOficial.categoriaCompleta.includes('Informe o peso')
+			!classificacaoOficial.categoriaCompleta.includes("Informe o peso")
 		) {
 			categoria = classificacaoOficial.categoriaCompleta;
 		}
@@ -129,10 +146,16 @@
 		if (v.nFederacao) nFederacao = String(v.nFederacao);
 		if (v.statusFederacao) statusFederacao = String(v.statusFederacao);
 		if (v.dataInicio) dataInicio = String(v.dataInicio);
-		if (v.dataPrimeiraGraduacao) dataPrimeiraGraduacao = String(v.dataPrimeiraGraduacao);
-		if (v.graduacaoAtual) graduacaoSelecionada = normalizarFaixaParaCadastro(String(v.graduacaoAtual));
-		if (v.grupoEspecialAspirante) grupoEspecialAspirante = String(v.grupoEspecialAspirante);
-		if (v.idProfessorResponsavel) idProfessorResponsavel = Number(v.idProfessorResponsavel);
+		if (v.dataPrimeiraGraduacao)
+			dataPrimeiraGraduacao = String(v.dataPrimeiraGraduacao);
+		if (v.graduacaoAtual)
+			graduacaoSelecionada = normalizarFaixaParaCadastro(
+				String(v.graduacaoAtual),
+			);
+		if (v.grupoEspecialAspirante)
+			grupoEspecialAspirante = String(v.grupoEspecialAspirante);
+		if (v.idProfessorResponsavel)
+			idProfessorResponsavel = Number(v.idProfessorResponsavel);
 	});
 
 	const faixasDisponiveis = LISTA_TODAS_FAIXAS_VALORES;
@@ -147,7 +170,7 @@
 	}
 
 	function formatarData(iso: string) {
-		const [a, m, d] = iso.split('-');
+		const [a, m, d] = iso.split("-");
 		return a && m && d ? `${d}/${m}/${a}` : iso;
 	}
 </script>
@@ -169,22 +192,29 @@
 			href="/dashboard/alunos"
 			class="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors mb-4 group"
 		>
-			<ArrowLeft class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+			<ArrowLeft
+				class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5"
+			/>
 			<span>Voltar para Lista de Judocas</span>
 		</a>
 
 		<div class="flex items-center gap-2 mb-1">
-			<span class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold">
+			<span
+				class="text-xs font-mono uppercase tracking-wider text-red-500 font-bold"
+			>
 				Formulário de Matrícula
 			</span>
 		</div>
-		<h1 class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
+		<h1
+			class="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight"
+		>
 			Novo Judoca
 		</h1>
 		<p class="text-xs sm:text-sm text-zinc-400 mt-1">
-			Selecione um usuário já cadastrado com o perfil <strong class="text-zinc-200">Aluno</strong> e
-			informe os dados técnicos. Dados pessoais e responsáveis legais são gerenciados no cadastro de
-			usuários.
+			Selecione um usuário já cadastrado com o perfil <strong
+				class="text-zinc-200">Aluno</strong
+			> e informe os dados técnicos. Dados pessoais e responsáveis legais são
+			gerenciados no cadastro de usuários.
 		</p>
 	</div>
 
@@ -195,7 +225,9 @@
 		>
 			<AlertCircle class="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
 			<div class="min-w-0 flex-1">
-				<span class="font-bold block mb-0.5">Não foi possível salvar a matrícula:</span>
+				<span class="font-bold block mb-0.5"
+					>Não foi possível salvar a matrícula:</span
+				>
 				<p>{form.erro}</p>
 			</div>
 		</div>
@@ -213,13 +245,19 @@
 		class="space-y-8"
 	>
 		{#if selecionado}
-			<input type="hidden" name="idUsuario" value={selecionado.id_usuario} />
+			<input
+				type="hidden"
+				name="idUsuario"
+				value={selecionado.id_usuario}
+			/>
 		{/if}
 
 		<!-- ===================================================================== -->
 		<!-- 1. LOCALIZAR USUÁRIO COM PERFIL ALUNO -->
 		<!-- ===================================================================== -->
-		<section class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
+		<section
+			class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6"
+		>
 			<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
 				<div
 					class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
@@ -227,9 +265,12 @@
 					<User class="w-4 h-4 text-red-500" />
 				</div>
 				<div class="flex-1">
-					<h2 class="text-sm font-bold text-white font-display">1. Identificação do Judoca</h2>
+					<h2 class="text-sm font-bold text-white font-display">
+						1. Identificação do Judoca
+					</h2>
 					<p class="text-[11px] text-zinc-500">
-						{totalDisponiveis} usuário(s) com perfil Aluno aguardando matrícula
+						{totalDisponiveis} usuário(s) com perfil Aluno aguardando
+						matrícula
 					</p>
 				</div>
 			</div>
@@ -239,16 +280,22 @@
 				<div
 					class="p-5 rounded-xl bg-emerald-950/20 border border-emerald-800/70 space-y-4"
 				>
-					<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+					<div
+						class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+					>
 						<div class="flex items-start gap-3">
 							<div
 								class="w-10 h-10 rounded-xl bg-emerald-900/50 border border-emerald-700/60 flex items-center justify-center shrink-0"
 							>
-								<CheckCircle2 class="w-5 h-5 text-emerald-400" />
+								<CheckCircle2
+									class="w-5 h-5 text-emerald-400"
+								/>
 							</div>
 							<div>
 								<div class="flex items-center gap-2 flex-wrap">
-									<span class="font-bold text-white text-base">{selecionado.nome}</span>
+									<span class="font-bold text-white text-base"
+										>{selecionado.nome}</span
+									>
 									{#if ehMenor}
 										<span
 											class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-amber-950/70 border border-amber-700 text-amber-300"
@@ -266,10 +313,13 @@
 								<div
 									class="text-[11px] text-zinc-400 font-mono mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1"
 								>
-									<span>CPF: {selecionado.cpf_mascarado}</span>
+									<span>CPF: {selecionado.cpf_mascarado}</span
+									>
 									<span class="flex items-center gap-1">
 										<Calendar class="w-3 h-3" />
-										{formatarData(selecionado.data_nascimento)}
+										{formatarData(
+											selecionado.data_nascimento,
+										)}
 									</span>
 									<span class="flex items-center gap-1">
 										<Mail class="w-3 h-3" />
@@ -285,7 +335,9 @@
 							</div>
 						</div>
 
-						<div class="flex items-center gap-2 self-end sm:self-auto">
+						<div
+							class="flex items-center gap-2 self-end sm:self-auto"
+						>
 							{#if data.podeGerenciarUsuario}
 								<a
 									href="/dashboard/usuarios/{selecionado.id_usuario}"
@@ -310,14 +362,19 @@
 			{:else}
 				<!-- BUSCA / LISTAGEM -->
 				<div class="space-y-4">
-					<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+					<div
+						class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+					>
 						<div class="relative flex-1">
-							<Search class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+							<Search
+								class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2"
+							/>
 							<input
 								type="search"
 								id="busca-aluno"
 								bind:value={termoBusca}
-								onkeydown={(e) => e.key === 'Enter' && e.preventDefault()}
+								onkeydown={(e) =>
+									e.key === "Enter" && e.preventDefault()}
 								placeholder="Buscar por nome, CPF, e-mail ou telefone..."
 								autocomplete="off"
 								class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
@@ -332,7 +389,11 @@
 								: 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700'}"
 						>
 							<List class="w-4 h-4" />
-							<span>{listarTodos ? 'Ocultar lista' : `Listar todos (${data.candidatos.length})`}</span>
+							<span
+								>{listarTodos
+									? "Ocultar lista"
+									: `Listar todos (${data.candidatos.length})`}</span
+							>
 						</button>
 					</div>
 
@@ -341,9 +402,14 @@
 							<div
 								class="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs text-zinc-400 flex items-start gap-2.5"
 							>
-								<Info class="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+								<Info
+									class="w-4 h-4 text-zinc-500 shrink-0 mt-0.5"
+								/>
 								<div>
-									<p>Nenhum usuário com perfil Aluno encontrado.</p>
+									<p>
+										Nenhum usuário com perfil Aluno
+										encontrado.
+									</p>
 									{#if data.podeGerenciarUsuario}
 										<a
 											href="/dashboard/usuarios/novo"
@@ -353,8 +419,11 @@
 											Cadastrar usuário com perfil Aluno
 										</a>
 									{:else}
-										<p class="mt-1 text-[11px] text-zinc-500">
-											Solicite à administração o cadastro prévio do usuário no sistema.
+										<p
+											class="mt-1 text-[11px] text-zinc-500"
+										>
+											Solicite à administração o cadastro
+											prévio do usuário no sistema.
 										</p>
 									{/if}
 								</div>
@@ -370,8 +439,13 @@
 											: 'hover:bg-zinc-800/40'}"
 									>
 										<div class="min-w-0 flex-1 space-y-1">
-											<div class="flex items-center gap-2 flex-wrap">
-												<strong class="text-white text-xs sm:text-sm truncate">{c.nome}</strong>
+											<div
+												class="flex items-center gap-2 flex-wrap"
+											>
+												<strong
+													class="text-white text-xs sm:text-sm truncate"
+													>{c.nome}</strong
+												>
 												{#if c.idade < 18}
 													<span
 														class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-950/60 border border-amber-800/70 text-amber-300"
@@ -390,13 +464,19 @@
 											<div
 												class="text-[11px] text-zinc-400 font-mono flex flex-wrap gap-x-3 gap-y-0.5"
 											>
-												<span>CPF: {c.cpf_mascarado}</span>
+												<span
+													>CPF: {c.cpf_mascarado}</span
+												>
 												<span>{c.idade} anos</span>
 												<span>{c.email}</span>
 											</div>
 											{#if c.responsaveis.length > 0}
-												<div class="flex items-center gap-1.5 flex-wrap text-[10px]">
-													<HeartHandshake class="w-3 h-3 text-amber-400" />
+												<div
+													class="flex items-center gap-1.5 flex-wrap text-[10px]"
+												>
+													<HeartHandshake
+														class="w-3 h-3 text-amber-400"
+													/>
 													{#each c.responsaveis as r (r.id_responsavel)}
 														<span
 															class="px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-zinc-300"
@@ -406,8 +486,12 @@
 													{/each}
 												</div>
 											{:else if c.idade < 18}
-												<div class="flex items-center gap-1 text-[10px] text-red-400">
-													<ShieldAlert class="w-3 h-3" />
+												<div
+													class="flex items-center gap-1 text-[10px] text-red-400"
+												>
+													<ShieldAlert
+														class="w-3 h-3"
+													/>
 													Sem responsável vinculado
 												</div>
 											{/if}
@@ -429,7 +513,8 @@
 						{/if}
 					{:else}
 						<p class="text-[11px] text-zinc-500">
-							Digite ao menos 2 caracteres para buscar ou clique em <strong>Listar todos</strong>.
+							Digite ao menos 2 caracteres para buscar ou clique
+							em <strong>Listar todos</strong>.
 						</p>
 					{/if}
 				</div>
@@ -450,9 +535,14 @@
 						<HeartHandshake class="w-4 h-4 text-zinc-500" />
 					</div>
 					<div>
-						<h2 class="text-sm font-bold text-zinc-300 font-display">2. Responsáveis Legais</h2>
+						<h2
+							class="text-sm font-bold text-zinc-300 font-display"
+						>
+							2. Responsáveis Legais
+						</h2>
 						<p class="text-xs text-zinc-500 mt-0.5">
-							Judoca maior de idade — responsável legal não se aplica.
+							Judoca maior de idade — responsável legal não se
+							aplica.
 						</p>
 					</div>
 				</section>
@@ -469,11 +559,16 @@
 							<div
 								class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
 							>
-								<HeartHandshake class="w-4 h-4 text-amber-400" />
+								<HeartHandshake
+									class="w-4 h-4 text-amber-400"
+								/>
 							</div>
 							<div>
-								<h2 class="text-sm font-bold text-amber-300 font-display">
-									2. Responsáveis Legais Vinculados ({selecionado.responsaveis.length})
+								<h2
+									class="text-sm font-bold text-amber-300 font-display"
+								>
+									2. Responsáveis Legais Vinculados ({selecionado
+										.responsaveis.length})
 								</h2>
 								<p class="text-[11px] text-zinc-500">
 									Gerenciados no cadastro do usuário
@@ -495,10 +590,14 @@
 						<div
 							class="p-4 rounded-xl bg-red-950/40 border border-red-800/70 text-red-200 text-xs flex items-start gap-2.5"
 						>
-							<ShieldAlert class="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+							<ShieldAlert
+								class="w-4 h-4 text-red-400 shrink-0 mt-0.5"
+							/>
 							<p>
-								<strong>{selecionado.nome}</strong> é menor de idade e não possui responsável legal
-								vinculado. Vincule ao menos um responsável no cadastro do usuário para liberar a matrícula.
+								<strong>{selecionado.nome}</strong> é menor de idade
+								e não possui responsável legal vinculado. Vincule
+								ao menos um responsável no cadastro do usuário para
+								liberar a matrícula.
 							</p>
 						</div>
 					{:else}
@@ -510,12 +609,22 @@
 									<div
 										class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0"
 									>
-										<HeartHandshake class="w-4 h-4 text-amber-400" />
+										<HeartHandshake
+											class="w-4 h-4 text-amber-400"
+										/>
 									</div>
 									<div class="min-w-0 flex-1">
-										<div class="flex items-center gap-2 flex-wrap">
-											<span class="text-xs font-bold text-white">{r.nome}</span>
-											<span class="text-[10px] font-mono text-zinc-500">CPF: {r.cpf_mascarado}</span>
+										<div
+											class="flex items-center gap-2 flex-wrap"
+										>
+											<span
+												class="text-xs font-bold text-white"
+												>{r.nome}</span
+											>
+											<span
+												class="text-[10px] font-mono text-zinc-500"
+												>CPF: {r.cpf_mascarado}</span
+											>
 											<span
 												class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-zinc-300"
 											>
@@ -532,8 +641,11 @@
 										<div
 											class="text-[11px] text-zinc-400 font-mono mt-0.5 flex flex-wrap gap-x-3"
 										>
-											{#if r.telefone}<span>Tel: {r.telefone}</span>{/if}
-											{#if r.email}<span>{r.email}</span>{/if}
+											{#if r.telefone}<span
+													>Tel: {r.telefone}</span
+												>{/if}
+											{#if r.email}<span>{r.email}</span
+												>{/if}
 										</div>
 									</div>
 								</div>
@@ -546,16 +658,24 @@
 			<!-- ===================================================================== -->
 			<!-- 3. DADOS TÉCNICOS DE JUDÔ & TATAME -->
 			<!-- ===================================================================== -->
-			<section class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6">
-				<div class="flex items-center gap-3 pb-4 border-b border-zinc-900">
+			<section
+				class="p-6 sm:p-8 rounded-2xl bg-zinc-950 border border-zinc-900 space-y-6"
+			>
+				<div
+					class="flex items-center gap-3 pb-4 border-b border-zinc-900"
+				>
 					<div
 						class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center"
 					>
 						<Award class="w-4 h-4 text-red-500" />
 					</div>
 					<div>
-						<h2 class="text-sm font-bold text-white font-display">3. Dados Técnicos do Judô</h2>
-						<p class="text-[11px] text-zinc-500">Graduação, professor responsável e categoria</p>
+						<h2 class="text-sm font-bold text-white font-display">
+							3. Dados Técnicos do Judô
+						</h2>
+						<p class="text-[11px] text-zinc-500">
+							Graduação, professor responsável e categoria
+						</p>
 					</div>
 				</div>
 
@@ -577,7 +697,7 @@
 						<option value="">Selecione o Sensei...</option>
 						{#each data.professores as prof}
 							<option value={prof.id_usuario}>
-								{prof.nome} ({prof.grau_faixa || 'Sensei'})
+								{prof.nome} ({prof.grau_faixa || "Sensei"})
 							</option>
 						{/each}
 					</select>
@@ -585,10 +705,15 @@
 
 				<!-- 2ª Linha: Seletor de Faixa & Visualização com Legenda Oficial -->
 				<div>
-					<label for="graduacaoAtual" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+					<label
+						for="graduacaoAtual"
+						class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+					>
 						Graduação Atual (Faixa & Dan) *
 					</label>
-					<div class="flex flex-col sm:flex-row sm:items-center gap-3.5 p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/80">
+					<div
+						class="flex flex-col sm:flex-row sm:items-center gap-3.5 p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/80"
+					>
 						<select
 							id="graduacaoAtual"
 							name="graduacaoAtual"
@@ -600,19 +725,29 @@
 								<option value={opt.valor}>{opt.rotulo}</option>
 							{/each}
 							{#if graduacaoSelecionada && !LISTA_TODAS_FAIXAS_VALORES.includes(graduacaoSelecionada)}
-								<option value={graduacaoSelecionada}>{graduacaoSelecionada} (Atual)</option>
+								<option value={graduacaoSelecionada}
+									>{graduacaoSelecionada} (Atual)</option
+								>
 							{/if}
 						</select>
-						<div class="shrink-0 flex justify-center sm:justify-start">
-							<BadgeFaixa faixa={graduacaoSelecionada} size="md" showLegend={true} />
+						<div
+							class="shrink-0 flex justify-center sm:justify-start"
+						>
+							<BadgeFaixa
+								faixa={graduacaoSelecionada}
+								size="md"
+								showLegend={true}
+							/>
 						</div>
 					</div>
 				</div>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
 					<div>
-						<label for="matricula" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						<label
+							for="matricula"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
 							Matrícula no Dojo
 						</label>
 						<input
@@ -626,7 +761,10 @@
 					</div>
 
 					<div>
-						<label for="peso" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						<label
+							for="peso"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
 							Peso Atual (kg)
 						</label>
 						<input
@@ -642,15 +780,22 @@
 
 					<div>
 						<div class="flex items-center justify-between mb-1.5">
-							<label for="categoria" class="block text-xs font-mono uppercase text-zinc-400">
+							<label
+								for="categoria"
+								class="block text-xs font-mono uppercase text-zinc-400"
+							>
 								Categoria de Peso / Idade
 							</label>
 							{#if classificacaoOficial && !categoriaEditadaManualmente && categoria}
-								<span class="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/50">
+								<span
+									class="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/50"
+								>
 									<Check class="w-3 h-3" /> CBJ Oficial
 								</span>
 							{:else if categoriaEditadaManualmente}
-								<span class="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50">
+								<span
+									class="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50"
+								>
 									Customizado
 								</span>
 							{/if}
@@ -670,25 +815,53 @@
 
 					<!-- Card Dinâmico de Classificação CBJ / FPJ -->
 					{#if classificacaoOficial && selecionado}
-						<div class="col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-red-950/20 border border-red-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all animate-in fade-in duration-200">
+						<div
+							class="col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-red-950/20 border border-red-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all animate-in fade-in duration-200"
+						>
 							<div class="space-y-1">
 								<div class="flex items-center gap-2 flex-wrap">
-									<span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+									<span
+										class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-red-500/20 text-red-400 border border-red-500/30"
+									>
 										Classificação Oficial CBJ
 									</span>
-									<span class="text-xs font-semibold text-white">
-										{classificacaoOficial.classeNome} ({selecionado.genero === 'F' ? 'Feminino' : 'Masculino'})
+									<span
+										class="text-xs font-semibold text-white"
+									>
+										{classificacaoOficial.classeNome} ({selecionado.genero ===
+										"F"
+											? "Feminino"
+											: "Masculino"})
 									</span>
 								</div>
-								<div class="text-xs text-zinc-300 flex items-center gap-2 flex-wrap">
-									<span>Categoria: <strong class="text-amber-300">{classificacaoOficial.categoriaCompleta}</strong></span>
+								<div
+									class="text-xs text-zinc-300 flex items-center gap-2 flex-wrap"
+								>
+									<span
+										>Categoria: <strong
+											class="text-amber-300"
+											>{classificacaoOficial.categoriaCompleta}</strong
+										></span
+									>
 									<span class="text-zinc-600">•</span>
-									<span>Divisão Regulamentar: <strong class="text-emerald-400">{classificacaoOficial.divisao}</strong></span>
+									<span
+										>Divisão Regulamentar: <strong
+											class="text-emerald-400"
+											>{classificacaoOficial.divisao}</strong
+										></span
+									>
 								</div>
 								{#if classificacaoOficial.mensagensAviso.length > 0}
-									<p class="text-[11px] text-zinc-400 flex items-center gap-1.5 mt-0.5">
-										<Info class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-										<span>{classificacaoOficial.mensagensAviso[0]}</span>
+									<p
+										class="text-[11px] text-zinc-400 flex items-center gap-1.5 mt-0.5"
+									>
+										<Info
+											class="w-3.5 h-3.5 text-zinc-400 shrink-0"
+										/>
+										<span
+											>{classificacaoOficial
+												.mensagensAviso[0]}</span
+										>
 									</p>
 								{/if}
 							</div>
@@ -705,7 +878,10 @@
 					{/if}
 
 					<div>
-						<label for="nFederacao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						<label
+							for="nFederacao"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
 							Nº de Registro Federativo (FPJ/CBJ)
 						</label>
 						<input
@@ -719,7 +895,10 @@
 					</div>
 
 					<div>
-						<label for="statusFederacao" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						<label
+							for="statusFederacao"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
 							Status na Federação
 						</label>
 						<select
@@ -747,14 +926,19 @@
 							bind:value={grupoEspecialAspirante}
 							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 						>
-							<option value="">Não classificado / Tradicional</option>
+							<option value=""
+								>Não classificado / Tradicional</option
+							>
 							<option value="Aspirante">Aspirante</option>
 							<option value="Especial">Especial</option>
 						</select>
 					</div>
 
 					<div>
-						<label for="dataInicio" class="block text-xs font-mono uppercase text-zinc-400 mb-1.5">
+						<label
+							for="dataInicio"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
 							Data de Início no Tatame
 						</label>
 						<input
@@ -771,7 +955,7 @@
 							for="dataPrimeiraGraduacao"
 							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
 						>
-							Data da 1ª Graduação (Faixa)
+							(Faixa Branca)
 						</label>
 						<input
 							type="date"
@@ -781,6 +965,36 @@
 							class="w-full px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
 						/>
 					</div>
+
+					<div class="sm:col-span-2">
+						<label
+							for="dataGraduacaoAtual"
+							class="block text-xs font-mono uppercase text-zinc-400 mb-1.5"
+						>
+							Data da Graduação Atual ({graduacaoSelecionada}) —
+							Registro automático no Histórico de Faixas
+						</label>
+						<div
+							class="flex flex-col sm:flex-row sm:items-center gap-3"
+						>
+							<input
+								type="date"
+								id="dataGraduacaoAtual"
+								name="dataGraduacaoAtual"
+								bind:value={dataGraduacaoAtual}
+								class="w-full sm:max-w-xs px-4 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+							/>
+							<p class="text-[11px] text-zinc-400">
+								Ao confirmar a matrícula, o sistema gravará
+								automaticamente a faixa <strong
+									class="text-white"
+									>{graduacaoSelecionada}</strong
+								> na linha do tempo de graduações do judoca (usando
+								esta data, a data da 1ª graduação/início ou a data
+								de hoje).
+							</p>
+						</div>
+					</div>
 				</div>
 			</section>
 		{/if}
@@ -788,7 +1002,9 @@
 		<!-- ========================================================================= -->
 		<!-- AÇÕES DE SUBMISSÃO -->
 		<!-- ========================================================================= -->
-		<div class="flex items-center justify-end gap-4 pt-4 border-t border-zinc-900">
+		<div
+			class="flex items-center justify-end gap-4 pt-4 border-t border-zinc-900"
+		>
 			<a
 				href="/dashboard/alunos"
 				class="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs sm:text-sm font-medium transition-colors"
@@ -803,7 +1019,8 @@
 				class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
 			>
 				{#if carregando}
-					<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+					<span
+						class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
 					></span>
 					<span>Gravando Matrícula...</span>
 				{:else}
