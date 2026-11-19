@@ -21,12 +21,17 @@ export interface MetricasDojo {
 		nome: string;
 		edicao: string | null;
 		data_inicio: string | null;
+		data_inicio_iso?: string | null;
+		dias_restantes?: number | null;
 		faixa_inicio?: string | null;
 		faixa_fim?: string | null;
 		limite_graduacao?: string | null;
 		limite_grupo?: string | null;
 		valor_inscricao?: number | null;
 		eh_campeonato: boolean;
+		inscrito?: boolean;
+		status_inscricao?: string | null;
+		confirmado_atleta?: boolean;
 	}>;
 }
 
@@ -295,14 +300,14 @@ function formatarDataIsoParaBr(iso: string | null): string | null {
 
 function inferirTipoMedalha(classificacao: string): 'ouro' | 'prata' | 'bronze' | 'participacao' {
 	const c = classificacao.toLowerCase();
-	if (c.includes('ouro') || c.includes('1º') || c.includes('1°') || c.includes('campeão') || c.includes('campeao')) {
-		return 'ouro';
-	}
-	if (c.includes('prata') || c.includes('2º') || c.includes('2°') || c.includes('vice')) {
+	if (c.includes('prata') || c.includes('2º') || c.includes('2°') || c.includes('vice') || c.includes('segundo')) {
 		return 'prata';
 	}
 	if (c.includes('bronze') || c.includes('3º') || c.includes('3°') || c.includes('terceiro')) {
 		return 'bronze';
+	}
+	if (c.includes('ouro') || c.includes('1º') || c.includes('1°') || c.includes('campeão') || c.includes('campeao')) {
+		return 'ouro';
 	}
 	return 'participacao';
 }
@@ -755,10 +760,70 @@ export async function obterPainelJudoca(
 		return 0;
 	});
 
-	const [presencas, metricasPresenca] = await Promise.all([
+	const [presencas, metricasPresenca, linhasEventosJudoca] = await Promise.all([
 		listarHistoricoPresencasAluno(idAcademia, idUsuario, 180),
-		obterMetricasDetalhadasPresencaAluno(idAcademia, idUsuario)
+		obterMetricasDetalhadasPresencaAluno(idAcademia, idUsuario),
+		pool
+			.execute<RowDataPacket[]>(
+				`
+				SELECT 
+					e.id_evento,
+					e.nome,
+					e.edicao,
+					DATE_FORMAT(e.data_inicio, '%d/%m/%Y') AS data_inicio,
+					DATE_FORMAT(e.data_inicio, '%Y-%m-%d') AS data_inicio_iso,
+					DATEDIFF(e.data_inicio, CURDATE()) AS dias_restantes,
+					COALESCE(c.faixa_inicio, ge.faixa_inicio) AS faixa_inicio,
+					COALESCE(c.faixa_fim, ge.faixa_fim) AS faixa_fim,
+					c.limite_graduacao,
+					c.limite_grupo,
+					COALESCE(c.valor_inscricao, ge.taxa_graduacao) AS valor_inscricao,
+					(c.id_evento IS NOT NULL) AS eh_campeonato,
+					(ie.id_inscricao IS NOT NULL) AS inscrito,
+					ie.status_inscricao,
+					COALESCE(ie.confirmado_atleta, 0) AS confirmado_atleta
+				FROM Evento e
+				LEFT JOIN Campeonato c ON e.id_evento = c.id_evento
+				LEFT JOIN Graduacao_Evento ge ON e.id_evento = ge.id_evento
+				LEFT JOIN Inscricao_Evento ie ON ie.id_evento = e.id_evento 
+					AND ie.id_aluno = ? 
+					AND COALESCE(ie.status_inscricao, '') != 'Cancelada'
+				WHERE e.id_academia = ?
+				  AND (e.data_inicio >= DATE_SUB(CURDATE(), INTERVAL 180 DAY) OR e.data_inicio IS NULL)
+				ORDER BY 
+					(e.data_inicio >= CURDATE()) DESC,
+					(ie.id_inscricao IS NOT NULL) DESC,
+					e.data_inicio ASC
+				LIMIT 50
+				`,
+				[idUsuario, idAcademia]
+			)
+			.then(([rows]) => rows)
 	]);
+
+	const proximosEventosJudoca = linhasEventosJudoca.map((linha) => ({
+		id_evento: Number(linha.id_evento),
+		nome: String(linha.nome),
+		edicao: linha.edicao ? String(linha.edicao) : null,
+		data_inicio: linha.data_inicio ? String(linha.data_inicio) : null,
+		data_inicio_iso: linha.data_inicio_iso ? String(linha.data_inicio_iso) : null,
+		dias_restantes:
+			linha.dias_restantes !== null && linha.dias_restantes !== undefined
+				? Number(linha.dias_restantes)
+				: null,
+		faixa_inicio: linha.faixa_inicio ? String(linha.faixa_inicio) : null,
+		faixa_fim: linha.faixa_fim ? String(linha.faixa_fim) : null,
+		limite_graduacao: linha.limite_graduacao ? String(linha.limite_graduacao) : null,
+		limite_grupo: linha.limite_grupo ? String(linha.limite_grupo) : null,
+		valor_inscricao:
+			linha.valor_inscricao !== null && linha.valor_inscricao !== undefined
+				? Number(linha.valor_inscricao)
+				: null,
+		eh_campeonato: Boolean(linha.eh_campeonato),
+		inscrito: Boolean(linha.inscrito),
+		status_inscricao: linha.status_inscricao ? String(linha.status_inscricao) : null,
+		confirmado_atleta: Boolean(linha.confirmado_atleta)
+	}));
 
 	return {
 		judoca: {
@@ -800,7 +865,7 @@ export async function obterPainelJudoca(
 		treinosInscritos,
 		conquistas,
 		graduacoes,
-		proximosEventos: metricasDojoGeral.proximosEventos,
+		proximosEventos: proximosEventosJudoca,
 		pendencias,
 		presencas,
 		metricasPresenca

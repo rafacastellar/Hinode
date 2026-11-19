@@ -151,14 +151,14 @@
 
 	function classificarMedalha(texto: string): 'ouro' | 'prata' | 'bronze' | null {
 		const norm = normalizarTexto(texto);
-		if (norm.includes('ouro') || norm.includes('campeao') || norm.includes('1o') || norm.includes('1º')) {
-			return 'ouro';
-		}
-		if (norm.includes('prata') || norm.includes('2o') || norm.includes('2º')) {
+		if (norm.includes('prata') || norm.includes('vice') || norm.includes('2o') || norm.includes('2º') || norm.includes('2°')) {
 			return 'prata';
 		}
-		if (norm.includes('bronze') || norm.includes('3o') || norm.includes('3º')) {
+		if (norm.includes('bronze') || norm.includes('3o') || norm.includes('3º') || norm.includes('3°')) {
 			return 'bronze';
+		}
+		if (norm.includes('ouro') || norm.includes('campeao') || norm.includes('1o') || norm.includes('1º') || norm.includes('1°')) {
+			return 'ouro';
 		}
 		return null;
 	}

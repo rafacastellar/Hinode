@@ -165,12 +165,17 @@ export async function listarCampeonatosDoDojo(
 			(
 				SELECT COUNT(*) 
 				FROM Classificacao cl 
-				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Ouro%' OR cl.classificacao_aluno LIKE '%Campeão%' OR cl.classificacao_aluno LIKE '%1º%')
+				WHERE cl.id_campeonato = e.id_evento AND (
+					cl.classificacao_aluno LIKE '%Ouro%' 
+					OR cl.classificacao_aluno LIKE '%1º%' 
+					OR cl.classificacao_aluno LIKE '%1°%' 
+					OR (cl.classificacao_aluno LIKE '%Campeão%' AND cl.classificacao_aluno NOT LIKE '%Vice%' AND cl.classificacao_aluno NOT LIKE '%Prata%')
+				)
 			) AS total_ouro,
 			(
 				SELECT COUNT(*) 
 				FROM Classificacao cl 
-				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Prata%' OR cl.classificacao_aluno LIKE '%2º%')
+				WHERE cl.id_campeonato = e.id_evento AND (cl.classificacao_aluno LIKE '%Prata%' OR cl.classificacao_aluno LIKE '%Vice%' OR cl.classificacao_aluno LIKE '%2º%' OR cl.classificacao_aluno LIKE '%2°%')
 			) AS total_prata,
 			(
 				SELECT COUNT(*) 
