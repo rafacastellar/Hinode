@@ -20,6 +20,7 @@
 		Calendar,
 		X,
 		Sparkles,
+		ChevronDown,
 	} from "@lucide/svelte";
 
 	interface Props {
@@ -27,6 +28,7 @@
 		pendenciasJudoca?: PendenciaJudoca[] | null;
 		nomeJudocaAlvo?: string | null;
 		escopo?: "geral" | "tutela" | "responsavel" | "aluno";
+		modo?: "topbar" | "barra" | "mobile";
 		onSelecionarAluno?: (idAluno: number) => void;
 	}
 
@@ -35,8 +37,11 @@
 		pendenciasJudoca = null,
 		nomeJudocaAlvo = null,
 		escopo = "geral",
+		modo = "topbar",
 		onSelecionarAluno,
 	}: Props = $props();
+
+	let expandidoMobile = $state(false);
 
 	type ChaveAlertaPopup =
 		| "virada_temporada"
@@ -45,6 +50,8 @@
 		| "campeonatos_autorizacao"
 		| "federacao_pendente"
 		| "mudancas_peso"
+		| "judoca_campeonatos"
+		| "judoca_exames"
 		| `judoca_${string}`;
 
 	let popupAtivo = $state<ChaveAlertaPopup | null>(null);
@@ -70,6 +77,23 @@
 	// Lista de pendências individuais do judoca (Aluno ou Dependente selecionado)
 	const listaPendenciasJudoca = $derived(pendenciasJudoca || []);
 
+	// Agrupamento de campeonatos do judoca (ações de aceite do atleta e autorizações familiares)
+	const pendenciasCampeonatosJudoca = $derived(
+		listaPendenciasJudoca.filter((p) => p.tipo === "confirmacao_campeonato"),
+	);
+
+	// Agrupamento de exames elegíveis do judoca
+	const pendenciasExamesJudoca = $derived(
+		listaPendenciasJudoca.filter((p) => p.tipo === "exame_elegivel"),
+	);
+
+	// Outras pendências individuais do judoca (sem turma, peso categoria, federação, etc.)
+	const outrasPendenciasJudoca = $derived(
+		listaPendenciasJudoca.filter(
+			(p) => p.tipo !== "confirmacao_campeonato" && p.tipo !== "exame_elegivel",
+		),
+	);
+
 	const totalAlertasAtivos = $derived(
 		qtdViradaTemporada +
 			qtdSemPeso +
@@ -91,6 +115,7 @@
 	// Pendência individual selecionada quando o popup é de um item `PendenciaJudoca`
 	const pendenciaJudocaSelecionada = $derived.by(() => {
 		if (!popupAtivo || !popupAtivo.startsWith("judoca_")) return null;
+		if (popupAtivo === "judoca_campeonatos" || popupAtivo === "judoca_exames") return null;
 		const idAlvo = popupAtivo.replace("judoca_", "");
 		return listaPendenciasJudoca.find((p) => p.id === idAlvo) || null;
 	});
@@ -100,239 +125,408 @@
 	onkeydown={(e) => e.key === "Escape" && popupAtivo && fecharPopup()}
 />
 
+{#snippet botoesAlertas(compacto: boolean = false)}
+	<!-- 1. Virada de Temporada CBJ/FPJ -->
+	{#if qtdViradaTemporada > 0 && pendenciasTecnicas?.viradaTemporada}
+		<button
+			type="button"
+			onclick={() => abrirPopup("virada_temporada")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {popupAtivo ===
+			'virada_temporada'
+				? 'bg-amber-500 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-300'
+				: 'bg-amber-950/70 hover:bg-amber-900/80 border border-amber-700/70 text-amber-200'}"
+			title="Clique para abrir detalhes da Virada de Temporada"
+		>
+			<CalendarDays class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
+			<span>Temporada {pendenciasTecnicas.viradaTemporada.anoVigente}</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
+				'virada_temporada'
+					? 'bg-zinc-950 text-amber-400'
+					: 'bg-amber-500 text-zinc-950'}"
+			>
+				{qtdViradaTemporada}
+			</span>
+		</button>
+	{/if}
+
+	<!-- 2. Autorizações de Campeonato Pendentes -->
+	{#if qtdAutorizacoes > 0}
+		<button
+			type="button"
+			onclick={() => abrirPopup("campeonatos_autorizacao")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {popupAtivo ===
+			'campeonatos_autorizacao'
+				? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)] ring-2 ring-purple-300'
+				: 'bg-purple-950/70 hover:bg-purple-900/80 border border-purple-700/70 text-purple-200'}"
+			title="Clique para ver autorizações de campeonato pendentes"
+		>
+			<Trophy class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
+			<span>Autorizações</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
+				'campeonatos_autorizacao'
+					? 'bg-zinc-950 text-purple-300'
+					: 'bg-purple-500 text-white'}"
+			>
+				{qtdAutorizacoes}
+			</span>
+		</button>
+	{/if}
+
+	<!-- 3. Alunos Sem Peso Cadastrado -->
+	{#if qtdSemPeso > 0}
+		<button
+			type="button"
+			onclick={() => abrirPopup("sem_peso")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {popupAtivo ===
+			'sem_peso'
+				? 'bg-amber-500 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-300'
+				: 'bg-zinc-900 hover:bg-zinc-800 border border-amber-700/60 text-amber-300'}"
+			title="Clique para ver judocas com pesagem pendente"
+		>
+			<Scale class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
+			<span>Sem Peso</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
+				'sem_peso'
+					? 'bg-zinc-950 text-amber-400'
+					: 'bg-amber-500/20 border border-amber-500/40 text-amber-300'}"
+			>
+				{qtdSemPeso}
+			</span>
+		</button>
+	{/if}
+
+	<!-- 4. Alunos Sem Turma Vinculada -->
+	{#if qtdSemTurma > 0}
+		<button
+			type="button"
+			onclick={() => abrirPopup("sem_turma")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {popupAtivo ===
+			'sem_turma'
+				? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.45)] ring-2 ring-red-300'
+				: 'bg-red-950/60 hover:bg-red-900/70 border border-red-800/80 text-red-300'}"
+			title="Clique para ver judocas sem turma vinculada"
+		>
+			<Users class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
+			<span>Sem Turma</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
+				'sem_turma'
+					? 'bg-zinc-950 text-red-400'
+					: 'bg-red-600 text-white'}"
+			>
+				{qtdSemTurma}
+			</span>
+		</button>
+	{/if}
+
+	<!-- 5. Alunos com Federação Pendente -->
+	{#if qtdFederacao > 0}
+		<button
+			type="button"
+			onclick={() => abrirPopup("federacao_pendente")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {popupAtivo ===
+			'federacao_pendente'
+				? 'bg-sky-500 text-zinc-950 shadow-[0_0_15px_rgba(14,165,233,0.4)] ring-2 ring-sky-300'
+				: 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300'}"
+			title="Clique para ver judocas com federação pendente"
+		>
+			<Award class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-sky-400 shrink-0" />
+			<span>Federação</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
+				'federacao_pendente'
+					? 'bg-zinc-950 text-sky-400'
+					: 'bg-zinc-800 border border-zinc-700 text-zinc-300'}"
+			>
+				{qtdFederacao}
+			</span>
+		</button>
+	{/if}
+
+	<!-- 6. Mudanças Recentes de Peso (Últimos 30 dias) -->
+	{#if qtdMudancasPeso > 0}
+		<button
+			type="button"
+			onclick={() => abrirPopup("mudancas_peso")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {popupAtivo ===
+			'mudancas_peso'
+				? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)] ring-2 ring-emerald-300'
+				: 'bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-800/70 text-emerald-300'}"
+			title="Clique para ver histórico recente de alterações de peso"
+		>
+			<History class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
+			<span>Mudanças de Peso</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
+				'mudancas_peso'
+					? 'bg-zinc-950 text-emerald-400'
+					: 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'}"
+			>
+				{qtdMudancasPeso}
+			</span>
+		</button>
+	{/if}
+
+	<!-- 7. Campeonatos do Judoca (Agrupados com contador se houver múltiplos) -->
+	{#if pendenciasCampeonatosJudoca.length > 1}
+		{@const ativo = popupAtivo === "judoca_campeonatos"}
+		{@const temAcaoAtleta = pendenciasCampeonatosJudoca.some((p) => p.dependeDoAluno)}
+		<button
+			type="button"
+			onclick={() => abrirPopup("judoca_campeonatos")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {ativo
+				? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] ring-2 ring-red-300'
+				: temAcaoAtleta
+					? 'bg-red-950/80 hover:bg-red-900/90 border border-red-600/80 text-red-200 shadow-[0_0_12px_rgba(220,38,38,0.2)]'
+					: 'bg-zinc-900 hover:bg-zinc-800 border border-amber-700/60 text-amber-200'}"
+			title="Clique para ver {pendenciasCampeonatosJudoca.length} confirmações de campeonato pendentes"
+		>
+			{#if temAcaoAtleta}
+				<span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping shrink-0"></span>
+			{/if}
+			<Trophy class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-amber-400 shrink-0" />
+			<span class="truncate max-w-[150px] sm:max-w-[200px]">
+				{nomeJudocaAlvo ? `${nomeJudocaAlvo.split(" ")[0]}: ` : ""}Campeonatos
+			</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {ativo
+					? 'bg-zinc-950 text-red-300'
+					: 'bg-red-600 text-white'}"
+			>
+				{pendenciasCampeonatosJudoca.length}
+			</span>
+		</button>
+	{:else if pendenciasCampeonatosJudoca.length === 1}
+		{@const pend = pendenciasCampeonatosJudoca[0]}
+		{@const ativo = popupAtivo === "judoca_campeonatos" || popupAtivo === `judoca_${pend.id}`}
+		<button
+			type="button"
+			onclick={() => abrirPopup("judoca_campeonatos")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {ativo
+				? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] ring-2 ring-red-300'
+				: pend.dependeDoAluno
+					? 'bg-red-950/80 hover:bg-red-900/90 border border-red-600/80 text-red-200 shadow-[0_0_12px_rgba(220,38,38,0.2)]'
+					: 'bg-zinc-900 hover:bg-zinc-800 border border-amber-700/60 text-amber-200'}"
+			title="Clique para abrir detalhes da confirmação do campeonato"
+		>
+			{#if pend.dependeDoAluno}
+				<span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping shrink-0"></span>
+			{/if}
+			<Trophy class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-amber-400 shrink-0" />
+			<span class="truncate max-w-[150px] sm:max-w-[200px]">
+				{nomeJudocaAlvo ? `${nomeJudocaAlvo.split(" ")[0]}: ` : ""}{pend.badge || "Campeonato"}
+			</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {ativo
+					? 'bg-zinc-950 text-red-300'
+					: 'bg-red-600 text-white'}"
+			>
+				1
+			</span>
+		</button>
+	{/if}
+
+	<!-- 8. Exames de Graduação do Judoca -->
+	{#if pendenciasExamesJudoca.length > 1}
+		{@const ativo = popupAtivo === "judoca_exames"}
+		<button
+			type="button"
+			onclick={() => abrirPopup("judoca_exames")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {ativo
+				? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)] ring-2 ring-purple-300'
+				: 'bg-purple-950/70 hover:bg-purple-900/80 border border-purple-700/70 text-purple-200'}"
+			title="Clique para ver {pendenciasExamesJudoca.length} exames elegíveis"
+		>
+			<Award class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-purple-400 shrink-0" />
+			<span class="truncate max-w-[150px] sm:max-w-[200px]">
+				{nomeJudocaAlvo ? `${nomeJudocaAlvo.split(" ")[0]}: ` : ""}Exames
+			</span>
+			<span
+				class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {ativo
+					? 'bg-zinc-950 text-purple-300'
+					: 'bg-purple-500 text-white'}"
+			>
+				{pendenciasExamesJudoca.length}
+			</span>
+		</button>
+	{:else if pendenciasExamesJudoca.length === 1}
+		{@const pend = pendenciasExamesJudoca[0]}
+		{@const chaveItem: ChaveAlertaPopup = `judoca_${pend.id}`}
+		{@const ativo = popupAtivo === chaveItem || popupAtivo === "judoca_exames"}
+		<button
+			type="button"
+			onclick={() => abrirPopup("judoca_exames")}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {ativo
+				? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)] ring-2 ring-purple-300'
+				: 'bg-purple-950/70 hover:bg-purple-900/80 border border-purple-700/70 text-purple-200'}"
+			title="Clique para abrir detalhes do exame elegível"
+		>
+			<Award class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-purple-400 shrink-0" />
+			<span class="truncate max-w-[150px] sm:max-w-[200px]">
+				{nomeJudocaAlvo ? `${nomeJudocaAlvo.split(" ")[0]}: ` : ""}{pend.badge || pend.titulo}
+			</span>
+			<span class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold bg-purple-500 text-white">
+				1
+			</span>
+		</button>
+	{/if}
+
+	<!-- 9. Outras Pendências Individuais do Judoca -->
+	{#each outrasPendenciasJudoca as pend (pend.id)}
+		{@const chaveItem: ChaveAlertaPopup = `judoca_${pend.id}`}
+		{@const ativo = popupAtivo === chaveItem}
+		<button
+			type="button"
+			onclick={() => abrirPopup(chaveItem)}
+			class="group inline-flex items-center gap-1.5 {compacto
+				? 'px-2 py-0.5 rounded-lg text-[10px]'
+				: 'px-2.5 py-1 rounded-xl text-[11px]'} font-mono font-bold transition-all cursor-pointer active:scale-95 shrink-0 {ativo
+				? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] ring-2 ring-red-300'
+				: pend.dependeDoAluno
+					? 'bg-red-950/80 hover:bg-red-900/90 border border-red-600/80 text-red-200 shadow-[0_0_12px_rgba(220,38,38,0.2)]'
+					: 'bg-zinc-900 hover:bg-zinc-800 border border-amber-700/60 text-amber-200'}"
+			title="Clique para abrir detalhes deste alerta"
+		>
+			{#if pend.dependeDoAluno}
+				<span
+					class="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping shrink-0"
+				></span>
+			{/if}
+			{#if pend.tipo === "sem_turma"}
+				<Calendar class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-sky-400 shrink-0" />
+			{:else if pend.tipo === "peso_categoria"}
+				<Scale class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-amber-400 shrink-0" />
+			{:else}
+				<AlertCircle
+					class="{compacto ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-amber-400 shrink-0"
+				/>
+			{/if}
+			<span class="truncate max-w-[150px] sm:max-w-[200px]">
+				{nomeJudocaAlvo
+					? `${nomeJudocaAlvo.split(" ")[0]}: `
+					: ""}{pend.badge || pend.titulo}
+			</span>
+		</button>
+	{/each}
+{/snippet}
+
 <!-- ========================================================================= -->
-<!-- BARRA COMPACTA DE NOTIFICAÇÕES (ESTILO CENTRAL DE ALERTAS MOBILE)         -->
+<!-- BARRA COMPACTA OU MODO TOPBAR INTEGRADO                                   -->
 <!-- ========================================================================= -->
-<div
-	class="-mt-2 mb-4 py-2 px-3.5 rounded-2xl bg-zinc-950/90 border border-zinc-900/90 backdrop-blur-md flex items-center justify-between gap-3 flex-wrap shadow-md"
-	role="region"
-	aria-label="Barra de notificações e alertas do perfil"
->
+{#if modo === "barra"}
 	<div
-		class="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-zinc-400 shrink-0"
+		class="-mt-2 mb-4 py-2 px-3.5 rounded-2xl bg-zinc-950/90 border border-zinc-900/90 backdrop-blur-md flex items-center justify-between gap-3 flex-wrap shadow-md"
+		role="region"
+		aria-label="Barra de notificações e alertas do perfil"
 	>
 		<div
-			class="w-6 h-6 rounded-lg flex items-center justify-center border {totalAlertasAtivos >
-			0
-				? 'bg-red-950/60 border-red-800/70 text-red-400'
-				: 'bg-emerald-950/50 border-emerald-800/60 text-emerald-400'}"
+			class="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-zinc-400 shrink-0"
 		>
-			{#if totalAlertasAtivos > 0}
-				<BellRing class="w-3.5 h-3.5 animate-pulse" />
-			{:else}
-				<CheckCircle2 class="w-3.5 h-3.5" />
-			{/if}
+			<div
+				class="w-6 h-6 rounded-lg flex items-center justify-center border {totalAlertasAtivos > 0
+					? 'bg-red-950/60 border-red-800/70 text-red-400'
+					: 'bg-emerald-950/50 border-emerald-800/60 text-emerald-400'}"
+			>
+				{#if totalAlertasAtivos > 0}
+					<BellRing class="w-3.5 h-3.5 animate-pulse" />
+				{:else}
+					<CheckCircle2 class="w-3.5 h-3.5" />
+				{/if}
+			</div>
 		</div>
-		<span class="font-bold text-zinc-300 hidden sm:inline"
-			>Notificações:</span
-		>
+
+		{#if totalAlertasAtivos === 0}
+			<div
+				class="flex items-center gap-2 text-[11px] font-mono text-emerald-400/90"
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+				<span>Nenhum alerta pendente — Tudo em dia no tatame</span>
+			</div>
+		{:else}
+			<div class="flex items-center gap-2 flex-wrap flex-1">
+				{@render botoesAlertas(false)}
+			</div>
+		{/if}
 	</div>
+{:else if modo === "mobile"}
+	<!-- MODO MOBILE CONCATENADO (1 ÚNICA NOTIFICAÇÃO QUE EXPANDE AO TOCAR) -->
+	{#if totalAlertasAtivos > 0}
+		<div class="w-full flex flex-col min-w-0" role="region" aria-label="Notificações do tatame">
+			<button
+				type="button"
+				onclick={() => (expandidoMobile = !expandidoMobile)}
+				class="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-300 transition-all cursor-pointer shadow-sm active:scale-[0.99]"
+				aria-expanded={expandidoMobile}
+			>
+				<div class="flex items-center gap-2 min-w-0">
+					<div
+						class="w-5 h-5 rounded-md flex items-center justify-center border bg-red-950/70 border-red-800/80 text-red-400 shrink-0 shadow-sm"
+					>
+						<BellRing class="w-3 h-3 animate-pulse" />
+					</div>
+					<span class="font-bold text-white text-[11px] truncate">
+						{totalAlertasAtivos} {totalAlertasAtivos === 1 ? "Notificação ativa" : "Notificações ativas no tatame"}
+					</span>
+				</div>
+				<div class="flex items-center gap-1 text-[10px] text-amber-400/90 font-bold shrink-0">
+					<span>{expandidoMobile ? "Recolher" : "Ver Todas"}</span>
+					<ChevronDown
+						class="w-3.5 h-3.5 transition-transform duration-200 {expandidoMobile ? 'rotate-180' : ''}"
+					/>
+				</div>
+			</button>
 
-	{#if totalAlertasAtivos === 0}
-		<div
-			class="flex items-center gap-2 text-[11px] font-mono text-emerald-400/90"
-		>
-			<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-			<span>Nenhum alerta pendente — Tudo em dia no tatame</span>
+			{#if expandidoMobile}
+				<div
+					class="mt-2 pt-2 border-t border-zinc-900/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 animate-in fade-in slide-in-from-top-1 duration-150"
+				>
+					{@render botoesAlertas(true)}
+				</div>
+			{/if}
 		</div>
-	{:else}
-		<!-- Ícones / Caixas Pequenas de Notificação Estilo Mobile -->
-		<div class="flex items-center gap-2 flex-wrap flex-1">
-			<!-- 1. Virada de Temporada CBJ/FPJ -->
-			{#if qtdViradaTemporada > 0 && pendenciasTecnicas?.viradaTemporada}
-				<button
-					type="button"
-					onclick={() => abrirPopup("virada_temporada")}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {popupAtivo ===
-					'virada_temporada'
-						? 'bg-amber-500 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-300'
-						: 'bg-amber-950/70 hover:bg-amber-900/80 border border-amber-700/70 text-amber-200'}"
-					title="Clique para abrir detalhes da Virada de Temporada"
-				>
-					<CalendarDays class="w-3.5 h-3.5 shrink-0" />
-					<span
-						>Temporada {pendenciasTecnicas.viradaTemporada
-							.anoVigente}</span
-					>
-					<span
-						class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
-						'virada_temporada'
-							? 'bg-zinc-950 text-amber-400'
-							: 'bg-amber-500 text-zinc-950'}"
-					>
-						{qtdViradaTemporada}
-					</span>
-				</button>
-			{/if}
-
-			<!-- 2. Autorizações de Campeonato Pendentes -->
-			{#if qtdAutorizacoes > 0}
-				<button
-					type="button"
-					onclick={() => abrirPopup("campeonatos_autorizacao")}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {popupAtivo ===
-					'campeonatos_autorizacao'
-						? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)] ring-2 ring-purple-300'
-						: 'bg-purple-950/70 hover:bg-purple-900/80 border border-purple-700/70 text-purple-200'}"
-					title="Clique para ver autorizações de campeonato pendentes"
-				>
-					<Trophy class="w-3.5 h-3.5 shrink-0" />
-					<span>Autorizações</span>
-					<span
-						class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
-						'campeonatos_autorizacao'
-							? 'bg-zinc-950 text-purple-300'
-							: 'bg-purple-500 text-white'}"
-					>
-						{qtdAutorizacoes}
-					</span>
-				</button>
-			{/if}
-
-			<!-- 3. Alunos Sem Peso Cadastrado -->
-			{#if qtdSemPeso > 0}
-				<button
-					type="button"
-					onclick={() => abrirPopup("sem_peso")}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {popupAtivo ===
-					'sem_peso'
-						? 'bg-amber-500 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-300'
-						: 'bg-zinc-900 hover:bg-zinc-800 border border-amber-700/60 text-amber-300'}"
-					title="Clique para ver judocas com pesagem pendente"
-				>
-					<Scale class="w-3.5 h-3.5 shrink-0" />
-					<span>Sem Peso</span>
-					<span
-						class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
-						'sem_peso'
-							? 'bg-zinc-950 text-amber-400'
-							: 'bg-amber-500/20 border border-amber-500/40 text-amber-300'}"
-					>
-						{qtdSemPeso}
-					</span>
-				</button>
-			{/if}
-
-			<!-- 4. Alunos Sem Turma Vinculada -->
-			{#if qtdSemTurma > 0}
-				<button
-					type="button"
-					onclick={() => abrirPopup("sem_turma")}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {popupAtivo ===
-					'sem_turma'
-						? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.45)] ring-2 ring-red-300'
-						: 'bg-red-950/60 hover:bg-red-900/70 border border-red-800/80 text-red-300'}"
-					title="Clique para ver judocas sem turma vinculada"
-				>
-					<Users class="w-3.5 h-3.5 shrink-0" />
-					<span>Sem Turma</span>
-					<span
-						class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
-						'sem_turma'
-							? 'bg-zinc-950 text-red-400'
-							: 'bg-red-600 text-white'}"
-					>
-						{qtdSemTurma}
-					</span>
-				</button>
-			{/if}
-
-			<!-- 5. Alunos com Federação Pendente -->
-			{#if qtdFederacao > 0}
-				<button
-					type="button"
-					onclick={() => abrirPopup("federacao_pendente")}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {popupAtivo ===
-					'federacao_pendente'
-						? 'bg-sky-500 text-zinc-950 shadow-[0_0_15px_rgba(14,165,233,0.4)] ring-2 ring-sky-300'
-						: 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300'}"
-					title="Clique para ver judocas com federação pendente"
-				>
-					<Award class="w-3.5 h-3.5 text-sky-400 shrink-0" />
-					<span>Federação</span>
-					<span
-						class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
-						'federacao_pendente'
-							? 'bg-zinc-950 text-sky-400'
-							: 'bg-zinc-800 border border-zinc-700 text-zinc-300'}"
-					>
-						{qtdFederacao}
-					</span>
-				</button>
-			{/if}
-
-			<!-- 6. Mudanças Recentes de Peso (Últimos 30 dias) -->
-			{#if qtdMudancasPeso > 0}
-				<button
-					type="button"
-					onclick={() => abrirPopup("mudancas_peso")}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {popupAtivo ===
-					'mudancas_peso'
-						? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)] ring-2 ring-emerald-300'
-						: 'bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-800/70 text-emerald-300'}"
-					title="Clique para ver histórico recente de alterações de peso"
-				>
-					<History class="w-3.5 h-3.5 shrink-0" />
-					<span>Mudanças de Peso</span>
-					<span
-						class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold {popupAtivo ===
-						'mudancas_peso'
-							? 'bg-zinc-950 text-emerald-400'
-							: 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'}"
-					>
-						{qtdMudancasPeso}
-					</span>
-				</button>
-			{/if}
-
-			<!-- 7. Alertas Individuais do Atleta / Dependente (PendenciaJudoca[]) -->
-			{#each listaPendenciasJudoca as pend (pend.id)}
-				{@const chaveItem: ChaveAlertaPopup = `judoca_${pend.id}`}
-				{@const ativo = popupAtivo === chaveItem}
-				<button
-					type="button"
-					onclick={() => abrirPopup(chaveItem)}
-					class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer active:scale-95 {ativo
-						? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] ring-2 ring-red-300'
-						: pend.dependeDoAluno
-							? 'bg-red-950/80 hover:bg-red-900/90 border border-red-600/80 text-red-200 shadow-[0_0_12px_rgba(220,38,38,0.2)]'
-							: 'bg-zinc-900 hover:bg-zinc-800 border border-amber-700/60 text-amber-200'}"
-					title="Clique para abrir detalhes deste alerta"
-				>
-					{#if pend.dependeDoAluno}
-						<span
-							class="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping shrink-0"
-						></span>
-					{/if}
-					{#if pend.tipo === "confirmacao_campeonato"}
-						<Trophy class="w-3.5 h-3.5 text-amber-400 shrink-0" />
-					{:else if pend.tipo === "exame_elegivel"}
-						<Award class="w-3.5 h-3.5 text-purple-400 shrink-0" />
-					{:else if pend.tipo === "sem_turma"}
-						<Calendar class="w-3.5 h-3.5 text-sky-400 shrink-0" />
-					{:else if pend.tipo === "peso_categoria"}
-						<Scale class="w-3.5 h-3.5 text-amber-400 shrink-0" />
-					{:else}
-						<AlertCircle
-							class="w-3.5 h-3.5 text-amber-400 shrink-0"
-						/>
-					{/if}
-					<span class="truncate max-w-[180px] sm:max-w-[240px]">
-						{nomeJudocaAlvo
-							? `${nomeJudocaAlvo.split(" ")[0]}: `
-							: ""}{pend.badge || pend.titulo}
-					</span>
-				</button>
-			{/each}
-		</div>
-
-		<span
-			class="text-[10px] font-mono text-zinc-500 hidden xl:inline shrink-0"
-		>
-			Toque em um alerta para expandir
-		</span>
 	{/if}
-</div>
+{:else}
+	<!-- MODO TOPBAR (Integrado diretamente na barra horizontal superior - LINHA ÚNICA, NUNCA EMPILHADO) -->
+	{#if totalAlertasAtivos > 0}
+		<div
+			class="flex items-center gap-1.5 flex-nowrap shrink-0 overflow-x-auto no-scrollbar py-0.5"
+			role="region"
+			aria-label="Notificações ativas do tatame"
+		>
+			<div
+				class="w-5 h-5 rounded-md flex items-center justify-center border bg-red-950/70 border-red-800/80 text-red-400 shrink-0 shadow-sm"
+				title="{totalAlertasAtivos} notificação(ões) ativa(s)"
+			>
+				<BellRing class="w-3 h-3 animate-pulse" />
+			</div>
+
+			{@render botoesAlertas(true)}
+		</div>
+	{/if}
+{/if}
 
 <!-- ========================================================================= -->
 <!-- POPUP / MODAL EXPANDIDO DE DETALHES DO ALERTA                             -->
@@ -500,9 +694,7 @@
 
 				<div class="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
 					<p class="text-xs text-zinc-400">
-						{escopo === "responsavel"
-							? "Inscrições em torneios aguardando confirmação do atleta/família ou aval técnico."
-							: "Atletas pré-inscritos que aguardam aval do Sensei ou confirmação final para competir."}
+						Inscrições em torneios que aguardam autorização do responsável legal, confirmação do atleta ou validação da comissão técnica.
 					</p>
 
 					<div class="space-y-2">
@@ -904,7 +1096,190 @@
 					{/each}
 				</div>
 
-				<!-- 7. POPUP: ALERTA INDIVIDUAL DO JUDOCA / DEPENDENTE -->
+				<!-- 7. POPUP: CAMPEONATOS DO JUDOCA (CONFIRMAÇÕES E AUTORIZAÇÕES) -->
+			{:else if popupAtivo === "judoca_campeonatos" && pendenciasCampeonatosJudoca.length > 0}
+				{@const temAcaoAtleta = pendenciasCampeonatosJudoca.some((p) => p.dependeDoAluno)}
+				<div
+					class="p-5 border-b border-zinc-900 {temAcaoAtleta
+						? 'bg-gradient-to-r from-red-950/60 via-zinc-950 to-zinc-950'
+						: 'bg-gradient-to-r from-purple-950/50 via-zinc-950 to-zinc-950'} flex items-center justify-between gap-3"
+				>
+					<div class="flex items-center gap-3">
+						<div
+							class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {temAcaoAtleta
+								? 'bg-red-950 border border-red-600 text-amber-400'
+								: 'bg-purple-950 border border-purple-700/80 text-purple-300'}"
+						>
+							<Trophy class="w-5 h-5" />
+						</div>
+						<div>
+							<div class="flex items-center gap-2 flex-wrap">
+								{#if temAcaoAtleta}
+									<span
+										class="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase bg-red-600 text-white"
+									>
+										Ação Requerida
+									</span>
+								{/if}
+								<span
+									class="text-[11px] font-mono text-zinc-300 font-bold"
+								>
+									{pendenciasCampeonatosJudoca.length} torneio(s) pendente(s)
+								</span>
+							</div>
+							<h3
+								class="text-sm sm:text-base font-bold text-white font-display mt-0.5"
+							>
+								Confirmações & Autorizações de Campeonatos
+							</h3>
+						</div>
+					</div>
+					<button
+						type="button"
+						onclick={fecharPopup}
+						class="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+						aria-label="Fechar alerta"
+					>
+						<X class="w-4 h-4" />
+					</button>
+				</div>
+
+				<div class="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
+					<p class="text-xs text-zinc-400">
+						{pendenciasCampeonatosJudoca.length === 1
+							? "Você possui uma inscrição em campeonato aguardando ação para garantir a vaga na chave de lutas:"
+							: "Você possui inscrições em campeonatos que aguardam confirmação da sua presença ou autorização familiar:"}
+					</p>
+
+					<div class="space-y-2.5">
+						{#each pendenciasCampeonatosJudoca as pend (pend.id)}
+							<div
+								class="p-4 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800 hover:border-amber-600/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+							>
+								<div class="min-w-0 space-y-1.5 flex-1">
+									<div class="flex items-center gap-2 flex-wrap">
+										<span
+											class="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase {pend.badge === 'Ação do Atleta'
+												? 'bg-amber-500 text-zinc-950'
+												: 'bg-purple-600 text-white'}"
+										>
+											{pend.badge}
+										</span>
+										{#if pend.prazo}
+											<span class="text-[10px] font-mono text-zinc-400">
+												• Data: <strong class="text-zinc-200">{pend.prazo}</strong>
+											</span>
+										{/if}
+									</div>
+									<h4 class="text-sm font-bold text-white">
+										{pend.titulo}
+									</h4>
+									<p class="text-xs text-zinc-400 leading-relaxed">
+										{pend.descricao}
+									</p>
+								</div>
+
+								<a
+									href={pend.href}
+									onclick={fecharPopup}
+									class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer {pend.badge === 'Ação do Atleta'
+										? 'bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-md'
+										: 'bg-purple-600 hover:bg-purple-500 text-white shadow-md'}"
+								>
+									<span>{pend.textoBotao}</span>
+									<ArrowRight class="w-3.5 h-3.5" />
+								</a>
+							</div>
+						{/each}
+					</div>
+				</div>
+
+				<!-- 8. POPUP: EXAMES ELEGÍVEIS DO JUDOCA -->
+			{:else if popupAtivo === "judoca_exames" && pendenciasExamesJudoca.length > 0}
+				<div
+					class="p-5 border-b border-zinc-900 bg-gradient-to-r from-purple-950/60 via-zinc-950 to-zinc-950 flex items-center justify-between gap-3"
+				>
+					<div class="flex items-center gap-3">
+						<div
+							class="w-10 h-10 rounded-xl bg-purple-950 border border-purple-600/80 flex items-center justify-center text-purple-400 shrink-0"
+						>
+							<Award class="w-5 h-5" />
+						</div>
+						<div>
+							<div class="flex items-center gap-2 flex-wrap">
+								<span
+									class="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase bg-purple-600 text-white"
+								>
+									Graduação
+								</span>
+								<span
+									class="text-[11px] font-mono text-purple-300 font-bold"
+								>
+									{pendenciasExamesJudoca.length} exame(s) elegível(is)
+								</span>
+							</div>
+							<h3
+								class="text-sm sm:text-base font-bold text-white font-display mt-0.5"
+							>
+								Exames de Faixa Disponíveis
+							</h3>
+						</div>
+					</div>
+					<button
+						type="button"
+						onclick={fecharPopup}
+						class="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+						aria-label="Fechar alerta"
+					>
+						<X class="w-4 h-4" />
+					</button>
+				</div>
+
+				<div class="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
+					<p class="text-xs text-zinc-400">
+						Você atingiu os critérios de tempo de carência e presença para participar dos seguintes exames de graduação:
+					</p>
+
+					<div class="space-y-2.5">
+						{#each pendenciasExamesJudoca as pend (pend.id)}
+							<div
+								class="p-4 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800 hover:border-purple-600/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+							>
+								<div class="min-w-0 space-y-1.5 flex-1">
+									<div class="flex items-center gap-2 flex-wrap">
+										<span
+											class="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase bg-purple-600 text-white"
+										>
+											{pend.badge}
+										</span>
+										{#if pend.prazo}
+											<span class="text-[10px] font-mono text-zinc-400">
+												• Data: <strong class="text-zinc-200">{pend.prazo}</strong>
+											</span>
+										{/if}
+									</div>
+									<h4 class="text-sm font-bold text-white">
+										{pend.titulo}
+									</h4>
+									<p class="text-xs text-zinc-400 leading-relaxed">
+										{pend.descricao}
+									</p>
+								</div>
+
+								<a
+									href={pend.href}
+									onclick={fecharPopup}
+									class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer bg-purple-600 hover:bg-purple-500 text-white shadow-md"
+								>
+									<span>{pend.textoBotao}</span>
+									<ArrowRight class="w-3.5 h-3.5" />
+								</a>
+							</div>
+						{/each}
+					</div>
+				</div>
+
+				<!-- 9. POPUP: ALERTA INDIVIDUAL DO JUDOCA / DEPENDENTE -->
 			{:else if pendenciaJudocaSelecionada}
 				{@const pend = pendenciaJudocaSelecionada}
 				<div

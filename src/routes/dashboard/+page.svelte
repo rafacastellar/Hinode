@@ -17,7 +17,6 @@
 	import PainelProfessor from "#lib/components/dashboard/PainelProfessor.svelte";
 	import PainelResponsavel from "#lib/components/dashboard/PainelResponsavel.svelte";
 	import CardAniversariantes from "#lib/components/dashboard/CardAniversariantes.svelte";
-	import BarraAlertasNotificacao from "#lib/components/dashboard/BarraAlertasNotificacao.svelte";
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
 </script>
@@ -64,29 +63,10 @@
 		/>
 	{:else}
 		<div class="space-y-8">
-			<!-- BARRA DE ALERTAS COMPACTA (ESTILO MOBILE) LOGO ABAIXO DA TOPBAR -->
-			{#if data.pendenciasTecnicas}
-				<BarraAlertasNotificacao
-					pendenciasTecnicas={data.pendenciasTecnicas}
-					escopo="geral"
-				/>
-			{/if}
-
 			<!-- ========================================================================= -->
 			<!-- 1. GRID DE MÉTRICAS OPERACIONAIS DO DOJO -->
 			<!-- ========================================================================= -->
 			<section>
-				<div class="flex items-center justify-between mb-4">
-					<h2
-						class="text-xs font-mono uppercase tracking-wider text-zinc-400"
-					>
-						Métricas Consolidadas da Academia
-					</h2>
-					<span class="text-[11px] text-zinc-500 font-mono"
-						>Filtro Tenant Ativo</span
-					>
-				</div>
-
 				<div
 					class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
 				>

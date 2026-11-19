@@ -3,7 +3,6 @@
 	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
 	import PassaporteJudoca from "#lib/components/ui/PassaporteJudoca.svelte";
 	import CalendarioTatameMensal from "#lib/components/ui/CalendarioTatameMensal.svelte";
-	import BarraAlertasNotificacao from "./BarraAlertasNotificacao.svelte";
 	import {
 		Award,
 		Trophy,
@@ -456,16 +455,6 @@
 </script>
 
 <div class="space-y-8 animate-in fade-in duration-300">
-	<!-- ========================================================================= -->
-	<!-- 0. BARRA DE ALERTAS COMPACTA (ESTILO NOTIFICAÇÕES MOBILE)                 -->
-	<!-- ========================================================================= -->
-	{#if mostrarAlertas}
-		<BarraAlertasNotificacao
-			pendenciasJudoca={painel.pendencias}
-			escopo="aluno"
-		/>
-	{/if}
-
 	<!-- ========================================================================= -->
 	<!-- 1. PASSAPORTE DIGITAL DO JUDOCA & TERMÔMETRO DE CARÊNCIA DE FAIXA         -->
 	<!-- ========================================================================= -->

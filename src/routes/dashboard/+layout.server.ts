@@ -1,6 +1,12 @@
 import type { LayoutServerLoad } from './$types';
 import { calcularPermissoes, obterMenuAutorizado, normalizarNomePapel } from '#lib/server/auth/rbac';
-import { contarPendenciasAcaoAluno } from '#lib/server/repositorios/dashboard.repo';
+import {
+	contarPendenciasAcaoAluno,
+	obterPendenciasTecnicasDojo,
+	obterPainelJudoca,
+	type PendenciasTecnicasDojo,
+	type PendenciaJudoca
+} from '#lib/server/repositorios/dashboard.repo';
 import { contarAlunosDoResponsavel } from '#lib/server/repositorios/responsavel.repo';
 import { buscarPerfilCompletoParaUsuario } from '#lib/server/repositorios/usuario.repo';
 
@@ -84,6 +90,65 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		return item;
 	});
 
+	// Carregamento de notificações para a barra superior conforme os papéis autorizados
+	const perfisNorm = perfis.map((p) => normalizarNomePapel(p));
+	const ehAdmin = perfisNorm.includes('admin');
+	const ehProfessor = perfisNorm.includes('professor');
+	const ehRecepcao = perfisNorm.includes('recepcao');
+	const ehGestor = ehAdmin || ehRecepcao;
+	const ehResponsavel = perfisNorm.includes('responsavel') || totalDependentes > 0;
+
+	let pendenciasTecnicas: PendenciasTecnicasDojo | null = null;
+	if (idAcademia && ehGestor) {
+		try {
+			pendenciasTecnicas = await obterPendenciasTecnicasDojo(idAcademia);
+		} catch (e) {
+			console.error('Erro ao carregar pendências técnicas do dojo para topbar:', e);
+		}
+	} else if (idAcademia && ehProfessor && idUsuario) {
+		try {
+			pendenciasTecnicas = await obterPendenciasTecnicasDojo(idAcademia, idUsuario);
+			// Se o professor também for responsável por dependentes, mesclar pendências de seus tutelados
+			if (ehResponsavel) {
+				const pendResp = await obterPendenciasTecnicasDojo(idAcademia, undefined, idUsuario);
+				if (pendResp && pendenciasTecnicas) {
+					const idsCamp = new Set(pendenciasTecnicas.campeonatosPendentesAutorizacao.map((c) => c.id_inscricao));
+					for (const c of pendResp.campeonatosPendentesAutorizacao) {
+						if (!idsCamp.has(c.id_inscricao)) pendenciasTecnicas.campeonatosPendentesAutorizacao.push(c);
+					}
+					const idsSemPeso = new Set(pendenciasTecnicas.alunosSemPeso.map((a) => a.id_usuario));
+					for (const a of pendResp.alunosSemPeso) {
+						if (!idsSemPeso.has(a.id_usuario)) pendenciasTecnicas.alunosSemPeso.push(a);
+					}
+					const idsSemTurma = new Set(pendenciasTecnicas.alunosSemTurma.map((a) => a.id_usuario));
+					for (const a of pendResp.alunosSemTurma) {
+						if (!idsSemTurma.has(a.id_usuario)) pendenciasTecnicas.alunosSemTurma.push(a);
+					}
+				}
+			}
+		} catch (e) {
+			console.error('Erro ao carregar pendências técnicas do professor para topbar:', e);
+		}
+	} else if (idAcademia && ehResponsavel && idUsuario) {
+		try {
+			pendenciasTecnicas = await obterPendenciasTecnicasDojo(idAcademia, undefined, idUsuario);
+		} catch (e) {
+			console.error('Erro ao carregar pendências do responsável para topbar:', e);
+		}
+	}
+
+	let pendenciasJudoca: PendenciaJudoca[] = [];
+	if (idAcademia && idUsuario && ehAluno) {
+		try {
+			const painelAluno = await obterPainelJudoca(idAcademia, idUsuario);
+			if (painelAluno) {
+				pendenciasJudoca = painelAluno.pendencias || [];
+			}
+		} catch (e) {
+			console.error('Erro ao carregar pendências do judoca para topbar:', e);
+		}
+	}
+
 	return {
 		usuario: locals.usuario,
 		idAcademia,
@@ -94,6 +159,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		itensMenu,
 		totalAcoesPendentes,
 		totalDependentes,
-		resumoCredenciais
+		resumoCredenciais,
+		pendenciasTecnicas,
+		pendenciasJudoca
 	};
 };

@@ -3,7 +3,6 @@
 	import StatCard from "#lib/components/ui/StatCard.svelte";
 	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
 	import CardAniversariantes from "./CardAniversariantes.svelte";
-	import BarraAlertasNotificacao from "./BarraAlertasNotificacao.svelte";
 	import {
 		Award,
 		Users,
@@ -37,14 +36,6 @@
 </script>
 
 <div class="space-y-8 animate-in fade-in duration-300">
-	<!-- ========================================================================= -->
-	<!-- BARRA DE ALERTAS COMPACTA (ESTILO MOBILE) LOGO ABAIXO DA TOPBAR           -->
-	<!-- ========================================================================= -->
-	<BarraAlertasNotificacao
-		pendenciasTecnicas={painel.pendenciasTecnicas}
-		escopo="tutela"
-	/>
-
 	<!-- ========================================================================= -->
 	<!-- 0. DESTAQUE DE GRADUAÇÃO & CREDENCIAL TÉCNICA DO SENSEI NO TATAME         -->
 	<!-- ========================================================================= -->

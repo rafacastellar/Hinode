@@ -3,6 +3,7 @@
 	import BadgePerfil from "#lib/components/ui/BadgePerfil.svelte";
 	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
 	import ToastContainer from "#lib/components/ui/ToastContainer.svelte";
+	import BarraAlertasNotificacao from "#lib/components/dashboard/BarraAlertasNotificacao.svelte";
 	import hinodeEmblema from "#lib/assets/hinode-emblema.svg";
 	import {
 		LayoutDashboard,
@@ -231,6 +232,19 @@
 
 	const abaPerfilAtiva = $derived(
 		page.url.searchParams.get("aba") || "dados",
+	);
+
+	const temAlertasAtivos = $derived(
+		Boolean(
+			(data.pendenciasTecnicas?.viradaTemporada?.totalDesatualizados || 0) +
+				(data.pendenciasTecnicas?.campeonatosPendentesAutorizacao?.length || 0) +
+				(data.pendenciasTecnicas?.alunosSemPeso?.length || 0) +
+				(data.pendenciasTecnicas?.alunosSemTurma?.length || 0) +
+				(data.pendenciasTecnicas?.alunosFederacaoPendente?.length || 0) +
+				(data.pendenciasTecnicas?.mudancasRecentesPeso?.length || 0) +
+				(data.pendenciasJudoca?.length || 0) >
+				0,
+		),
 	);
 
 	// Sub-menus dinâmicos do item "Graduações & Faixas" na Sidebar Lateral (Gestão)
@@ -976,6 +990,18 @@
 		</div>
 	</header>
 
+	{#if temAlertasAtivos}
+		<div
+			class="lg:hidden border-b border-zinc-900 bg-zinc-950/95 px-3 py-2"
+		>
+			<BarraAlertasNotificacao
+				pendenciasTecnicas={data.pendenciasTecnicas}
+				pendenciasJudoca={data.pendenciasJudoca}
+				modo="mobile"
+			/>
+		</div>
+	{/if}
+
 	<!-- Drawer Mobile (Aberto quando menuAberto = true) -->
 	{#if menuAberto}
 		<div class="lg:hidden fixed inset-0 z-50 flex">
@@ -1378,18 +1404,20 @@
 	<!-- CONTEÚDO PRINCIPAL (Slot das rotas filhas) -->
 	<!-- ========================================================================= -->
 	<main class="flex-1 min-w-0 bg-black flex flex-col">
-		<!-- Topbar Desktop Minimalista com Identidade, Faixa em Destaque & Controle de Visualização -->
-		<div
-			class="hidden lg:flex min-h-20 lg:h-24 border-b border-zinc-900/80 bg-zinc-950/40 backdrop-blur-md px-6 sm:px-8 items-center justify-between gap-4 sticky top-0 z-30"
+		<!-- Topbar Desktop Minimalista com Identidade, Faixa em Destaque & Notificações Integradas -->
+		<header
+			class="hidden lg:flex flex-col border-b border-zinc-900/80 bg-zinc-950/60 backdrop-blur-md px-6 sm:px-8 py-3.5 sticky top-0 z-30 shadow-sm gap-2"
 		>
-			<!-- Lado Esquerdo: Destaque da Academia + Rota Acessada + Sensei -->
-			<div class="flex items-center gap-4 min-w-0 flex-1">
-				<!-- Destaque Especial da Academia na Topbar Superior -->
+			<!-- Linha Superior Principal: Identidade e Dados do Dojo (Esquerda) + Perfil e Ações (Direita) -->
+			<div
+				class="flex items-center justify-between gap-4 min-w-0"
+			>
+				<!-- Lado Esquerdo: Destaque da Academia + Rota Acessada + Sensei -->
 				<div class="flex items-center gap-4 min-w-0">
 					<!-- Logo Ampliado da Academia na barra superior -->
 					<a
 						href="/dashboard"
-						class="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_18px_rgba(220,38,38,0.22)] hover:border-red-600/60 transition-all group"
+						class="w-13 h-13 rounded-2xl bg-zinc-900 border border-zinc-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_18px_rgba(220,38,38,0.22)] hover:border-red-600/60 transition-all group"
 						title={data.nomeAcademia || "Academia"}
 					>
 						{#if data.logoAcademia}
@@ -1408,8 +1436,8 @@
 						{/if}
 					</a>
 
-					<!-- Breadcrumb, Rota Atual & Sensei -->
-					<div class="flex flex-col min-w-0">
+					<!-- Breadcrumb & Sensei (Alinhado verticalmente ao lado do logo) -->
+					<div class="flex flex-col min-w-0 justify-center">
 						<div
 							class="flex items-center gap-2 text-xs text-zinc-400 font-mono flex-wrap"
 						>
@@ -1425,26 +1453,12 @@
 							>
 								{configContextoRota.titulo}
 							</span>
-
-							{#if data.totalAcoesPendentes && data.totalAcoesPendentes > 0}
-								<span class="text-zinc-600">•</span>
-								<span
-									class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-red-600/20 border border-red-500/60 text-red-300 flex items-center gap-1.5 animate-pulse"
-								>
-									<span
-										class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"
-									></span>
-									<span
-										>{data.totalAcoesPendentes} Pendente</span
-									>
-								</span>
-							{/if}
 						</div>
 
 						<!-- Subtítulo enxuto sem quebrar a barra -->
 						{#if senseiDoUsuario || (data.totalDependentes && data.totalDependentes > 0)}
 							<div
-								class="flex items-center gap-2 text-[10px] font-mono text-zinc-400 tracking-wider uppercase mt-0.5 truncate"
+								class="flex items-center gap-2 text-[10px] font-mono text-zinc-400 tracking-wider uppercase mt-1 truncate"
 							>
 								{#if senseiDoUsuario}
 									<span
@@ -1468,87 +1482,100 @@
 						{/if}
 					</div>
 				</div>
-			</div>
 
-			<!-- Painel do Usuário Logado, Faixa Unificada em Destaque & Controle de Visualização (Topo Direito) -->
-			<div class="flex items-center gap-3.5 sm:gap-4 shrink-0">
-				<!-- Destaque da Faixa Oficial do Judoca / Sensei (Mantida em todos os perfis) -->
-				{#if faixaUnificadaUsuario}
-					<a
-						href="/dashboard/perfil"
-						class="flex items-center p-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800/90 hover:border-amber-500/40 transition-all shadow-sm"
-						title="Graduação oficial no tatame ({faixaUnificadaUsuario})"
-					>
-						<BadgeFaixa faixa={faixaUnificadaUsuario} size="md" />
-					</a>
-
-					<div class="w-px h-8 bg-zinc-800/80"></div>
-				{/if}
-
-				<!-- Identificação do Usuário (Avatar + Nome + Email + Botões de Controle de Visualização) -->
-				<div class="flex items-center gap-3">
-					<a
-						href="/dashboard/perfil"
-						class="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 flex items-center justify-center text-xs font-bold font-mono text-zinc-200 transition-colors shrink-0 shadow-sm"
-						title="Acessar meu perfil ({data.usuario?.email})"
-					>
-						{data.usuario?.nome.charAt(0).toUpperCase()}
-					</a>
-
-					<div class="text-left min-w-0">
-						<div class="flex items-center gap-1.5 flex-wrap">
-							<a
-								href="/dashboard/perfil"
-								class="text-xs font-bold text-white hover:text-red-400 transition-colors leading-tight truncate max-w-[150px] sm:max-w-[200px]"
-							>
-								{data.usuario?.nome}
-							</a>
-							<span
-								class="text-[10px] text-zinc-500 font-mono hidden xl:inline truncate max-w-[180px]"
-							>
-								({data.usuario?.email})
-							</span>
-						</div>
-
-						<!-- Botões de Controle de Visualização do Painel por Perfil -->
-						<div
-							class="flex items-center gap-1.5 mt-1 flex-wrap"
-							role="group"
-							aria-label="Alternar visualização do painel por perfil"
+				<!-- Painel do Usuário Logado, Faixa Unificada em Destaque & Controle de Visualização (Topo Direito) -->
+				<div class="flex items-center gap-3.5 sm:gap-4 shrink-0">
+					<!-- Destaque da Faixa Oficial do Judoca / Sensei (Mantida em todos os perfis) -->
+					{#if faixaUnificadaUsuario}
+						<a
+							href="/dashboard/perfil"
+							class="flex items-center p-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800/90 hover:border-amber-500/40 transition-all shadow-sm"
+							title="Graduação oficial no tatame ({faixaUnificadaUsuario})"
 						>
-							{#each data.perfis as perfil}
-								{@const chavePerfil = normalizarPapel(perfil)}
-								<BadgePerfil
-									{perfil}
-									tamanho="sm"
-									href="/dashboard?visao={chavePerfil}"
-									ativo={page.url.pathname === "/dashboard" &&
-										visaoAtivaAtual === chavePerfil}
-								/>
-							{/each}
+							<BadgeFaixa faixa={faixaUnificadaUsuario} size="md" />
+						</a>
+
+						<div class="w-px h-8 bg-zinc-800/80"></div>
+					{/if}
+
+					<!-- Identificação do Usuário (Avatar + Nome + Email + Botões de Controle de Visualização) -->
+					<div class="flex items-center gap-3">
+						<a
+							href="/dashboard/perfil"
+							class="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 flex items-center justify-center text-xs font-bold font-mono text-zinc-200 transition-colors shrink-0 shadow-sm"
+							title="Acessar meu perfil ({data.usuario?.email})"
+						>
+							{data.usuario?.nome.charAt(0).toUpperCase()}
+						</a>
+
+						<div class="text-left min-w-0">
+							<div class="flex items-center gap-1.5 flex-wrap">
+								<a
+									href="/dashboard/perfil"
+									class="text-xs font-bold text-white hover:text-red-400 transition-colors leading-tight truncate max-w-[150px] sm:max-w-[200px]"
+								>
+									{data.usuario?.nome}
+								</a>
+								<span
+									class="text-[10px] text-zinc-500 font-mono hidden xl:inline truncate max-w-[180px]"
+								>
+									({data.usuario?.email})
+								</span>
+							</div>
+
+							<!-- Botões de Controle de Visualização do Painel por Perfil -->
+							<div
+								class="flex items-center gap-1.5 mt-1 flex-wrap"
+								role="group"
+								aria-label="Alternar visualização do painel por perfil"
+							>
+								{#each data.perfis as perfil}
+									{@const chavePerfil = normalizarPapel(perfil)}
+									<BadgePerfil
+										{perfil}
+										tamanho="sm"
+										href="/dashboard?visao={chavePerfil}"
+										ativo={page.url.pathname === "/dashboard" &&
+											visaoAtivaAtual === chavePerfil}
+									/>
+								{/each}
+							</div>
 						</div>
 					</div>
-				</div>
 
-				<div class="w-px h-8 bg-zinc-800/80 hidden sm:block"></div>
+					<div class="w-px h-8 bg-zinc-800/80 hidden sm:block"></div>
 
-				<!-- Botão Encerrar Sessão -->
-				<form action="/logout" method="POST" class="shrink-0">
-					<button
-						type="submit"
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-red-950/40 border border-zinc-800 hover:border-red-900/60 text-xs font-medium text-zinc-400 hover:text-red-300 transition-all cursor-pointer shadow-sm active:scale-95"
-						title="Encerrar Sessão"
-					>
-						<LogOut
-							class="w-3.5 h-3.5 text-zinc-500 hover:text-red-400"
-						/>
-						<span class="hidden sm:inline font-medium"
-							>Encerrar Sessão</span
+					<!-- Botão Encerrar Sessão -->
+					<form action="/logout" method="POST" class="shrink-0">
+						<button
+							type="submit"
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-red-950/40 border border-zinc-800 hover:border-red-900/60 text-xs font-medium text-zinc-400 hover:text-red-300 transition-all cursor-pointer shadow-sm active:scale-95"
+							title="Encerrar Sessão"
 						>
-					</button>
-				</form>
+							<LogOut
+								class="w-3.5 h-3.5 text-zinc-500 hover:text-red-400"
+							/>
+							<span class="hidden sm:inline font-medium"
+								>Encerrar Sessão</span
+							>
+						</button>
+					</form>
+				</div>
 			</div>
-		</div>
+
+			<!-- Linha Integrada de Notificações do Usuário (Carregadas no login, presentes em qualquer visão do painel) -->
+			{#if temAlertasAtivos}
+				<div
+					class="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0 pt-0.5"
+				>
+					<BarraAlertasNotificacao
+						pendenciasTecnicas={data.pendenciasTecnicas}
+						pendenciasJudoca={data.pendenciasJudoca}
+						modo="topbar"
+					/>
+				</div>
+			{/if}
+		</header>
 
 		<!-- Conteúdo Específico da Rota -->
 		<div class="flex-1 p-6 sm:p-8 lg:p-10 max-w-7xl w-full mx-auto">

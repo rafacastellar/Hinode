@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PainelResponsavelDados } from "#lib/server/repositorios/dashboard.repo";
 	import BadgeFaixa from "#lib/components/ui/BadgeFaixa.svelte";
-	import BarraAlertasNotificacao from "./BarraAlertasNotificacao.svelte";
 	import PainelJudoca from "./PainelJudoca.svelte";
 	import {
 		Users,
@@ -36,24 +35,6 @@
 </script>
 
 <div class="space-y-8 animate-in fade-in duration-300">
-	<!-- ========================================================================= -->
-	<!-- 0. BARRA DE ALERTAS COMPACTA (ESTILO NOTIFICAÇÕES MOBILE)                 -->
-	<!-- ========================================================================= -->
-	<BarraAlertasNotificacao
-		pendenciasTecnicas={painel.pendenciasTecnicas}
-		pendenciasJudoca={pendenciasAtivas}
-		nomeJudocaAlvo={dependenteAtivo?.aluno.nome}
-		escopo="responsavel"
-		onSelecionarAluno={(idAluno) => {
-			const idx = painel.dependentes.findIndex(
-				(d) => d.aluno.id_usuario === idAluno,
-			);
-			if (idx !== -1) {
-				indiceSelecionado = idx;
-			}
-		}}
-	/>
-
 	<!-- ========================================================================= -->
 	<!-- 1. KPIs RÁPIDOS DA FAMÍLIA / TUTELA                                       -->
 	<!-- ========================================================================= -->
